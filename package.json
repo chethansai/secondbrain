@@ -1,0 +1,29 @@
+{
+  "name": "rnnotetaking",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start --lan",
+    "android": "expo start --lan --android",
+    "ios": "expo start --lan --ios",
+    "web": "expo start --web",
+    "deploy:rules": "firebase deploy --only firestore:rules --project notes-55c97 --config firebase.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "^6.1.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "^54.0.34",
+    "expo-secure-store": "~15.0.8",
+    "firebase": "^12.12.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-native": "^0.81.5",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2"
+  }
+}

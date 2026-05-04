@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Native Note Taking",
+    "slug": "notes",
+    "scheme": "nativenotes",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.notes.native"
+    },
+    "android": {
+      "package": "com.notes.native"
+    },
+    "plugins": [
+      "expo-secure-store"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c0a094a3-1559-40fc-b92d-12a1081e5168"
+      }
+    },
+    "owner": "chethansai"
+  }
+}
