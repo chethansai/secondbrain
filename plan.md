@@ -1,9 +1,12 @@
 ## NON-NEGOTIABLE MUST DO
-AFTER IMPLEMENTING EACH STEP PERFORM
-git status
-git add .
-git commit -m <with proper message>
-git push -u origin main
+After each Copilot chat implementation step, these Git commands must be run and completed for sure:
+
+1. `git status`
+2. `git add .`
+3. `git commit -m "<proper message>"`
+4. `git push -u origin main`
+
+This post-step Git workflow is mandatory and must not be skipped after any implemented change.
 
 ## Plan: Exhaustive React Native Firebase Notes
 
