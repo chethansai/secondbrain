@@ -1,5 +1,5 @@
 import { CategoryPath, FlatNote, MutationResult, NotesData } from '../../shared/types/notes';
-import { cloneData, getCategoryItems, isCategoryNode } from '../categories/categoryTree';
+import { cloneData, getCategoryItems, isCategoryNode, syncStandaloneCategory } from '../categories/categoryTree';
 
 export function addNote(data: NotesData, path: CategoryPath, text: string): MutationResult {
   const cleanText = normalizeNoteText(text);
@@ -8,6 +8,7 @@ export function addNote(data: NotesData, path: CategoryPath, text: string): Muta
   const items = getCategoryItems(next, path);
   if (!items) return failure('path_not_found', 'The selected category no longer exists.');
   items.push(cleanText);
+  syncStandaloneCategory(next, path);
   return { ok: true, data: next };
 }
 
@@ -20,6 +21,7 @@ export function editNote(data: NotesData, path: CategoryPath, oldText: string, n
   const index = findNoteIndex(items, oldText, selectedIndex);
   if (index === -1) return failure('not_found', 'The note could not be found.');
   items[index] = cleanText;
+  syncStandaloneCategory(next, path);
   return { ok: true, data: next };
 }
 
@@ -30,6 +32,7 @@ export function deleteNote(data: NotesData, path: CategoryPath, text: string, se
   const index = findNoteIndex(items, text, selectedIndex);
   if (index === -1) return failure('not_found', 'The note could not be found.');
   items.splice(index, 1);
+  syncStandaloneCategory(next, path);
   return { ok: true, data: next };
 }
 
@@ -42,6 +45,8 @@ export function moveNote(data: NotesData, sourcePath: CategoryPath, destinationP
   if (index === -1) return failure('not_found', 'The note could not be found.');
   const [note] = source.splice(index, 1);
   destination.push(note);
+  syncStandaloneCategory(next, sourcePath);
+  syncStandaloneCategory(next, destinationPath);
   return { ok: true, data: next };
 }
 
@@ -53,6 +58,7 @@ export function copyNote(data: NotesData, sourcePath: CategoryPath, destinationP
   const index = findNoteIndex(source, text, selectedIndex);
   if (index === -1) return failure('not_found', 'The note could not be found.');
   destination.push(source[index]);
+  syncStandaloneCategory(next, destinationPath);
   return { ok: true, data: next };
 }
 
@@ -79,6 +85,7 @@ export function setNotePriority(data: NotesData, path: CategoryPath, text: strin
     items[entry.itemIndex] = nextNoteOrder[entryIndex].item;
   });
 
+  syncStandaloneCategory(next, path);
   return { ok: true, data: next };
 }
 

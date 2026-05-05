@@ -1,6 +1,8 @@
 ## NON-NEGOTIABLE MUST DO
 After each Copilot chat implementation step, these Git commands must be run and completed for sure:
 
+Before running the Git commands, update the `## history` section with a dated summary of the completed chat step and any redirection/decision that happened during the step.
+
 1. `git status`
 2. `git add .`
 3. `git commit -m "<proper message>"`
@@ -359,6 +361,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-05: Updated the mandatory post-step workflow. Decision: after every Copilot chat implementation step and any redirection, `plan.md` history must be updated before running the required git status/add/commit/push sequence.
 - 2026-05-05: Fixed workspace metadata behavior. Decision: `workspaceslist` stores selected root categories when root categories are created, renamed, deleted, or toggled; notes remain in the single `reactnativecollection/main` document, so creating/selecting/renaming workspaces no longer creates per-workspace note documents.
 - 2026-05-05: Started Android Intent/deep-link automation. Decision: LlamaLab Automate should launch the installed app with `ACTION_VIEW` and a `nativenotes://add-note?...` data URI; the app queues the command while locked and saves to `SEEK` after unlock/load.
 

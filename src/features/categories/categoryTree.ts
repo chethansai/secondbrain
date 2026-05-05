@@ -4,6 +4,10 @@ export function cloneData(data: NotesData): NotesData {
   return JSON.parse(JSON.stringify(data)) as NotesData;
 }
 
+export function cloneItems(items: NoteItem[]): NoteItem[] {
+  return JSON.parse(JSON.stringify(items)) as NoteItem[];
+}
+
 export function normalizeName(name: string): string {
   return name.trim();
 }
@@ -44,7 +48,8 @@ export function createRootCategory(data: NotesData, name: string): MutationResul
   if (!cleanName) return failure('empty_name', 'Category name cannot be empty.');
   if (Object.prototype.hasOwnProperty.call(data, cleanName)) return failure('duplicate_category', 'A category with this name already exists.');
   const next = cloneData(data);
-  next[cleanName] = [];
+  const nestedItems = findNestedCategoryItems(next, cleanName);
+  next[cleanName] = nestedItems ? cloneItems(nestedItems) : [];
   return { ok: true, data: next };
 }
 
@@ -57,7 +62,9 @@ export function createSubcategory(data: NotesData, parentPath: CategoryPath, nam
   if (parent.some((item) => isCategoryNode(item) && Object.prototype.hasOwnProperty.call(item, cleanName))) {
     return failure('duplicate_category', 'A subcategory with this name already exists here.');
   }
-  parent.push({ [cleanName]: [] });
+  const standaloneItems = next[cleanName] ? cloneItems(next[cleanName]) : [];
+  parent.push({ [cleanName]: cloneItems(standaloneItems) });
+  next[cleanName] = standaloneItems;
   return { ok: true, data: next };
 }
 
@@ -73,6 +80,7 @@ export function renameCategory(data: NotesData, path: CategoryPath, newName: str
     if (Object.prototype.hasOwnProperty.call(next, cleanName)) return failure('duplicate_category', 'A root category with this name already exists.');
     next[cleanName] = next[oldName];
     delete next[oldName];
+    renameNestedCategoriesNamed(next, oldName, cleanName, next[cleanName]);
     return { ok: true, data: next };
   }
 
@@ -81,11 +89,20 @@ export function renameCategory(data: NotesData, path: CategoryPath, newName: str
   if (parent.some((item) => isCategoryNode(item) && Object.prototype.hasOwnProperty.call(item, cleanName))) {
     return failure('duplicate_category', 'A sibling category with this name already exists.');
   }
+  if (Object.prototype.hasOwnProperty.call(next, cleanName) && Object.prototype.hasOwnProperty.call(next, oldName)) {
+    return failure('duplicate_category', 'A root category with this name already exists.');
+  }
   const node = parent.find((item) => isCategoryNode(item) && Object.prototype.hasOwnProperty.call(item, oldName));
   if (!node || typeof node === 'string') return failure('path_not_found', 'The selected category no longer exists.');
   const items = node[oldName];
   delete node[oldName];
   node[cleanName] = items;
+  if (Object.prototype.hasOwnProperty.call(next, oldName)) {
+    next[cleanName] = next[oldName];
+    delete next[oldName];
+  } else {
+    next[cleanName] = cloneItems(items);
+  }
   return { ok: true, data: next };
 }
 
@@ -96,6 +113,7 @@ export function deleteCategory(data: NotesData, path: CategoryPath): MutationRes
   if (path.length === 1) {
     if (!Object.prototype.hasOwnProperty.call(next, name)) return failure('path_not_found', 'The selected category no longer exists.');
     delete next[name];
+    deleteNestedCategoriesNamed(next, name);
     return { ok: true, data: next };
   }
 
@@ -104,7 +122,23 @@ export function deleteCategory(data: NotesData, path: CategoryPath): MutationRes
   const index = parent.findIndex((item) => isCategoryNode(item) && Object.prototype.hasOwnProperty.call(item, name));
   if (index === -1) return failure('path_not_found', 'The selected category no longer exists.');
   parent.splice(index, 1);
+  if (!hasNestedCategoryNamed(next, name)) delete next[name];
   return { ok: true, data: next };
+}
+
+export function syncStandaloneCategory(data: NotesData, path: CategoryPath): NotesData {
+  const name = path[path.length - 1];
+  if (!name) return data;
+  const sourceItems = getCategoryItems(data, path);
+  if (!sourceItems) return data;
+
+  if (path.length > 1) {
+    data[name] = cloneItems(sourceItems);
+    return data;
+  }
+
+  replaceNestedCategoriesNamed(data, name, sourceItems);
+  return data;
 }
 
 export function countCategoryContents(data: NotesData, path: CategoryPath): { notes: number; categories: number } {
@@ -148,6 +182,87 @@ function countItems(items: NoteItem[]): { notes: number; categories: number } {
     },
     { notes: 0, categories: 0 },
   );
+}
+
+function hasNestedCategoryNamed(data: NotesData, name: string) {
+  return Object.values(data).some((items) => containsCategoryNamed(items, name));
+}
+
+function findNestedCategoryItems(data: NotesData, name: string) {
+  for (const items of Object.values(data)) {
+    const found = findItemsNamed(items, name);
+    if (found) return found;
+  }
+  return null;
+}
+
+function findItemsNamed(items: NoteItem[], name: string): NoteItem[] | null {
+  for (const item of items) {
+    if (!isCategoryNode(item)) continue;
+    const [childName, childItems] = Object.entries(item)[0];
+    if (childName === name) return childItems;
+    const found = findItemsNamed(childItems, name);
+    if (found) return found;
+  }
+  return null;
+}
+
+function containsCategoryNamed(items: NoteItem[], name: string): boolean {
+  return items.some((item) => {
+    if (!isCategoryNode(item)) return false;
+    const [childName, childItems] = Object.entries(item)[0];
+    return childName === name || containsCategoryNamed(childItems, name);
+  });
+}
+
+function replaceNestedCategoriesNamed(data: NotesData, name: string, sourceItems: NoteItem[]) {
+  Object.values(data).forEach((items) => replaceItemsNamed(items, name, sourceItems));
+}
+
+function replaceItemsNamed(items: NoteItem[], name: string, sourceItems: NoteItem[]) {
+  items.forEach((item) => {
+    if (!isCategoryNode(item)) return;
+    const [childName, childItems] = Object.entries(item)[0];
+    if (childName === name) {
+      item[childName] = cloneItems(sourceItems);
+      return;
+    }
+    replaceItemsNamed(childItems, name, sourceItems);
+  });
+}
+
+function renameNestedCategoriesNamed(data: NotesData, oldName: string, newName: string, sourceItems: NoteItem[]) {
+  Object.values(data).forEach((items) => renameItemsNamed(items, oldName, newName, sourceItems));
+}
+
+function renameItemsNamed(items: NoteItem[], oldName: string, newName: string, sourceItems: NoteItem[]) {
+  items.forEach((item) => {
+    if (!isCategoryNode(item)) return;
+    const [childName, childItems] = Object.entries(item)[0];
+    if (childName === oldName) {
+      delete item[oldName];
+      item[newName] = cloneItems(sourceItems);
+      return;
+    }
+    renameItemsNamed(childItems, oldName, newName, sourceItems);
+  });
+}
+
+function deleteNestedCategoriesNamed(data: NotesData, name: string) {
+  Object.values(data).forEach((items) => deleteItemsNamed(items, name));
+}
+
+function deleteItemsNamed(items: NoteItem[], name: string) {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (!isCategoryNode(item)) continue;
+    const [childName, childItems] = Object.entries(item)[0];
+    if (childName === name) {
+      items.splice(index, 1);
+      continue;
+    }
+    deleteItemsNamed(childItems, name);
+  }
 }
 
 function failure(code: string, message: string): MutationResult {

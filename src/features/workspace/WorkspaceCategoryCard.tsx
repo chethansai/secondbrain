@@ -126,12 +126,13 @@ export function WorkspaceCategoryCard({
         showsVerticalScrollIndicator={notes.length > 4}
       >
         {childCategories.length ? (
-          <View style={styles.subcategoryBlock}>
-            {childCategories.map((child) => (
+          <View style={[styles.subcategoryBlock, { zIndex: notes.length + childCategories.length + 1 }]}>
+            {childCategories.map((child, index) => (
               <WorkspaceSubcategoryRow
                 key={pathKey(child.path)}
                 category={child}
                 depth={0}
+                stackOrder={childCategories.length - index}
                 expandedCategoryKeys={expandedCategoryKeys}
                 childCategoriesByParentKey={childCategoriesByParentKey}
                 notesByCategoryKey={notesByCategoryKey}
@@ -179,7 +180,7 @@ export function WorkspaceCategoryCard({
   );
 }
 
-function WorkspaceSubcategoryRow({ category, depth, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, colors, styles, onToggleCategory, onOpenCategory, onEditNote, onMoveNote, onSetNotePriority, onDeleteNote }: { category: CategorySummary; depth: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onDeleteNote: (note: FlatNote) => void }) {
+function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, colors, styles, onToggleCategory, onOpenCategory, onEditNote, onMoveNote, onSetNotePriority, onDeleteNote }: { category: CategorySummary; depth: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onDeleteNote: (note: FlatNote) => void }) {
   const key = pathKey(category.path);
   const children = childCategoriesByParentKey.get(key) ?? [];
   const childNotes = notesByCategoryKey.get(key) ?? [];
@@ -189,7 +190,7 @@ function WorkspaceSubcategoryRow({ category, depth, expandedCategoryKeys, childC
   const indent = Math.min(depth, 4) * styles.subcategoryIndent.width;
 
   return (
-    <View style={styles.subcategoryNode}>
+    <View style={[styles.subcategoryNode, { zIndex: stackOrder }]}>
       <View style={[styles.subcategoryRow, { marginLeft: indent }]}>
         <Pressable
           accessibilityRole="button"
@@ -210,11 +211,12 @@ function WorkspaceSubcategoryRow({ category, depth, expandedCategoryKeys, childC
       </View>
       {expanded ? (
         <View style={[styles.subcategoryContents, { marginLeft: indent + styles.subcategoryIndent.width }]}>
-          {children.map((child) => (
+          {children.map((child, index) => (
             <WorkspaceSubcategoryRow
               key={pathKey(child.path)}
               category={child}
               depth={depth + 1}
+              stackOrder={children.length + childNotes.length - index}
               expandedCategoryKeys={expandedCategoryKeys}
               childCategoriesByParentKey={childCategoriesByParentKey}
               notesByCategoryKey={notesByCategoryKey}
@@ -346,8 +348,8 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   panelButton: { flex: 1, minHeight: scale(32), paddingHorizontal: scale(4) },
   previewScroller: { flex: 1, minHeight: 0, marginTop: scale(1) },
   previewList: { gap: scale(1), paddingBottom: scale(2) },
-  subcategoryBlock: { gap: scale(1), borderRadius: rounded.xs, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, backgroundColor: isDark ? 'rgba(10,11,14,0.32)' : 'rgba(255,255,255,0.48)', padding: scale(2), marginBottom: scale(2) },
-  subcategoryNode: { gap: scale(1) },
+  subcategoryBlock: { position: 'relative', gap: scale(1), borderRadius: rounded.xs, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, backgroundColor: isDark ? 'rgba(10,11,14,0.32)' : 'rgba(255,255,255,0.48)', padding: scale(2), marginBottom: scale(2) },
+  subcategoryNode: { position: 'relative', gap: scale(1) },
   subcategoryRow: { minHeight: scale(24), flexDirection: 'row', alignItems: 'center', gap: scale(2) },
   subcategoryIndent: { width: scale(10) },
   subcategoryContents: { gap: scale(1), paddingTop: scale(1), paddingBottom: scale(1) },
