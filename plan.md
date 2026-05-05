@@ -361,6 +361,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-05: Limited the shown-categories drawer to seven visible rows. Decision: keep the existing left drawer interaction, but cap the internal category list height and show its vertical scrollbar when more categories are available.
 - 2026-05-05: Implemented exact-name subcategory creation propagation. Decision: creating a subcategory now treats every case-sensitive exact-name parent category as the same logical category, adds the child relationship to all matching root/nested parent occurrences, initializes the child from any existing standalone/nested child content, and keeps note-route propagation aligned with the existing exact-name sync behavior.
 - 2026-05-05: Collapsed exact-name categories in move/copy destination picker. Decision: share the case-sensitive exact-name category collapse helper across the workspace shown-categories picker and note move/copy category picker, so destination choices no longer show both a nested category and its standalone exact-name category.
 - 2026-05-05: Fixed exact-character note editing across nested notes. Decision: preserve user-entered note casing/punctuation by removing forced uppercase normalization, and make edit-note replace every case-sensitive exact matching note string throughout all categories and subcategories.

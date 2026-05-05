@@ -306,7 +306,7 @@ export function WorkspaceBoard({
               </Pressable>
             </View>
 
-            <ScrollView style={styles.paneScroll} contentContainerStyle={styles.paneList} nestedScrollEnabled>
+            <ScrollView style={styles.paneScroll} contentContainerStyle={styles.paneList} nestedScrollEnabled showsVerticalScrollIndicator>
               {pickerCategories.length ? pickerCategories.map(({ category, selectedIndex }) => {
                 const key = pathKey(category.path);
                 const selected = selectedIndex >= 0;
@@ -485,6 +485,10 @@ function formatHours(hours: number) {
 
 const boardCardGutter = 1;
 const boardCardHalfGutter = boardCardGutter / 2;
+const shownCategoryVisibleRows = 7;
+const shownCategoryRowHeight = 52;
+const shownCategoryRowGap = spacing.xs;
+const shownCategoryListMaxHeight = shownCategoryVisibleRows * shownCategoryRowHeight + (shownCategoryVisibleRows - 1) * shownCategoryRowGap;
 const minCategoryZoom = 1;
 const maxCategoryZoom = 2.4;
 
@@ -542,7 +546,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   paneKicker: { ...typography.micro, color: colors.primary, textTransform: 'uppercase' },
   paneTitle: { ...typography.heading5, color: colors.ink },
   paneCloseButton: { width: 32, height: 32, borderRadius: rounded.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
-  paneScroll: { flex: 1, minHeight: 0 },
+  paneScroll: { flexGrow: 0, maxHeight: shownCategoryListMaxHeight },
   paneList: { gap: spacing.xs, paddingBottom: spacing.xl },
   paneCategoryRow: { position: 'relative', minHeight: 52, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surfaceSoft, padding: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, zIndex: 1 },
   paneCategoryRowSelected: { backgroundColor: colors.cardTintYellow, borderColor: colors.brandYellow, zIndex: 2 },
