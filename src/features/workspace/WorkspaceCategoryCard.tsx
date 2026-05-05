@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { rounded, shadows, spacing, typography } from '../../shared/design/tokens';
@@ -120,8 +120,8 @@ export function WorkspaceCategoryCard({
           </Pressable>
         ) : null}
 
-        {notes.length ? notes.map((note) => (
-          <WorkspacePreviewNote key={`${note.path.join('/')}-${note.index}`} note={note} noteCount={notes.length} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onSetPriority={onSetNotePriority} onDelete={onDeleteNote} />
+        {notes.length ? notes.map((note, index) => (
+          <WorkspacePreviewNote key={`${note.path.join('/')}-${note.index}`} note={note} noteCount={notes.length} currentOrder={index + 1} stackOrder={notes.length - index} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onSetPriority={onSetNotePriority} onDelete={onDeleteNote} />
         )) : !adding ? (
           <View style={styles.emptyPreview}><Text style={styles.emptyPreviewText}>No notes yet.</Text></View>
         ) : null}
@@ -130,13 +130,22 @@ export function WorkspaceCategoryCard({
   );
 }
 
-function WorkspacePreviewNote({ note, noteCount, colors, styles, onEdit, onMove, onSetPriority, onDelete }: { note: FlatNote; noteCount: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
+function WorkspacePreviewNote({ note, noteCount, currentOrder, stackOrder, colors, styles, onEdit, onMove, onSetPriority, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; stackOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
+  const priorityScrollRef = useRef<ScrollView>(null);
   const priorityOptions = createPriorityOptions(noteCount, prioritySearch);
+
+  useEffect(() => {
+    if (!priorityOpen || prioritySearch) return;
+    requestAnimationFrame(() => {
+      priorityScrollRef.current?.scrollTo({ y: Math.max(0, (currentOrder - 2) * previewPriorityOptionHeight), animated: true });
+    });
+  }, [currentOrder, priorityOpen, prioritySearch]);
+
   return (
-    <View style={styles.previewNote}>
+    <View style={[styles.previewNote, { zIndex: stackOrder }]}>
       <Text style={styles.previewText} numberOfLines={4}>{note.note}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Note actions" onPress={() => setOpen((current) => !current)} style={styles.previewMenuButton}>
         <Icon name="settings-outline" size={11} color={colors.steel} />
@@ -149,12 +158,15 @@ function WorkspacePreviewNote({ note, noteCount, colors, styles, onEdit, onMove,
           {priorityOpen ? (
             <View style={styles.previewPriorityPicker}>
               <TextInput value={prioritySearch} onChangeText={setPrioritySearch} placeholder="Search number" placeholderTextColor={colors.stone} keyboardType="number-pad" style={styles.previewPrioritySearch} />
-              <ScrollView style={styles.previewPriorityScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                {priorityOptions.map((option) => (
-                  <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Set note order ${option}`} onPress={() => { setOpen(false); setPriorityOpen(false); setPrioritySearch(''); onSetPriority(note, option); }} style={styles.previewPriorityOption}>
-                    <Text style={styles.previewPriorityOptionText}>{option}</Text>
-                  </Pressable>
-                ))}
+              <ScrollView ref={priorityScrollRef} style={styles.previewPriorityScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                {priorityOptions.map((option) => {
+                  const current = option === currentOrder;
+                  return (
+                    <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Set note order ${option}${current ? ', current order' : ''}`} onPress={() => { setOpen(false); setPriorityOpen(false); setPrioritySearch(''); onSetPriority(note, option); }} style={[styles.previewPriorityOption, current && styles.previewPriorityOptionCurrent]}>
+                      <Text style={[styles.previewPriorityOptionText, current && styles.previewPriorityOptionTextCurrent]}>{option}</Text>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
             </View>
           ) : null}
@@ -164,6 +176,8 @@ function WorkspacePreviewNote({ note, noteCount, colors, styles, onEdit, onMove,
     </View>
   );
 }
+
+const previewPriorityOptionHeight = 26;
 
 function createPriorityOptions(count: number, search: string) {
   const cleanSearch = search.replace(/[^0-9]/g, '');
@@ -217,7 +231,9 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   previewPrioritySearch: { height: 26, borderRadius: rounded.xs, borderWidth: 1, borderColor: colors.hairlineStrong, color: colors.ink, backgroundColor: colors.surfaceSoft, paddingHorizontal: 6, paddingVertical: 0, fontSize: 11, lineHeight: 14 },
   previewPriorityScroll: { maxHeight: 96 },
   previewPriorityOption: { minHeight: 24, borderRadius: rounded.xs, justifyContent: 'center', paddingHorizontal: 7, backgroundColor: colors.surfaceSoft, marginBottom: 2 },
+  previewPriorityOptionCurrent: { backgroundColor: colors.primary, borderWidth: 1, borderColor: colors.primaryDeep },
   previewPriorityOptionText: { ...typography.micro, color: colors.charcoal },
+  previewPriorityOptionTextCurrent: { color: colors.onPrimary },
   emptyPreview: { borderRadius: rounded.sm, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.hairlineStrong, padding: spacing.sm, backgroundColor: isDark ? 'rgba(10,11,14,0.42)' : 'rgba(255,255,255,0.45)' },
   emptyPreviewText: { ...typography.micro, color: colors.slate },
   });

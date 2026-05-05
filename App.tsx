@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AutomationCommand, parseAutomationDeepLink } from './src/features/automation/deepLinks';
+import { clearSavedUnlock, defaultAuthTimeoutHours, markUnlocked, readAuthTimeoutHours, readShouldStartUnlocked, writeAuthTimeoutHours } from './src/features/auth/authSession';
 import { LockScreen } from './src/features/auth/LockScreen';
 import { CategoryList } from './src/features/categories/CategoryList';
 import { countCategoryContents, createRootCategory, createSubcategory, deleteCategory, formatPath, getCategoryItems, listChildCategories, renameCategory } from './src/features/categories/categoryTree';
@@ -31,8 +32,48 @@ export default function App() {
 
 function AppContent() {
   const [unlocked, setUnlocked] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authTimeoutHours, setAuthTimeoutHours] = useState(defaultAuthTimeoutHours);
   const [pendingAutomationCommand, setPendingAutomationCommand] = useState<AutomationCommand | null>(null);
   const processedAutomationLinks = useRef(new Set<string>());
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadAuthSession() {
+      try {
+        const [timeoutHours, shouldStartUnlocked] = await Promise.all([
+          readAuthTimeoutHours(),
+          readShouldStartUnlocked(),
+        ]);
+        if (!mounted) return;
+        setAuthTimeoutHours(timeoutHours);
+        setUnlocked(shouldStartUnlocked);
+      } finally {
+        if (mounted) setAuthLoading(false);
+      }
+    }
+
+    loadAuthSession();
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (state) => {
+      if (state !== 'active') return;
+      const shouldStayUnlocked = await readShouldStartUnlocked();
+      setUnlocked(shouldStayUnlocked);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!unlocked) return;
+    const interval = setInterval(async () => {
+      const shouldStayUnlocked = await readShouldStartUnlocked();
+      setUnlocked(shouldStayUnlocked);
+    }, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [unlocked]);
 
   useEffect(() => {
     function queueAutomationUrl(url: string | null) {
@@ -52,11 +93,42 @@ function AppContent() {
     setPendingAutomationCommand((current) => (current?.key === commandKey ? null : current));
   }
 
-  if (!unlocked) return <LockScreen onUnlock={() => setUnlocked(true)} />;
-  return <NotesWorkspace automationCommand={pendingAutomationCommand} onAutomationComplete={completeAutomationCommand} />;
+  async function unlock() {
+    await markUnlocked();
+    setUnlocked(true);
+  }
+
+  async function updateAuthTimeout(hours: number) {
+    const nextHours = await writeAuthTimeoutHours(hours);
+    setAuthTimeoutHours(nextHours);
+    const shouldStayUnlocked = await readShouldStartUnlocked();
+    setUnlocked(shouldStayUnlocked);
+  }
+
+  async function logout() {
+    await clearSavedUnlock();
+    setUnlocked(false);
+  }
+
+  if (authLoading) return <AuthLoadingScreen />;
+  if (!unlocked) return <LockScreen onUnlock={unlock} />;
+  return <NotesWorkspace automationCommand={pendingAutomationCommand} onAutomationComplete={completeAutomationCommand} authTimeoutHours={authTimeoutHours} onAuthTimeoutChange={updateAuthTimeout} onLogout={logout} />;
 }
 
-function NotesWorkspace({ automationCommand, onAutomationComplete }: { automationCommand: AutomationCommand | null; onAutomationComplete: (commandKey: string) => void }) {
+function AuthLoadingScreen() {
+  const { colors } = useTheme();
+  return (
+    <View style={[authLoadingStyles.screen, { backgroundColor: colors.brandNavy }]}>
+      <ActivityIndicator color={colors.onPrimary} />
+    </View>
+  );
+}
+
+const authLoadingStyles = StyleSheet.create({
+  screen: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+});
+
+function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHours, onAuthTimeoutChange, onLogout }: { automationCommand: AutomationCommand | null; onAutomationComplete: (commandKey: string) => void; authTimeoutHours: number; onAuthTimeoutChange: (hours: number) => Promise<void>; onLogout: () => void }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { data, workspaces, activeWorkspace, activeWorkspaceId, defaultWorkspaceId, loading, saving, refreshing, error, setError, commit, createWorkspace, selectWorkspace, setDefaultWorkspace, renameWorkspace, updateSelectedCategoryPaths, refresh } = useNotesSync();
@@ -227,6 +299,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete }: { automatio
                   saving={saving}
                   refreshing={refreshing}
                   floatingActionsVisible={boardTopActionsVisible}
+                  authTimeoutHours={authTimeoutHours}
                   onSelectWorkspace={selectWorkspaceAndReset}
                   onSetDefaultWorkspace={setDefaultWorkspace}
                   onCreateWorkspace={() => setPromptMode('workspace')}
@@ -234,6 +307,8 @@ function NotesWorkspace({ automationCommand, onAutomationComplete }: { automatio
                   onRefresh={refresh}
                   onOpenSearch={() => setTab('search')}
                   onOpenSettings={() => setTab('settings')}
+                  onAuthTimeoutChange={onAuthTimeoutChange}
+                  onLogout={onLogout}
                   onOpenCategory={setPath}
                   onCreateRootCategory={() => setPromptMode('root')}
                   onToggleCategory={toggleWorkspaceCategory}
@@ -288,7 +363,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete }: { automatio
           {!loading && tab === 'settings' ? (
             <View style={styles.sectionStack}>
               <PanelHeader title="Settings" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
-              <SettingsPanel data={data} onImport={importData} />
+              <SettingsPanel data={data} authTimeoutHours={authTimeoutHours} onAuthTimeoutChange={onAuthTimeoutChange} onImport={importData} />
             </View>
           ) : null}
         </View>

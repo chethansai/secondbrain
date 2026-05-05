@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { colors, rounded, spacing, typography } from '../../shared/design/tokens';
 import { FlatNote } from '../../shared/types/notes';
@@ -19,20 +19,28 @@ export function NoteList({ notes, onEdit, onMove, onSetPriority, onDelete }: Pro
   return (
     <View style={styles.list}>
       {notes.map((note, index) => (
-        <View key={`${note.path.join('/')}-${note.index}-${index}`} style={styles.card}>
+        <View key={`${note.path.join('/')}-${note.index}-${index}`} style={[styles.card, { zIndex: notes.length - index }]}>
           <Text style={styles.text}>{note.note}</Text>
-          <NoteActionsDropdown note={note} noteCount={notes.length} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onSetPriority={onSetPriority} onDelete={onDelete} />
+          <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={index + 1} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onSetPriority={onSetPriority} onDelete={onDelete} />
         </View>
       ))}
     </View>
   );
 }
 
-function NoteActionsDropdown({ note, noteCount, colors, styles, onEdit, onMove, onSetPriority, onDelete }: { note: FlatNote; noteCount: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
+function NoteActionsDropdown({ note, noteCount, currentOrder, colors, styles, onEdit, onMove, onSetPriority, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
+  const priorityScrollRef = useRef<ScrollView>(null);
   const priorityOptions = createPriorityOptions(noteCount, prioritySearch);
+
+  useEffect(() => {
+    if (!priorityOpen || prioritySearch) return;
+    requestAnimationFrame(() => {
+      priorityScrollRef.current?.scrollTo({ y: Math.max(0, (currentOrder - 2) * priorityOptionHeight), animated: true });
+    });
+  }, [currentOrder, priorityOpen, prioritySearch]);
 
   function close() {
     setOpen(false);
@@ -63,12 +71,15 @@ function NoteActionsDropdown({ note, noteCount, colors, styles, onEdit, onMove, 
           {priorityOpen ? (
             <View style={styles.priorityPicker}>
               <TextInput value={prioritySearch} onChangeText={setPrioritySearch} placeholder="Search number" placeholderTextColor={colors.stone} keyboardType="number-pad" style={styles.prioritySearch} />
-              <ScrollView style={styles.priorityScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                {priorityOptions.map((option) => (
-                  <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Set note order ${option}`} onPress={() => { close(); onSetPriority(note, option); }} style={styles.priorityOption}>
-                    <Text style={styles.priorityOptionText}>{option}</Text>
-                  </Pressable>
-                ))}
+              <ScrollView ref={priorityScrollRef} style={styles.priorityScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                {priorityOptions.map((option) => {
+                  const current = option === currentOrder;
+                  return (
+                    <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Set note order ${option}${current ? ', current order' : ''}`} onPress={() => { close(); onSetPriority(note, option); }} style={[styles.priorityOption, current && styles.priorityOptionCurrent]}>
+                      <Text style={[styles.priorityOptionText, current && styles.priorityOptionTextCurrent]}>{option}</Text>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
             </View>
           ) : null}
@@ -82,6 +93,8 @@ function NoteActionsDropdown({ note, noteCount, colors, styles, onEdit, onMove, 
   );
 }
 
+const priorityOptionHeight = 37;
+
 function createPriorityOptions(count: number, search: string) {
   const cleanSearch = search.replace(/[^0-9]/g, '');
   return Array.from({ length: count }, (_, index) => index + 1).filter((option) => !cleanSearch || String(option).includes(cleanSearch));
@@ -90,7 +103,7 @@ function createPriorityOptions(count: number, search: string) {
 function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
   return StyleSheet.create({
   list: { gap: spacing.sm },
-  card: { position: 'relative', backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, borderRadius: rounded.lg, padding: spacing.lg, gap: 1, zIndex: 1 },
+  card: { position: 'relative', backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, borderRadius: rounded.lg, padding: spacing.lg, gap: 1 },
   text: { ...typography.body, color: colors.charcoal },
   actions: { position: 'relative', flexDirection: 'row', gap: spacing.xs, justifyContent: 'flex-end', zIndex: 3 },
   iconButton: { width: 40, height: 40, borderRadius: rounded.md, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
@@ -102,6 +115,8 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   prioritySearch: { minHeight: 34, borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairlineStrong, color: colors.ink, backgroundColor: colors.surfaceSoft, paddingHorizontal: spacing.xs, paddingVertical: 0, ...typography.bodySm },
   priorityScroll: { maxHeight: 160 },
   priorityOption: { minHeight: 34, borderRadius: rounded.sm, justifyContent: 'center', paddingHorizontal: spacing.sm, backgroundColor: colors.surfaceSoft, marginBottom: 3 },
+  priorityOptionCurrent: { backgroundColor: colors.primary, borderWidth: 1, borderColor: colors.primaryDeep },
   priorityOptionText: { ...typography.bodySmMedium, color: colors.charcoal },
+  priorityOptionTextCurrent: { color: colors.onPrimary },
   });
 }

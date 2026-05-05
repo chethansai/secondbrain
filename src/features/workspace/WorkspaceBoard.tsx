@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { formatPath, listAllCategories } from '../categories/categoryTree';
 import { listNotesAtPath } from '../notes/noteMutations';
 import { useTheme } from '../../shared/design/ThemeProvider';
@@ -18,6 +18,7 @@ type Props = {
   saving: boolean;
   refreshing: boolean;
   floatingActionsVisible: boolean;
+  authTimeoutHours: number;
   onSelectWorkspace: (workspaceId: string) => void;
   onSetDefaultWorkspace: (workspaceId: string) => void;
   onCreateWorkspace: () => void;
@@ -25,6 +26,8 @@ type Props = {
   onRefresh: () => void;
   onOpenSearch: () => void;
   onOpenSettings: () => void;
+  onAuthTimeoutChange: (hours: number) => Promise<void> | void;
+  onLogout: () => void;
   onOpenCategory: (path: CategoryPath) => void;
   onCreateRootCategory: () => void;
   onToggleCategory: (path: CategoryPath) => void;
@@ -47,6 +50,7 @@ export function WorkspaceBoard({
   saving,
   refreshing,
   floatingActionsVisible,
+  authTimeoutHours,
   onSelectWorkspace,
   onSetDefaultWorkspace,
   onCreateWorkspace,
@@ -54,6 +58,8 @@ export function WorkspaceBoard({
   onRefresh,
   onOpenSearch,
   onOpenSettings,
+  onAuthTimeoutChange,
+  onLogout,
   onOpenCategory,
   onCreateRootCategory,
   onToggleCategory,
@@ -71,6 +77,8 @@ export function WorkspaceBoard({
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [authHoursText, setAuthHoursText] = useState(String(authTimeoutHours));
+  const [authHoursStatus, setAuthHoursStatus] = useState<string | null>(null);
   const [priorityMenuKey, setPriorityMenuKey] = useState<string | null>(null);
   const allCategories = useMemo(() => listAllCategories(data), [data]);
   const selectedPaths = activeWorkspace?.selectedCategoryPaths ?? [];
@@ -109,6 +117,23 @@ export function WorkspaceBoard({
     closeHeaderMenus();
     onRefresh();
   }
+
+  async function submitAuthHours() {
+    const nextHours = Number(authHoursText);
+    if (!Number.isFinite(nextHours) || nextHours <= 0) {
+      setAuthHoursText(String(authTimeoutHours));
+      setAuthHoursStatus('Enter hours');
+      return;
+    }
+    const roundedHours = Math.round(nextHours);
+    await onAuthTimeoutChange(roundedHours);
+    setAuthHoursText(String(roundedHours));
+    setAuthHoursStatus('Saved');
+  }
+
+  useEffect(() => {
+    setAuthHoursText(String(authTimeoutHours));
+  }, [authTimeoutHours]);
 
   useEffect(() => {
     if (!floatingActionsVisible) {
@@ -167,6 +192,34 @@ export function WorkspaceBoard({
                   <View style={styles.headerMenuRowIcon}><Icon name="search-outline" size={16} color={colors.ink} /></View>
                   <Text style={styles.headerMenuRowText} numberOfLines={1}>Search</Text>
                 </Pressable>
+
+                <Pressable accessibilityRole="button" accessibilityLabel="Log out" onPress={() => { closeHeaderMenus(); onLogout(); }} style={styles.headerMenuRow}>
+                  <View style={styles.headerMenuRowIcon}><Icon name="log-out-outline" size={16} color={colors.ink} /></View>
+                  <Text style={styles.headerMenuRowText} numberOfLines={1}>Logout</Text>
+                </Pressable>
+
+                <View style={styles.authTimeoutRow}>
+                  <View style={styles.authTimeoutTextBlock}>
+                    <Text style={styles.headerMenuKicker}>Password</Text>
+                    <Text style={styles.authTimeoutText} numberOfLines={1}>{formatHours(authTimeoutHours)}</Text>
+                  </View>
+                  <TextInput
+                    accessibilityLabel="Password timeout hours"
+                    value={authHoursText}
+                    onChangeText={(text) => { setAuthHoursStatus(null); setAuthHoursText(text.replace(/[^0-9]/g, '')); }}
+                    onSubmitEditing={submitAuthHours}
+                    onBlur={() => setAuthHoursText(authHoursText || String(authTimeoutHours))}
+                    keyboardType="number-pad"
+                    returnKeyType="done"
+                    maxLength={2}
+                    selectTextOnFocus
+                    style={styles.authTimeoutInput}
+                  />
+                  <Pressable accessibilityRole="button" accessibilityLabel="Save password timeout hours" onPress={submitAuthHours} style={styles.authTimeoutSaveButton}>
+                    <Icon name="checkmark" size={12} color={colors.onPrimary} />
+                  </Pressable>
+                  {authHoursStatus ? <Text style={styles.authTimeoutStatus}>{authHoursStatus}</Text> : null}
+                </View>
 
                 <View style={styles.workspaceMenuWrap}>
                   <Pressable accessibilityRole="button" accessibilityLabel="Choose workspace" onPress={() => setShowWorkspaceMenu((current) => !current)} style={styles.workspaceMenuButton}>
@@ -321,6 +374,10 @@ function pathKey(path: CategoryPath) {
   return path.join('\u001f');
 }
 
+function formatHours(hours: number) {
+  return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+}
+
 const boardCardGutter = 1;
 const boardCardHalfGutter = boardCardGutter / 2;
 
@@ -344,6 +401,12 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   headerMenuRowPrimaryIcon: { width: 24, height: 24, borderRadius: rounded.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryDeep, flexShrink: 0 },
   headerMenuRowText: { ...typography.bodySmMedium, color: colors.charcoal, flex: 1, minWidth: 0 },
   headerMenuRowPrimaryText: { ...typography.bodySmMedium, color: colors.onPrimary, flex: 1, minWidth: 0 },
+  authTimeoutRow: { minHeight: 48, borderRadius: rounded.md, paddingHorizontal: spacing.xs, paddingVertical: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.surfaceSoft, borderWidth: 1, borderColor: colors.hairlineSoft },
+  authTimeoutTextBlock: { flex: 1, minWidth: 0 },
+  authTimeoutText: { ...typography.bodySmMedium, color: colors.charcoal },
+  authTimeoutInput: { width: 44, height: 32, borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.canvas, color: colors.ink, textAlign: 'center', paddingHorizontal: spacing.xs, paddingVertical: 0, ...typography.bodySmMedium },
+  authTimeoutSaveButton: { width: 30, height: 30, borderRadius: rounded.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, flexShrink: 0 },
+  authTimeoutStatus: { ...typography.micro, color: colors.primary, minWidth: 36, textAlign: 'right' },
   categoryAddButton: { width: 34, height: 34, borderRadius: rounded.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, flexShrink: 0 },
   categoryShownControl: { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 0 },
   categoryShownButton: { width: 34, height: 34, borderRadius: rounded.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairline, flexShrink: 0 },
