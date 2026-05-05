@@ -17,6 +17,7 @@ type Props = {
   showWorkspaceIntro: boolean;
   zoom?: number;
   onOpen: () => void;
+  onOpenCategory: (path: CategoryPath) => void;
   onAddNote: (text: string) => Promise<boolean> | boolean;
   onRename: () => void;
   onDelete: () => void;
@@ -36,6 +37,7 @@ export function WorkspaceCategoryCard({
   showWorkspaceIntro,
   zoom = 1,
   onOpen,
+  onOpenCategory,
   onAddNote,
   onRename,
   onDelete,
@@ -136,6 +138,7 @@ export function WorkspaceCategoryCard({
                 colors={colors}
                 styles={styles}
                 onToggleCategory={toggleCategory}
+                onOpenCategory={onOpenCategory}
                 onEditNote={onEditNote}
                 onMoveNote={onMoveNote}
                 onSetNotePriority={onSetNotePriority}
@@ -176,7 +179,7 @@ export function WorkspaceCategoryCard({
   );
 }
 
-function WorkspaceSubcategoryRow({ category, depth, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, colors, styles, onToggleCategory, onEditNote, onMoveNote, onSetNotePriority, onDeleteNote }: { category: CategorySummary; depth: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onDeleteNote: (note: FlatNote) => void }) {
+function WorkspaceSubcategoryRow({ category, depth, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, colors, styles, onToggleCategory, onOpenCategory, onEditNote, onMoveNote, onSetNotePriority, onDeleteNote }: { category: CategorySummary; depth: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onDeleteNote: (note: FlatNote) => void }) {
   const key = pathKey(category.path);
   const children = childCategoriesByParentKey.get(key) ?? [];
   const childNotes = notesByCategoryKey.get(key) ?? [];
@@ -197,7 +200,7 @@ function WorkspaceSubcategoryRow({ category, depth, expandedCategoryKeys, childC
         >
           {expandable ? <Icon name={expanded ? 'chevron-down' : 'chevron-forward'} size={10} color={colors.steel} /> : null}
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={expandable ? `${expanded ? 'Collapse' : 'Expand'} ${category.name}` : category.name} disabled={!expandable} onPress={(event) => { event.stopPropagation(); onToggleCategory(category.path); }} style={styles.subcategoryMain}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Open ${category.name}`} onPress={() => onOpenCategory(category.path)} style={styles.subcategoryMain}>
           <Text style={styles.subcategoryName} numberOfLines={1}>{category.name}</Text>
           <View style={styles.subcategoryCounts}>
             {childNotes.length ? <Text style={styles.subcategoryCount}>{childNotes.length}</Text> : null}
@@ -218,6 +221,7 @@ function WorkspaceSubcategoryRow({ category, depth, expandedCategoryKeys, childC
               colors={colors}
               styles={styles}
               onToggleCategory={onToggleCategory}
+              onOpenCategory={onOpenCategory}
               onEditNote={onEditNote}
               onMoveNote={onMoveNote}
               onSetNotePriority={onSetNotePriority}
