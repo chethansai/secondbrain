@@ -83,20 +83,20 @@ export function WorkspaceBoard({
   const [authHoursStatus, setAuthHoursStatus] = useState<string | null>(null);
   const [priorityMenuKey, setPriorityMenuKey] = useState<string | null>(null);
   const rawCategories = useMemo(() => listAllCategories(data), [data]);
-  const allCategories = useMemo(() => collapseExactNameCategories(rawCategories), [rawCategories]);
+  const visibleCategories = useMemo(() => collapseExactNameCategories(rawCategories), [rawCategories]);
   const selectedPaths = activeWorkspace?.selectedCategoryPaths ?? [];
   const rawCategoriesByKey = new Map(rawCategories.map((category) => [pathKey(category.path), category]));
-  const visibleCategoriesByName = new Map(allCategories.map((category) => [category.name, category]));
-  const categoriesByKey = new Map(allCategories.map((category) => [pathKey(category.path), category]));
-  const notesByCategoryKey = new Map(allCategories.map((category) => [pathKey(category.path), listNotesAtPath(data, category.path)]));
+  const visibleCategoriesByName = new Map(visibleCategories.map((category) => [category.name, category]));
+  const visibleCategoriesByKey = new Map(visibleCategories.map((category) => [pathKey(category.path), category]));
+  const notesByCategoryKey = new Map(rawCategories.map((category) => [pathKey(category.path), listNotesAtPath(data, category.path)]));
   const selectedCategoryRows = selectedPaths.flatMap((path) => {
     const rawCategory = rawCategoriesByKey.get(pathKey(path));
-    const category = rawCategory ? visibleCategoriesByName.get(rawCategory.name) : categoriesByKey.get(pathKey(path));
+    const category = rawCategory ? visibleCategoriesByName.get(rawCategory.name) : visibleCategoriesByKey.get(pathKey(path));
     return category ? [category] : [];
   });
-  const boardCategories = selectedCategoryRows.length ? removeDescendantCategories(selectedCategoryRows) : allCategories.filter((category) => category.path.length === 1);
+  const boardCategories = selectedCategoryRows.length ? removeDescendantCategories(selectedCategoryRows) : visibleCategories.filter((category) => category.path.length === 1);
   const prioritizedCategories = boardCategories.map((category, index) => ({ category, priority: index + 1, notes: notesByCategoryKey.get(pathKey(category.path)) ?? [] }));
-  const pickerCategories = allCategories
+  const pickerCategories = visibleCategories
     .map((category, index) => ({ category, index, selectedIndex: findSelectedCategoryIndex(selectedPaths, rawCategoriesByKey, category) }))
     .sort((left, right) => {
       const leftSelected = left.selectedIndex >= 0;
@@ -345,7 +345,7 @@ export function WorkspaceBoard({
         </View>
       ) : null}
 
-      {allCategories.length === 0 ? (
+      {rawCategories.length === 0 ? (
         <EmptyState title="No categories yet" message="Create a category to start this workspace." actionLabel="New category" onAction={onCreateRootCategory} />
       ) : prioritizedCategories.length === 0 ? (
         <EmptyState title="No cards selected" message="Choose categories for this workspace board." actionLabel="Choose categories" onAction={() => setShowCategoryPicker(true)} />
@@ -356,7 +356,7 @@ export function WorkspaceBoard({
               {(zoom) => (
                 <WorkspaceCategoryCard
                   category={category}
-                  allCategories={allCategories}
+                  allCategories={rawCategories}
                   notesByCategoryKey={notesByCategoryKey}
                   notes={notes}
                   priority={priority}

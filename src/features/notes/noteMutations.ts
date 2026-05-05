@@ -18,10 +18,8 @@ export function editNote(data: NotesData, path: CategoryPath, oldText: string, n
   const next = cloneData(data);
   const items = getCategoryItems(next, path);
   if (!items) return failure('path_not_found', 'The selected category no longer exists.');
-  const index = findNoteIndex(items, oldText, selectedIndex);
-  if (index === -1) return failure('not_found', 'The note could not be found.');
-  items[index] = cleanText;
-  syncStandaloneCategory(next, path);
+  const matchedCount = editExactNotes(next, oldText, cleanText);
+  if (matchedCount === 0) return failure('not_found', 'The note could not be found.');
   return { ok: true, data: next };
 }
 
@@ -115,8 +113,29 @@ function findNoteIndex(items: unknown[], text: string, selectedIndex?: number): 
   return items.findIndex((item) => item === text);
 }
 
+function editExactNotes(data: NotesData, oldText: string, newText: string): number {
+  return Object.values(data).reduce((count, items) => count + editExactNotesInItems(items, oldText, newText), 0);
+}
+
+function editExactNotesInItems(items: unknown[], oldText: string, newText: string): number {
+  let matchedCount = 0;
+  items.forEach((item, index) => {
+    if (typeof item === 'string') {
+      if (item === oldText) {
+        items[index] = newText;
+        matchedCount += 1;
+      }
+      return;
+    }
+    if (!isCategoryNode(item)) return;
+    const [, childItems] = Object.entries(item)[0];
+    matchedCount += editExactNotesInItems(childItems, oldText, newText);
+  });
+  return matchedCount;
+}
+
 export function normalizeNoteText(text: string) {
-  return text.trim().toUpperCase();
+  return text.trim();
 }
 
 function failure(code: string, message: string): MutationResult {

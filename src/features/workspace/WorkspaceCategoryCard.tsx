@@ -157,8 +157,8 @@ export function WorkspaceCategoryCard({
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.inlineAdd}>
             <TextInput
               value={newNote}
-              onChangeText={(value) => setNewNote(value.toUpperCase())}
-              autoCapitalize="characters"
+              onChangeText={setNewNote}
+              autoCapitalize="sentences"
               placeholder="Add note"
               placeholderTextColor={colors.stone}
               accessibilityLabel={`New note in ${category.name}`}
@@ -239,8 +239,8 @@ function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategory
         <Pressable onPress={(event) => event.stopPropagation()} style={[styles.inlineAdd, styles.subcategoryInlineAdd, { marginLeft: indent + styles.subcategoryIndent.width }]}> 
           <TextInput
             value={newNote}
-            onChangeText={(value) => setNewNote(value.toUpperCase())}
-            autoCapitalize="characters"
+            onChangeText={setNewNote}
+            autoCapitalize="sentences"
             placeholder="Add note"
             placeholderTextColor={colors.stone}
             accessibilityLabel={`New note in ${category.name}`}

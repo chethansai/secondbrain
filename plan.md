@@ -361,6 +361,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-05: Restored category card subcategory views after exact-name collapse. Decision: keep collapsed exact-name categories only for the workspace board and shown-categories picker, while passing the full raw category tree into cards so nested subcategories still render inside their parent cards.
 - 2026-05-05: Collapsed exact-name shown categories. Decision: the workspace board and shown-categories picker now treat categories with exactly matching case-sensitive names as one visible category, preferring the standalone/root category over a nested duplicate while preserving old nested selections.
 - 2026-05-05: Reconciled workspace card subcategory add-note changes after the move/copy push. Decision: keep the subcategory inline add control, pass the selected category path through the board note-add callback, and add the missing styles so the workspace card remains typecheck-clean.
 - 2026-05-05: Updated note actions and move/copy category selection. Decision: note option menus now show Edit, Move, Order, Delete, and Copy; Copy is only launched from the note options, and choosing a category after Move or Copy immediately performs the selected action without an extra submit button.

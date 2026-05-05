@@ -31,7 +31,7 @@ export function NoteEditorModal({ visible, title, initialText = '', onClose, onS
     <ModalShell visible={visible} title={title} onClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.content}>
-          <TextInputField value={text} onChangeText={(value) => setText(value.toUpperCase())} autoCapitalize="characters" multiline placeholder="Write a note" accessibilityLabel="Note text" />
+          <TextInputField value={text} onChangeText={setText} autoCapitalize="sentences" multiline placeholder="Write a note" accessibilityLabel="Note text" />
           <Button label="Save note" icon="checkmark" onPress={submit} disabled={busy || !text.trim()} />
         </View>
       </KeyboardAvoidingView>
