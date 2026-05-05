@@ -84,12 +84,13 @@ export function WorkspaceBoard({
   const selectedPaths = activeWorkspace?.selectedCategoryPaths ?? [];
   const selectedKeys = new Set(selectedPaths.map(pathKey));
   const categoriesByKey = new Map(allCategories.map((category) => [pathKey(category.path), category]));
+  const notesByCategoryKey = new Map(allCategories.map((category) => [pathKey(category.path), listNotesAtPath(data, category.path)]));
   const selectedCategoryRows = selectedPaths.flatMap((path) => {
     const category = categoriesByKey.get(pathKey(path));
     return category ? [category] : [];
   });
   const boardCategories = selectedCategoryRows.length ? removeDescendantCategories(selectedCategoryRows) : allCategories.filter((category) => category.path.length === 1);
-  const prioritizedCategories = boardCategories.map((category, index) => ({ category, priority: index + 1, notes: listNotesAtPath(data, category.path) }));
+  const prioritizedCategories = boardCategories.map((category, index) => ({ category, priority: index + 1, notes: notesByCategoryKey.get(pathKey(category.path)) ?? [] }));
   const pickerCategories = allCategories
     .map((category, index) => ({ category, index, selectedIndex: selectedPaths.findIndex((path) => pathKey(path) === pathKey(category.path)) }))
     .sort((left, right) => {
@@ -351,13 +352,13 @@ export function WorkspaceBoard({
                 <WorkspaceCategoryCard
                   category={category}
                   allCategories={allCategories}
+                  notesByCategoryKey={notesByCategoryKey}
                   notes={notes}
                   priority={priority}
                   workspaceName={activeWorkspace?.name ?? 'Workspace'}
                   showWorkspaceIntro={priority === 1}
                   zoom={zoom}
                   onOpen={() => onOpenCategory(category.path)}
-                  onOpenCategory={onOpenCategory}
                   onAddNote={(text) => onAddNote(category.path, text)}
                   onRename={() => onRenameCategory(category.path)}
                   onDelete={() => onDeleteCategory(category.path)}
