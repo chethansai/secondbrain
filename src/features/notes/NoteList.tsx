@@ -9,11 +9,12 @@ type Props = {
   notes: FlatNote[];
   onEdit: (note: FlatNote) => void;
   onMove: (note: FlatNote) => void;
+  onCopy: (note: FlatNote) => void;
   onSetPriority: (note: FlatNote, priority: number) => void;
   onDelete: (note: FlatNote) => void;
 };
 
-export function NoteList({ notes, onEdit, onMove, onSetPriority, onDelete }: Props) {
+export function NoteList({ notes, onEdit, onMove, onCopy, onSetPriority, onDelete }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -21,14 +22,14 @@ export function NoteList({ notes, onEdit, onMove, onSetPriority, onDelete }: Pro
       {notes.map((note, index) => (
         <View key={`${note.path.join('/')}-${note.index}-${index}`} style={[styles.card, { zIndex: notes.length - index }]}>
           <Text style={styles.text}>{note.note}</Text>
-          <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={index + 1} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onSetPriority={onSetPriority} onDelete={onDelete} />
+          <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={index + 1} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onCopy={onCopy} onSetPriority={onSetPriority} onDelete={onDelete} />
         </View>
       ))}
     </View>
   );
 }
 
-function NoteActionsDropdown({ note, noteCount, currentOrder, colors, styles, onEdit, onMove, onSetPriority, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
+function NoteActionsDropdown({ note, noteCount, currentOrder, colors, styles, onEdit, onMove, onCopy, onSetPriority, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
@@ -59,7 +60,7 @@ function NoteActionsDropdown({ note, noteCount, currentOrder, colors, styles, on
             <Icon name="create-outline" size={15} color={colors.ink} />
             <Text style={styles.dropdownItemText}>Edit</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Move or copy note" onPress={() => { close(); onMove(note); }} style={styles.dropdownItem}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Move note" onPress={() => { close(); onMove(note); }} style={styles.dropdownItem}>
             <Icon name="git-branch-outline" size={15} color={colors.ink} />
             <Text style={styles.dropdownItemText}>Move</Text>
           </Pressable>
@@ -86,6 +87,10 @@ function NoteActionsDropdown({ note, noteCount, currentOrder, colors, styles, on
           <Pressable accessibilityRole="button" accessibilityLabel="Delete note" onPress={() => { close(); onDelete(note); }} style={styles.dropdownItem}>
             <Icon name="trash-outline" size={15} color={colors.semanticError} />
             <Text style={styles.dropdownItemDanger}>Delete</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Copy note" onPress={() => { close(); onCopy(note); }} style={styles.dropdownItem}>
+            <Icon name="copy-outline" size={15} color={colors.ink} />
+            <Text style={styles.dropdownItemText}>Copy</Text>
           </Pressable>
         </View>
       ) : null}

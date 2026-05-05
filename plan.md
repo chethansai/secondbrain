@@ -361,6 +361,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-05: Updated note actions and move/copy category selection. Decision: note option menus now show Edit, Move, Order, Delete, and Copy; Copy is only launched from the note options, and choosing a category after Move or Copy immediately performs the selected action without an extra submit button.
 - 2026-05-05: Completed mandatory git handoff for the category card note options stacking fix. Decision: include the finished UI stacking change and current workspace changes in the requested `git status`, `git add .`, commit, and push workflow.
 - 2026-05-05: Fixed Android category card note options stacking. Decision: open note action menus now raise their row above sibling notes and lower-half note menus open upward so the options container stays in front of the card content instead of going behind it.
 - 2026-05-05: Updated the mandatory post-step workflow. Decision: after every Copilot chat implementation step and any redirection, `plan.md` history must be updated before running the required git status/add/commit/push sequence.

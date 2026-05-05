@@ -23,6 +23,7 @@ type Props = {
   onDelete: () => void;
   onEditNote: (note: FlatNote) => void;
   onMoveNote: (note: FlatNote) => void;
+  onCopyNote: (note: FlatNote) => void;
   onSetNotePriority: (note: FlatNote, priority: number) => void;
   onDeleteNote: (note: FlatNote) => void;
 };
@@ -43,6 +44,7 @@ export function WorkspaceCategoryCard({
   onDelete,
   onEditNote,
   onMoveNote,
+  onCopyNote,
   onSetNotePriority,
   onDeleteNote,
 }: Props) {
@@ -142,6 +144,7 @@ export function WorkspaceCategoryCard({
                 onOpenCategory={onOpenCategory}
                 onEditNote={onEditNote}
                 onMoveNote={onMoveNote}
+                onCopyNote={onCopyNote}
                 onSetNotePriority={onSetNotePriority}
                 onDeleteNote={onDeleteNote}
               />
@@ -171,7 +174,7 @@ export function WorkspaceCategoryCard({
         ) : null}
 
         {notes.length ? notes.map((note, index) => (
-          <WorkspacePreviewNote key={`${note.path.join('/')}-${note.index}`} note={note} noteCount={notes.length} currentOrder={index + 1} stackOrder={notes.length - index} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onSetPriority={onSetNotePriority} onDelete={onDeleteNote} />
+          <WorkspacePreviewNote key={`${note.path.join('/')}-${note.index}`} note={note} noteCount={notes.length} currentOrder={index + 1} stackOrder={notes.length - index} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onSetPriority={onSetNotePriority} onDelete={onDeleteNote} />
         )) : !adding ? (
           <View style={styles.emptyPreview}><Text style={styles.emptyPreviewText}>No notes yet.</Text></View>
         ) : null}
@@ -180,7 +183,7 @@ export function WorkspaceCategoryCard({
   );
 }
 
-function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, colors, styles, onToggleCategory, onOpenCategory, onEditNote, onMoveNote, onSetNotePriority, onDeleteNote }: { category: CategorySummary; depth: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onDeleteNote: (note: FlatNote) => void }) {
+function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, colors, styles, onToggleCategory, onOpenCategory, onEditNote, onMoveNote, onCopyNote, onSetNotePriority, onDeleteNote }: { category: CategorySummary; depth: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onDeleteNote: (note: FlatNote) => void }) {
   const key = pathKey(category.path);
   const children = childCategoriesByParentKey.get(key) ?? [];
   const childNotes = notesByCategoryKey.get(key) ?? [];
@@ -226,12 +229,13 @@ function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategory
               onOpenCategory={onOpenCategory}
               onEditNote={onEditNote}
               onMoveNote={onMoveNote}
+              onCopyNote={onCopyNote}
               onSetNotePriority={onSetNotePriority}
               onDeleteNote={onDeleteNote}
             />
           ))}
           {childNotes.map((note, index) => (
-            <WorkspacePreviewNote key={`${note.path.join('/')}-${note.index}`} note={note} noteCount={childNotes.length} currentOrder={index + 1} stackOrder={childNotes.length - index} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onSetPriority={onSetNotePriority} onDelete={onDeleteNote} />
+            <WorkspacePreviewNote key={`${note.path.join('/')}-${note.index}`} note={note} noteCount={childNotes.length} currentOrder={index + 1} stackOrder={childNotes.length - index} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onSetPriority={onSetNotePriority} onDelete={onDeleteNote} />
           ))}
         </View>
       ) : null}
@@ -239,7 +243,7 @@ function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategory
   );
 }
 
-function WorkspacePreviewNote({ note, noteCount, currentOrder, stackOrder, colors, styles, onEdit, onMove, onSetPriority, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; stackOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
+function WorkspacePreviewNote({ note, noteCount, currentOrder, stackOrder, colors, styles, onEdit, onMove, onCopy, onSetPriority, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; stackOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
@@ -281,6 +285,7 @@ function WorkspacePreviewNote({ note, noteCount, currentOrder, stackOrder, color
             </View>
           ) : null}
           <Pressable onPress={() => { setOpen(false); onDelete(note); }} style={styles.previewAction}><Text style={styles.previewActionDanger}>Delete</Text></Pressable>
+          <Pressable onPress={() => { setOpen(false); onCopy(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Copy</Text></Pressable>
         </View>
       ) : null}
     </View>

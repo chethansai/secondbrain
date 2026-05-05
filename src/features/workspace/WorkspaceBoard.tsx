@@ -37,6 +37,7 @@ type Props = {
   onDeleteCategory: (path: CategoryPath) => void;
   onEditNote: (note: FlatNote) => void;
   onMoveNote: (note: FlatNote) => void;
+  onCopyNote: (note: FlatNote) => void;
   onSetNotePriority: (note: FlatNote, priority: number) => void;
   onDeleteNote: (note: FlatNote) => void;
 };
@@ -69,6 +70,7 @@ export function WorkspaceBoard({
   onDeleteCategory,
   onEditNote,
   onMoveNote,
+  onCopyNote,
   onSetNotePriority,
   onDeleteNote,
 }: Props) {
@@ -365,6 +367,7 @@ export function WorkspaceBoard({
                   onDelete={() => onDeleteCategory(category.path)}
                   onEditNote={onEditNote}
                   onMoveNote={onMoveNote}
+                  onCopyNote={onCopyNote}
                   onSetNotePriority={onSetNotePriority}
                   onDeleteNote={onDeleteNote}
                 />

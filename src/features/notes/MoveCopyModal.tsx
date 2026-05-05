@@ -1,46 +1,40 @@
-import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { spacing } from '../../shared/design/tokens';
-import { Button } from '../../shared/ui/Button';
+import { useEffect, useState } from 'react';
 import { ModalShell } from '../../shared/ui/ModalShell';
 import { CategoryPath, NotesData } from '../../shared/types/notes';
 import { CategoryPicker } from '../categories/CategoryPicker';
 
 type Props = {
   visible: boolean;
+  action: 'move' | 'copy';
   data: NotesData;
   onClose: () => void;
   onMove: (path: CategoryPath) => Promise<boolean> | boolean;
   onCopy: (path: CategoryPath) => Promise<boolean> | boolean;
 };
 
-export function MoveCopyModal({ visible, data, onClose, onMove, onCopy }: Props) {
+export function MoveCopyModal({ visible, action, data, onClose, onMove, onCopy }: Props) {
   const [selectedPath, setSelectedPath] = useState<CategoryPath | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function run(action: 'move' | 'copy') {
-    if (!selectedPath) return;
+  useEffect(() => {
+    if (!visible) {
+      setSelectedPath(null);
+      setBusy(false);
+    }
+  }, [visible]);
+
+  async function run(path: CategoryPath) {
+    if (busy) return;
+    setSelectedPath(path);
     setBusy(true);
-    const ok = action === 'move' ? await onMove(selectedPath) : await onCopy(selectedPath);
+    const ok = action === 'move' ? await onMove(path) : await onCopy(path);
     setBusy(false);
     if (ok) onClose();
   }
 
   return (
-    <ModalShell visible={visible} title="Move or copy" onClose={onClose}>
-      <View style={styles.content}>
-        <CategoryPicker data={data} selectedPath={selectedPath} onSelect={setSelectedPath} />
-        <View style={styles.actions}>
-          <Button label="Copy" icon="copy-outline" variant="secondary" onPress={() => run('copy')} disabled={!selectedPath || busy} style={styles.action} />
-          <Button label="Move" icon="arrow-forward" onPress={() => run('move')} disabled={!selectedPath || busy} style={styles.action} />
-        </View>
-      </View>
+    <ModalShell visible={visible} title={action === 'move' ? 'Move to category' : 'Copy to category'} onClose={onClose}>
+      <CategoryPicker data={data} selectedPath={selectedPath} onSelect={run} disabled={busy} />
     </ModalShell>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { gap: spacing.md },
-  actions: { flexDirection: 'row', gap: spacing.sm },
-  action: { flex: 1 },
-});

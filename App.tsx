@@ -23,6 +23,7 @@ import { EmptyState } from './src/shared/ui/EmptyState';
 import { Icon } from './src/shared/ui/Icon';
 
 type ModalMode = 'root' | 'subcategory' | 'rename' | 'workspace' | 'renameWorkspace' | null;
+type MoveCopyAction = 'move' | 'copy';
 type Tab = 'workspace' | 'search' | 'settings';
 type DeleteTarget = { type: 'category'; path: CategoryPath } | { type: 'note'; note: FlatNote } | null;
 
@@ -139,6 +140,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const [selectedNote, setSelectedNote] = useState<FlatNote | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [moveVisible, setMoveVisible] = useState(false);
+  const [moveCopyAction, setMoveCopyAction] = useState<MoveCopyAction>('move');
   const [boardTopActionsVisible, setBoardTopActionsVisible] = useState(true);
   const runningAutomationKey = useRef<string | null>(null);
 
@@ -208,6 +210,12 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
 
   function confirmDeleteNote(note: FlatNote) {
     setDeleteTarget({ type: 'note', note });
+  }
+
+  function openMoveCopy(note: FlatNote, action: MoveCopyAction) {
+    setSelectedNote(note);
+    setMoveCopyAction(action);
+    setMoveVisible(true);
   }
 
   async function runDelete() {
@@ -317,7 +325,8 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onRenameCategory={(categoryPath) => { setPath(categoryPath); setPromptMode('rename'); }}
                   onDeleteCategory={(categoryPath) => setDeleteTarget({ type: 'category', path: categoryPath })}
                   onEditNote={(note) => { setSelectedNote(note); setEditorMode('edit'); }}
-                  onMoveNote={(note) => { setSelectedNote(note); setMoveVisible(true); }}
+                  onMoveNote={(note) => openMoveCopy(note, 'move')}
+                  onCopyNote={(note) => openMoveCopy(note, 'copy')}
                   onSetNotePriority={setNoteOrderPriority}
                   onDeleteNote={confirmDeleteNote}
                 />
@@ -345,7 +354,8 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     <NoteList
                       notes={notes}
                       onEdit={(note) => { setSelectedNote(note); setEditorMode('edit'); }}
-                      onMove={(note) => { setSelectedNote(note); setMoveVisible(true); }}
+                      onMove={(note) => openMoveCopy(note, 'move')}
+                      onCopy={(note) => openMoveCopy(note, 'copy')}
                       onSetPriority={setNoteOrderPriority}
                       onDelete={confirmDeleteNote}
                     />
@@ -387,6 +397,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
       />
       <MoveCopyModal
         visible={moveVisible}
+        action={moveCopyAction}
         data={data}
         onClose={() => { setMoveVisible(false); setSelectedNote(null); }}
         onMove={(destination) => selectedNote ? commit(moveNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index)) : false}
