@@ -18,6 +18,7 @@ type Props = {
   onDelete: () => void;
   onEditNote: (note: FlatNote) => void;
   onMoveNote: (note: FlatNote) => void;
+  onSetNotePriority: (note: FlatNote, priority: number) => void;
   onDeleteNote: (note: FlatNote) => void;
 };
 
@@ -33,6 +34,7 @@ export function WorkspaceCategoryCard({
   onDelete,
   onEditNote,
   onMoveNote,
+  onSetNotePriority,
   onDeleteNote,
 }: Props) {
   const { colors, isDark } = useTheme();
@@ -119,7 +121,7 @@ export function WorkspaceCategoryCard({
         ) : null}
 
         {notes.length ? notes.map((note) => (
-          <WorkspacePreviewNote key={`${note.path.join('/')}-${note.index}`} note={note} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onDelete={onDeleteNote} />
+          <WorkspacePreviewNote key={`${note.path.join('/')}-${note.index}`} note={note} noteCount={notes.length} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onSetPriority={onSetNotePriority} onDelete={onDeleteNote} />
         )) : !adding ? (
           <View style={styles.emptyPreview}><Text style={styles.emptyPreviewText}>No notes yet.</Text></View>
         ) : null}
@@ -128,8 +130,11 @@ export function WorkspaceCategoryCard({
   );
 }
 
-function WorkspacePreviewNote({ note, colors, styles, onEdit, onMove, onDelete }: { note: FlatNote; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onDelete: (note: FlatNote) => void }) {
+function WorkspacePreviewNote({ note, noteCount, colors, styles, onEdit, onMove, onSetPriority, onDelete }: { note: FlatNote; noteCount: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
+  const [priorityOpen, setPriorityOpen] = useState(false);
+  const [prioritySearch, setPrioritySearch] = useState('');
+  const priorityOptions = createPriorityOptions(noteCount, prioritySearch);
   return (
     <View style={styles.previewNote}>
       <Text style={styles.previewText} numberOfLines={4}>{note.note}</Text>
@@ -140,11 +145,29 @@ function WorkspacePreviewNote({ note, colors, styles, onEdit, onMove, onDelete }
         <View style={styles.previewActions}>
           <Pressable onPress={() => { setOpen(false); onEdit(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Edit</Text></Pressable>
           <Pressable onPress={() => { setOpen(false); onMove(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Move</Text></Pressable>
+          <Pressable onPress={() => setPriorityOpen((current) => !current)} style={styles.previewAction}><Text style={styles.previewActionText}>Order</Text></Pressable>
+          {priorityOpen ? (
+            <View style={styles.previewPriorityPicker}>
+              <TextInput value={prioritySearch} onChangeText={setPrioritySearch} placeholder="Search number" placeholderTextColor={colors.stone} keyboardType="number-pad" style={styles.previewPrioritySearch} />
+              <ScrollView style={styles.previewPriorityScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                {priorityOptions.map((option) => (
+                  <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Set note order ${option}`} onPress={() => { setOpen(false); setPriorityOpen(false); setPrioritySearch(''); onSetPriority(note, option); }} style={styles.previewPriorityOption}>
+                    <Text style={styles.previewPriorityOptionText}>{option}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
           <Pressable onPress={() => { setOpen(false); onDelete(note); }} style={styles.previewAction}><Text style={styles.previewActionDanger}>Delete</Text></Pressable>
         </View>
       ) : null}
     </View>
   );
+}
+
+function createPriorityOptions(count: number, search: string) {
+  const cleanSearch = search.replace(/[^0-9]/g, '');
+  return Array.from({ length: count }, (_, index) => index + 1).filter((option) => !cleanSearch || String(option).includes(cleanSearch));
 }
 
 function createCategoryTints(colors: typeof import('../../shared/design/tokens').colors, isDark: boolean) {
@@ -186,10 +209,15 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   previewNote: { position: 'relative', flexDirection: 'row', alignItems: 'flex-start', gap: 4, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.54)' : 'rgba(255,255,255,0.66)', paddingHorizontal: 4, paddingVertical: 3, marginTop: 0 },
   previewText: { fontSize: 11, fontWeight: '500', lineHeight: 13, color: colors.charcoal, flex: 1, minWidth: 0, paddingRight: 24 },
   previewMenuButton: { position: 'absolute', top: 3, right: 3, width: 22, height: 16, borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, zIndex: 4 },
-  previewActions: { position: 'absolute', top: 22, right: 3, zIndex: 5, minWidth: 74, borderRadius: rounded.xs, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: 3, ...shadows.card },
+  previewActions: { position: 'absolute', top: 22, right: 3, zIndex: 5, minWidth: 94, borderRadius: rounded.xs, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: 3, ...shadows.card },
   previewAction: { minHeight: 22, justifyContent: 'center', paddingHorizontal: 6 },
   previewActionText: { ...typography.micro, color: colors.charcoal },
   previewActionDanger: { ...typography.micro, color: colors.semanticError },
+  previewPriorityPicker: { gap: 3, borderTopWidth: 1, borderTopColor: colors.hairlineSoft, borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft, paddingVertical: 3, marginVertical: 2 },
+  previewPrioritySearch: { height: 26, borderRadius: rounded.xs, borderWidth: 1, borderColor: colors.hairlineStrong, color: colors.ink, backgroundColor: colors.surfaceSoft, paddingHorizontal: 6, paddingVertical: 0, fontSize: 11, lineHeight: 14 },
+  previewPriorityScroll: { maxHeight: 96 },
+  previewPriorityOption: { minHeight: 24, borderRadius: rounded.xs, justifyContent: 'center', paddingHorizontal: 7, backgroundColor: colors.surfaceSoft, marginBottom: 2 },
+  previewPriorityOptionText: { ...typography.micro, color: colors.charcoal },
   emptyPreview: { borderRadius: rounded.sm, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.hairlineStrong, padding: spacing.sm, backgroundColor: isDark ? 'rgba(10,11,14,0.42)' : 'rgba(255,255,255,0.45)' },
   emptyPreviewText: { ...typography.micro, color: colors.slate },
   });

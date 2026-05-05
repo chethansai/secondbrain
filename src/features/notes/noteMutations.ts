@@ -56,9 +56,38 @@ export function copyNote(data: NotesData, sourcePath: CategoryPath, destinationP
   return { ok: true, data: next };
 }
 
+export function setNotePriority(data: NotesData, path: CategoryPath, text: string, priority: number, selectedIndex?: number): MutationResult {
+  const next = cloneData(data);
+  const items = getCategoryItems(next, path);
+  if (!items) return failure('path_not_found', 'The selected category no longer exists.');
+  const index = findNoteIndex(items, text, selectedIndex);
+  if (index === -1) return failure('not_found', 'The note could not be found.');
+
+  const noteEntries = items.flatMap((item, itemIndex) => (typeof item === 'string' ? [{ item, itemIndex }] : []));
+  if (noteEntries.length <= 1) return { ok: true, data: next };
+
+  const visibleNotes = [...noteEntries].reverse();
+  const currentVisibleIndex = visibleNotes.findIndex((entry) => entry.itemIndex === index);
+  if (currentVisibleIndex === -1) return failure('not_found', 'The note could not be found.');
+
+  const targetVisibleIndex = Math.max(0, Math.min(priority - 1, visibleNotes.length - 1));
+  const [selectedNote] = visibleNotes.splice(currentVisibleIndex, 1);
+  visibleNotes.splice(targetVisibleIndex, 0, selectedNote);
+
+  const nextNoteOrder = [...visibleNotes].reverse();
+  noteEntries.forEach((entry, entryIndex) => {
+    items[entry.itemIndex] = nextNoteOrder[entryIndex].item;
+  });
+
+  return { ok: true, data: next };
+}
+
 export function listNotesAtPath(data: NotesData, path: CategoryPath): FlatNote[] {
   const items = getCategoryItems(data, path) ?? [];
-  return items.flatMap((item, itemIndex) => (typeof item === 'string' ? [{ path, note: item, index: itemIndex }] : []));
+  return items.reduceRight<FlatNote[]>((notes, item, itemIndex) => {
+    if (typeof item === 'string') notes.push({ path, note: item, index: itemIndex });
+    return notes;
+  }, []);
 }
 
 export function flattenNotes(data: NotesData): FlatNote[] {

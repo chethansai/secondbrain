@@ -34,6 +34,7 @@ type Props = {
   onDeleteCategory: (path: CategoryPath) => void;
   onEditNote: (note: FlatNote) => void;
   onMoveNote: (note: FlatNote) => void;
+  onSetNotePriority: (note: FlatNote, priority: number) => void;
   onDeleteNote: (note: FlatNote) => void;
 };
 
@@ -62,6 +63,7 @@ export function WorkspaceBoard({
   onDeleteCategory,
   onEditNote,
   onMoveNote,
+  onSetNotePriority,
   onDeleteNote,
 }: Props) {
   const { colors, isDark, toggleTheme } = useTheme();
@@ -304,6 +306,7 @@ export function WorkspaceBoard({
                 onDelete={() => onDeleteCategory(category.path)}
                 onEditNote={onEditNote}
                 onMoveNote={onMoveNote}
+                onSetNotePriority={onSetNotePriority}
                 onDeleteNote={onDeleteNote}
               />
             </View>

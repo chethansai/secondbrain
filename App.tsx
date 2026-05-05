@@ -8,7 +8,7 @@ import { TextPromptModal } from './src/features/editor/TextPromptModal';
 import { NoteEditorModal } from './src/features/editor/NoteEditorModal';
 import { MoveCopyModal } from './src/features/notes/MoveCopyModal';
 import { NoteList } from './src/features/notes/NoteList';
-import { addNote, copyNote, deleteNote, editNote, listNotesAtPath, moveNote } from './src/features/notes/noteMutations';
+import { addNote, copyNote, deleteNote, editNote, listNotesAtPath, moveNote, setNotePriority } from './src/features/notes/noteMutations';
 import { SearchPanel } from './src/features/search/SearchPanel';
 import { SettingsPanel } from './src/features/settings/SettingsPanel';
 import { useNotesSync } from './src/features/sync/useNotesSync';
@@ -161,6 +161,10 @@ function NotesWorkspace({ automationCommand, onAutomationComplete }: { automatio
     return commit(addNote(data, notePath, text));
   }
 
+  async function setNoteOrderPriority(note: FlatNote, priority: number) {
+    return commit(setNotePriority(data, note.path, note.note, priority, note.index));
+  }
+
   async function toggleWorkspaceCategory(categoryPath: CategoryPath) {
     const selected = activeWorkspace?.selectedCategoryPaths ?? [];
     const key = categoryPath.join('\u001f');
@@ -239,6 +243,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete }: { automatio
                   onDeleteCategory={(categoryPath) => setDeleteTarget({ type: 'category', path: categoryPath })}
                   onEditNote={(note) => { setSelectedNote(note); setEditorMode('edit'); }}
                   onMoveNote={(note) => { setSelectedNote(note); setMoveVisible(true); }}
+                  onSetNotePriority={setNoteOrderPriority}
                   onDeleteNote={confirmDeleteNote}
                 />
               ) : (
@@ -266,6 +271,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete }: { automatio
                       notes={notes}
                       onEdit={(note) => { setSelectedNote(note); setEditorMode('edit'); }}
                       onMove={(note) => { setSelectedNote(note); setMoveVisible(true); }}
+                      onSetPriority={setNoteOrderPriority}
                       onDelete={confirmDeleteNote}
                     />
                   ) : <EmptyState title="No notes here" message="This category is ready for notes or subcategories." actionLabel="Add note" onAction={() => setEditorMode('add')} />}
