@@ -2,7 +2,7 @@ import { CategoryPath, FlatNote, MutationResult, NotesData } from '../../shared/
 import { cloneData, getCategoryItems, isCategoryNode } from '../categories/categoryTree';
 
 export function addNote(data: NotesData, path: CategoryPath, text: string): MutationResult {
-  const cleanText = text.trim();
+  const cleanText = normalizeNoteText(text);
   if (!cleanText) return failure('empty_note', 'Note text cannot be empty.');
   const next = cloneData(data);
   const items = getCategoryItems(next, path);
@@ -12,7 +12,7 @@ export function addNote(data: NotesData, path: CategoryPath, text: string): Muta
 }
 
 export function editNote(data: NotesData, path: CategoryPath, oldText: string, newText: string, selectedIndex?: number): MutationResult {
-  const cleanText = newText.trim();
+  const cleanText = normalizeNoteText(newText);
   if (!cleanText) return failure('empty_note', 'Note text cannot be empty.');
   const next = cloneData(data);
   const items = getCategoryItems(next, path);
@@ -106,6 +106,10 @@ function flattenItems(items: unknown[], path: CategoryPath): FlatNote[] {
 function findNoteIndex(items: unknown[], text: string, selectedIndex?: number): number {
   if (typeof selectedIndex === 'number' && items[selectedIndex] === text) return selectedIndex;
   return items.findIndex((item) => item === text);
+}
+
+export function normalizeNoteText(text: string) {
+  return text.trim().toUpperCase();
 }
 
 function failure(code: string, message: string): MutationResult {

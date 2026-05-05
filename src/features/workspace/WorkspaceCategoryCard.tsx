@@ -2,17 +2,21 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { rounded, shadows, spacing, typography } from '../../shared/design/tokens';
-import { CategorySummary, FlatNote } from '../../shared/types/notes';
+import { CategoryPath, CategorySummary, FlatNote } from '../../shared/types/notes';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
+import { normalizeNoteText } from '../notes/noteMutations';
 
 type Props = {
   category: CategorySummary;
+  allCategories: CategorySummary[];
   notes: FlatNote[];
   priority: number;
   workspaceName: string;
   showWorkspaceIntro: boolean;
+  zoom?: number;
   onOpen: () => void;
+  onOpenCategory: (path: CategoryPath) => void;
   onAddNote: (text: string) => Promise<boolean> | boolean;
   onRename: () => void;
   onDelete: () => void;
@@ -24,11 +28,14 @@ type Props = {
 
 export function WorkspaceCategoryCard({
   category,
+  allCategories,
   notes,
   priority,
   workspaceName,
   showWorkspaceIntro,
+  zoom = 1,
   onOpen,
+  onOpenCategory,
   onAddNote,
   onRename,
   onDelete,
@@ -38,16 +45,20 @@ export function WorkspaceCategoryCard({
   onDeleteNote,
 }: Props) {
   const { colors, isDark } = useTheme();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => createStyles(colors, isDark, zoom), [colors, isDark, zoom]);
   const tints = useMemo(() => createCategoryTints(colors, isDark), [colors, isDark]);
   const [adding, setAdding] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [actionsOpen, setActionsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [subcategoriesOpen, setSubcategoriesOpen] = useState(false);
+  const [expandedCategoryKeys, setExpandedCategoryKeys] = useState<Set<string>>(() => new Set());
   const tint = tints[(priority - 1) % tints.length];
+  const childCategoriesByParentKey = useMemo(() => groupChildCategories(allCategories, category.path), [allCategories, category.path]);
+  const childCategories = childCategoriesByParentKey.get(pathKey(category.path)) ?? [];
 
   async function submitNote() {
-    const text = newNote.trim();
+    const text = normalizeNoteText(newNote);
     if (!text) {
       setAdding(false);
       return;
@@ -59,6 +70,19 @@ export function WorkspaceCategoryCard({
       setNewNote('');
       setAdding(false);
     }
+  }
+
+  function toggleCategory(path: CategoryPath) {
+    const key = pathKey(path);
+    setExpandedCategoryKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
   }
 
   return (
@@ -100,11 +124,47 @@ export function WorkspaceCategoryCard({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={notes.length > 4}
       >
+        {childCategories.length ? (
+          <View style={styles.subcategoryContainer}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${subcategoriesOpen ? 'Collapse' : 'Expand'} ${category.name} subcategories`}
+              onPress={(event) => { event.stopPropagation(); setSubcategoriesOpen((current) => !current); }}
+              style={styles.subcategoryContainerHeader}
+            >
+              <View style={styles.subcategoryContainerIcon}>
+                <Icon name="git-branch-outline" size={10} color={colors.primary} />
+              </View>
+              <Text style={styles.subcategoryContainerTitle} numberOfLines={1}>Subcategories</Text>
+              <Text style={styles.subcategoryContainerCount}>{childCategories.length}</Text>
+              <Icon name={subcategoriesOpen ? 'chevron-down' : 'chevron-forward'} size={11} color={colors.steel} />
+            </Pressable>
+            {subcategoriesOpen ? (
+              <View style={styles.subcategoryList}>
+                {childCategories.map((child) => (
+                  <WorkspaceSubcategoryRow
+                    key={pathKey(child.path)}
+                    category={child}
+                    depth={0}
+                    expandedCategoryKeys={expandedCategoryKeys}
+                    childCategoriesByParentKey={childCategoriesByParentKey}
+                    colors={colors}
+                    styles={styles}
+                    onOpenCategory={onOpenCategory}
+                    onToggleCategory={toggleCategory}
+                  />
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
         {adding ? (
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.inlineAdd}>
             <TextInput
               value={newNote}
-              onChangeText={setNewNote}
+              onChangeText={(value) => setNewNote(value.toUpperCase())}
+              autoCapitalize="characters"
               placeholder="Add note"
               placeholderTextColor={colors.stone}
               accessibilityLabel={`New note in ${category.name}`}
@@ -126,6 +186,49 @@ export function WorkspaceCategoryCard({
           <View style={styles.emptyPreview}><Text style={styles.emptyPreviewText}>No notes yet.</Text></View>
         ) : null}
       </ScrollView>
+    </View>
+  );
+}
+
+function WorkspaceSubcategoryRow({ category, depth, expandedCategoryKeys, childCategoriesByParentKey, colors, styles, onOpenCategory, onToggleCategory }: { category: CategorySummary; depth: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onOpenCategory: (path: CategoryPath) => void; onToggleCategory: (path: CategoryPath) => void }) {
+  const key = pathKey(category.path);
+  const children = childCategoriesByParentKey.get(key) ?? [];
+  const expanded = expandedCategoryKeys.has(key);
+  const hasChildren = children.length > 0;
+
+  return (
+    <View style={styles.subcategoryNode}>
+      <View style={[styles.subcategoryRow, { marginLeft: Math.min(depth, 4) * styles.subcategoryIndent.width }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={hasChildren ? `${expanded ? 'Collapse' : 'Expand'} ${category.name}` : `${category.name} has no subcategories`}
+          disabled={!hasChildren}
+          onPress={(event) => { event.stopPropagation(); onToggleCategory(category.path); }}
+          style={[styles.subcategoryToggle, !hasChildren && styles.subcategoryToggleEmpty]}
+        >
+          {hasChildren ? <Icon name={expanded ? 'chevron-down' : 'chevron-forward'} size={10} color={colors.steel} /> : null}
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Open ${category.name}`} onPress={() => onOpenCategory(category.path)} style={styles.subcategoryMain}>
+          <Text style={styles.subcategoryName} numberOfLines={1}>{category.name}</Text>
+          <View style={styles.subcategoryCounts}>
+            <Text style={styles.subcategoryCount}>{category.noteCount}</Text>
+            {hasChildren ? <Text style={styles.subcategoryCount}>{children.length}</Text> : null}
+          </View>
+        </Pressable>
+      </View>
+      {expanded ? children.map((child) => (
+        <WorkspaceSubcategoryRow
+          key={pathKey(child.path)}
+          category={child}
+          depth={depth + 1}
+          expandedCategoryKeys={expandedCategoryKeys}
+          childCategoriesByParentKey={childCategoriesByParentKey}
+          colors={colors}
+          styles={styles}
+          onOpenCategory={onOpenCategory}
+          onToggleCategory={onToggleCategory}
+        />
+      )) : null}
     </View>
   );
 }
@@ -184,6 +287,26 @@ function createPriorityOptions(count: number, search: string) {
   return Array.from({ length: count }, (_, index) => index + 1).filter((option) => !cleanSearch || String(option).includes(cleanSearch));
 }
 
+function groupChildCategories(categories: CategorySummary[], rootPath: CategoryPath) {
+  const rootKey = pathKey(rootPath);
+  return categories.reduce<Map<string, CategorySummary[]>>((groups, category) => {
+    if (!isDescendantPath(rootPath, category.path)) return groups;
+    const parentKey = pathKey(category.path.slice(0, -1));
+    const siblings = groups.get(parentKey) ?? [];
+    siblings.push(category);
+    groups.set(parentKey, siblings);
+    return groups;
+  }, new Map([[rootKey, []]]));
+}
+
+function isDescendantPath(rootPath: CategoryPath, path: CategoryPath) {
+  return path.length > rootPath.length && rootPath.every((segment, index) => path[index] === segment);
+}
+
+function pathKey(path: CategoryPath) {
+  return path.join('\u001f');
+}
+
 function createCategoryTints(colors: typeof import('../../shared/design/tokens').colors, isDark: boolean) {
   if (isDark) {
     return [
@@ -200,41 +323,58 @@ function createCategoryTints(colors: typeof import('../../shared/design/tokens')
   return [colors.canvas, colors.cardTintYellow, colors.cardTintMint, colors.cardTintSky, colors.cardTintRose, colors.cardTintLavender, colors.cardTintPeach];
 }
 
-function createStyles(colors: typeof import('../../shared/design/tokens').colors, isDark: boolean) {
+function createStyles(colors: typeof import('../../shared/design/tokens').colors, isDark: boolean, zoom: number) {
+  const scale = (value: number) => Math.round(value * zoom);
+  const scaledRadius = Math.max(rounded.xs, scale(rounded.lg));
   return StyleSheet.create({
-  card: { width: '100%', minWidth: 0, height: 264, borderRadius: rounded.lg, borderWidth: 1, borderColor: isDark ? '#353a45' : colors.hairline, paddingHorizontal: 5, paddingVertical: 7, gap: 2, ...shadows.card },
-  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 3 },
+  card: { width: '100%', minWidth: 0, height: scale(264), borderRadius: scaledRadius, borderWidth: 1, borderColor: isDark ? '#353a45' : colors.hairline, paddingHorizontal: scale(5), paddingVertical: scale(7), gap: scale(2), ...shadows.card },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: scale(3) },
   titleBlock: { flex: 1, minWidth: 0 },
-  workspaceName: { fontSize: 7, fontWeight: '500', lineHeight: 9, color: colors.steel, textTransform: 'uppercase' },
-  titleButton: { minHeight: 18, flexDirection: 'row', alignItems: 'flex-start', gap: 3, paddingRight: 1 },
-  titleRow: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
-  title: { fontSize: 13, fontWeight: '700', lineHeight: 16, color: colors.charcoal, flex: 1, minWidth: 0 },
-  titleMeta: { flexShrink: 0, flexDirection: 'row', gap: 2, paddingTop: 1 },
-  titleMetaText: { fontSize: 7, fontWeight: '700', lineHeight: 9, color: colors.steel, textTransform: 'uppercase' },
-  headerMeta: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 3, maxWidth: 40 },
-  iconButtonSmall: { width: 18, height: 18, borderRadius: rounded.xs, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.12)' : colors.hairline, backgroundColor: isDark ? 'rgba(10,11,14,0.72)' : 'rgba(255,255,255,0.72)', alignItems: 'center', justifyContent: 'center' },
-  actionsPanel: { flexDirection: 'row', gap: 4 },
-  panelButton: { flex: 1, minHeight: 32, paddingHorizontal: 4 },
-  previewScroller: { flex: 1, minHeight: 0, marginTop: 1 },
-  previewList: { gap: 1, paddingBottom: 2 },
-  inlineAdd: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 27, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.82)' : colors.canvas, paddingHorizontal: 5 },
-  inlineInput: { ...typography.micro, color: colors.charcoal, flex: 1, minWidth: 0, paddingVertical: 0 },
-  inlineIconButton: { width: 22, height: 22, borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center' },
-  previewNote: { position: 'relative', flexDirection: 'row', alignItems: 'flex-start', gap: 4, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.54)' : 'rgba(255,255,255,0.66)', paddingHorizontal: 4, paddingVertical: 3, marginTop: 0 },
-  previewText: { fontSize: 11, fontWeight: '500', lineHeight: 13, color: colors.charcoal, flex: 1, minWidth: 0, paddingRight: 24 },
-  previewMenuButton: { position: 'absolute', top: 3, right: 3, width: 22, height: 16, borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, zIndex: 4 },
-  previewActions: { position: 'absolute', top: 22, right: 3, zIndex: 5, minWidth: 94, borderRadius: rounded.xs, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: 3, ...shadows.card },
-  previewAction: { minHeight: 22, justifyContent: 'center', paddingHorizontal: 6 },
-  previewActionText: { ...typography.micro, color: colors.charcoal },
-  previewActionDanger: { ...typography.micro, color: colors.semanticError },
-  previewPriorityPicker: { gap: 3, borderTopWidth: 1, borderTopColor: colors.hairlineSoft, borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft, paddingVertical: 3, marginVertical: 2 },
-  previewPrioritySearch: { height: 26, borderRadius: rounded.xs, borderWidth: 1, borderColor: colors.hairlineStrong, color: colors.ink, backgroundColor: colors.surfaceSoft, paddingHorizontal: 6, paddingVertical: 0, fontSize: 11, lineHeight: 14 },
-  previewPriorityScroll: { maxHeight: 96 },
-  previewPriorityOption: { minHeight: 24, borderRadius: rounded.xs, justifyContent: 'center', paddingHorizontal: 7, backgroundColor: colors.surfaceSoft, marginBottom: 2 },
+  workspaceName: { fontSize: scale(7), fontWeight: '500', lineHeight: scale(9), color: colors.steel, textTransform: 'uppercase' },
+  titleButton: { minHeight: scale(18), flexDirection: 'row', alignItems: 'flex-start', gap: scale(3), paddingRight: scale(1) },
+  titleRow: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: scale(4) },
+  title: { fontSize: scale(13), fontWeight: '700', lineHeight: scale(16), color: colors.charcoal, flex: 1, minWidth: 0 },
+  titleMeta: { flexShrink: 0, flexDirection: 'row', gap: scale(2), paddingTop: scale(1) },
+  titleMetaText: { fontSize: scale(7), fontWeight: '700', lineHeight: scale(9), color: colors.steel, textTransform: 'uppercase' },
+  headerMeta: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: scale(3), maxWidth: scale(40) },
+  iconButtonSmall: { width: scale(18), height: scale(18), borderRadius: rounded.xs, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.12)' : colors.hairline, backgroundColor: isDark ? 'rgba(10,11,14,0.72)' : 'rgba(255,255,255,0.72)', alignItems: 'center', justifyContent: 'center' },
+  actionsPanel: { flexDirection: 'row', gap: scale(4) },
+  panelButton: { flex: 1, minHeight: scale(32), paddingHorizontal: scale(4) },
+  previewScroller: { flex: 1, minHeight: 0, marginTop: scale(1) },
+  previewList: { gap: scale(1), paddingBottom: scale(2) },
+  subcategoryContainer: { borderRadius: rounded.xs, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.12)' : colors.hairlineSoft, backgroundColor: isDark ? 'rgba(10,11,14,0.32)' : 'rgba(255,255,255,0.48)', overflow: 'hidden', marginBottom: scale(2) },
+  subcategoryContainerHeader: { minHeight: scale(26), flexDirection: 'row', alignItems: 'center', gap: scale(4), paddingHorizontal: scale(5), paddingVertical: scale(3), backgroundColor: isDark ? 'rgba(10,11,14,0.44)' : 'rgba(255,255,255,0.62)' },
+  subcategoryContainerIcon: { width: scale(16), height: scale(16), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'rgba(216,179,90,0.12)' : colors.cardTintYellow, flexShrink: 0 },
+  subcategoryContainerTitle: { fontSize: scale(10), fontWeight: '800', lineHeight: scale(13), color: colors.charcoal, flex: 1, minWidth: 0 },
+  subcategoryContainerCount: { fontSize: scale(8), fontWeight: '800', lineHeight: scale(10), color: colors.steel, minWidth: scale(14), textAlign: 'center' },
+  subcategoryList: { gap: scale(1), padding: scale(2), borderTopWidth: 1, borderTopColor: isDark ? 'rgba(243,241,236,0.08)' : colors.hairlineSoft },
+  subcategoryNode: { gap: scale(1) },
+  subcategoryRow: { minHeight: scale(24), flexDirection: 'row', alignItems: 'center', gap: scale(2) },
+  subcategoryIndent: { width: scale(10) },
+  subcategoryToggle: { width: scale(18), height: scale(20), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'rgba(10,11,14,0.62)' : 'rgba(255,255,255,0.72)', borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, flexShrink: 0 },
+  subcategoryToggleEmpty: { opacity: 0.45 },
+  subcategoryMain: { flex: 1, minWidth: 0, minHeight: scale(22), borderRadius: rounded.xs, flexDirection: 'row', alignItems: 'center', gap: scale(4), paddingHorizontal: scale(4), backgroundColor: isDark ? 'rgba(10,11,14,0.42)' : 'rgba(255,255,255,0.56)' },
+  subcategoryName: { fontSize: scale(10), fontWeight: '700', lineHeight: scale(13), color: colors.charcoal, flex: 1, minWidth: 0 },
+  subcategoryCounts: { flexDirection: 'row', alignItems: 'center', gap: scale(2), flexShrink: 0 },
+  subcategoryCount: { fontSize: scale(7), fontWeight: '700', lineHeight: scale(9), color: colors.steel },
+  inlineAdd: { flexDirection: 'row', alignItems: 'center', gap: scale(4), minHeight: scale(27), borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.82)' : colors.canvas, paddingHorizontal: scale(5) },
+  inlineInput: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.charcoal, flex: 1, minWidth: 0, paddingVertical: 0 },
+  inlineIconButton: { width: scale(22), height: scale(22), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center' },
+  previewNote: { position: 'relative', flexDirection: 'row', alignItems: 'flex-start', gap: scale(4), borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.54)' : 'rgba(255,255,255,0.66)', paddingHorizontal: scale(4), paddingVertical: scale(3), marginTop: 0 },
+  previewText: { fontSize: scale(11), fontWeight: '500', lineHeight: scale(13), color: colors.charcoal, flex: 1, minWidth: 0, paddingRight: scale(24) },
+  previewMenuButton: { position: 'absolute', top: scale(3), right: scale(3), width: scale(22), height: scale(16), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, zIndex: 4 },
+  previewActions: { position: 'absolute', top: scale(22), right: scale(3), zIndex: 5, minWidth: scale(94), borderRadius: rounded.xs, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: scale(3), ...shadows.card },
+  previewAction: { minHeight: scale(22), justifyContent: 'center', paddingHorizontal: scale(6) },
+  previewActionText: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.charcoal },
+  previewActionDanger: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.semanticError },
+  previewPriorityPicker: { gap: scale(3), borderTopWidth: 1, borderTopColor: colors.hairlineSoft, borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft, paddingVertical: scale(3), marginVertical: scale(2) },
+  previewPrioritySearch: { height: scale(26), borderRadius: rounded.xs, borderWidth: 1, borderColor: colors.hairlineStrong, color: colors.ink, backgroundColor: colors.surfaceSoft, paddingHorizontal: scale(6), paddingVertical: 0, fontSize: scale(11), lineHeight: scale(14) },
+  previewPriorityScroll: { maxHeight: scale(96) },
+  previewPriorityOption: { minHeight: scale(24), borderRadius: rounded.xs, justifyContent: 'center', paddingHorizontal: scale(7), backgroundColor: colors.surfaceSoft, marginBottom: scale(2) },
   previewPriorityOptionCurrent: { backgroundColor: colors.primary, borderWidth: 1, borderColor: colors.primaryDeep },
-  previewPriorityOptionText: { ...typography.micro, color: colors.charcoal },
+  previewPriorityOptionText: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.charcoal },
   previewPriorityOptionTextCurrent: { color: colors.onPrimary },
-  emptyPreview: { borderRadius: rounded.sm, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.hairlineStrong, padding: spacing.sm, backgroundColor: isDark ? 'rgba(10,11,14,0.42)' : 'rgba(255,255,255,0.45)' },
-  emptyPreviewText: { ...typography.micro, color: colors.slate },
+  emptyPreview: { borderRadius: rounded.sm, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.hairlineStrong, padding: scale(spacing.sm), backgroundColor: isDark ? 'rgba(10,11,14,0.42)' : 'rgba(255,255,255,0.45)' },
+  emptyPreviewText: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.slate },
   });
 }

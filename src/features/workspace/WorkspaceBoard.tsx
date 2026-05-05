@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { GestureResponderEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type DimensionValue } from 'react-native';
 import { formatPath, listAllCategories } from '../categories/categoryTree';
 import { listNotesAtPath } from '../notes/noteMutations';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { colors, rounded, spacing, typography } from '../../shared/design/tokens';
-import { CategoryPath, FlatNote, NotesData, WorkspaceMeta } from '../../shared/types/notes';
+import { CategoryPath, CategorySummary, FlatNote, NotesData, WorkspaceMeta } from '../../shared/types/notes';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { Icon } from '../../shared/ui/Icon';
 import { WorkspaceCategoryCard } from './WorkspaceCategoryCard';
@@ -88,7 +88,7 @@ export function WorkspaceBoard({
     const category = categoriesByKey.get(pathKey(path));
     return category ? [category] : [];
   });
-  const boardCategories = selectedCategoryRows.length ? selectedCategoryRows : allCategories;
+  const boardCategories = selectedCategoryRows.length ? removeDescendantCategories(selectedCategoryRows) : allCategories.filter((category) => category.path.length === 1);
   const prioritizedCategories = boardCategories.map((category, index) => ({ category, priority: index + 1, notes: listNotesAtPath(data, category.path) }));
   const pickerCategories = allCategories
     .map((category, index) => ({ category, index, selectedIndex: selectedPaths.findIndex((path) => pathKey(path) === pathKey(category.path)) }))
@@ -346,32 +346,118 @@ export function WorkspaceBoard({
       ) : (
         <View style={styles.grid}>
           {prioritizedCategories.map(({ category, notes, priority }, index) => (
-            <View key={pathKey(category.path)} style={[styles.cardSlot, index % 2 === 0 ? styles.cardSlotLeft : styles.cardSlotRight]}>
-              <WorkspaceCategoryCard
-                category={category}
-                notes={notes}
-                priority={priority}
-                workspaceName={activeWorkspace?.name ?? 'Workspace'}
-                showWorkspaceIntro={priority === 1}
-                onOpen={() => onOpenCategory(category.path)}
-                onAddNote={(text) => onAddNote(category.path, text)}
-                onRename={() => onRenameCategory(category.path)}
-                onDelete={() => onDeleteCategory(category.path)}
-                onEditNote={onEditNote}
-                onMoveNote={onMoveNote}
-                onSetNotePriority={onSetNotePriority}
-                onDeleteNote={onDeleteNote}
-              />
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
-  );
+            <ZoomableCategorySlot key={pathKey(category.path)} index={index} styles={styles}>
+              {(zoom) => (
+                <WorkspaceCategoryCard
+                  category={category}
+                  allCategories={allCategories}
+                  notes={notes}
+                  priority={priority}
+                  workspaceName={activeWorkspace?.name ?? 'Workspace'}
+                  showWorkspaceIntro={priority === 1}
+                  zoom={zoom}
+                  onOpen={() => onOpenCategory(category.path)}
+                  onOpenCategory={onOpenCategory}
+                  onAddNote={(text) => onAddNote(category.path, text)}
+                  onRename={() => onRenameCategory(category.path)}
+                  onDelete={() => onDeleteCategory(category.path)}
+                  onEditNote={onEditNote}
+                  onMoveNote={onMoveNote}
+                  onSetNotePriority={onSetNotePriority}
+                  onDeleteNote={onDeleteNote}
+                />
+              )}
+            </ZoomableCategorySlot>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  function ZoomableCategorySlot({ index, styles, children }: { index: number; styles: ReturnType<typeof createStyles>; children: (zoom: number) => ReactNode }) {
+    const [zoom, setZoom] = useState(minCategoryZoom);
+    const pinch = useRef<{ distance: number; zoom: number } | null>(null);
+    const zoomed = zoom > minCategoryZoom + 0.02;
+    const width: DimensionValue = zoomed ? `${Math.min(100, 50 * zoom)}%` : '50%';
+    const webWheelProps = Platform.OS === 'web' ? {
+      onWheel: (event: { ctrlKey?: boolean; metaKey?: boolean; deltaY: number; preventDefault?: () => void }) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault?.();
+        const direction = event.deltaY < 0 ? 1 : -1;
+        setZoom((current) => snapCategoryZoom(clampCategoryZoom(current + direction * 0.14)));
+      },
+    } : null;
+
+    function hasPinch(event: GestureResponderEvent) {
+      return (event.nativeEvent.touches?.length ?? 0) >= 2;
+    }
+
+    function startPinch(event: GestureResponderEvent) {
+      const distance = touchDistance(event);
+      if (distance > 0) pinch.current = { distance, zoom };
+    }
+
+    function movePinch(event: GestureResponderEvent) {
+      if (!pinch.current) startPinch(event);
+      if (!pinch.current) return;
+      const distance = touchDistance(event);
+      if (distance <= 0) return;
+      setZoom(snapCategoryZoom(clampCategoryZoom(pinch.current.zoom * (distance / pinch.current.distance))));
+    }
+
+    function endPinch() {
+      pinch.current = null;
+      setZoom((current) => snapCategoryZoom(current));
+    }
+
+    return (
+      <View
+        {...(webWheelProps as object)}
+        onStartShouldSetResponderCapture={hasPinch}
+        onMoveShouldSetResponderCapture={hasPinch}
+        onResponderGrant={startPinch}
+        onResponderMove={movePinch}
+        onResponderRelease={endPinch}
+        onResponderTerminate={endPinch}
+        style={[
+          styles.cardSlot,
+          index % 2 === 0 ? styles.cardSlotLeft : styles.cardSlotRight,
+          zoomed && styles.cardSlotZoomed,
+          { width },
+        ]}
+      >
+        {children(zoom)}
+      </View>
+    );
+  }
+
+function touchDistance(event: GestureResponderEvent) {
+  const touches = event.nativeEvent.touches;
+  if (!touches || touches.length < 2) return 0;
+  const first = touches[0];
+  const second = touches[1];
+  return Math.hypot(second.pageX - first.pageX, second.pageY - first.pageY);
+}
+
+function clampCategoryZoom(zoom: number) {
+  return Math.min(maxCategoryZoom, Math.max(minCategoryZoom, zoom));
+}
+
+function snapCategoryZoom(zoom: number) {
+  return zoom < minCategoryZoom + 0.04 ? minCategoryZoom : zoom;
 }
 
 function pathKey(path: CategoryPath) {
   return path.join('\u001f');
+}
+
+function removeDescendantCategories(categories: CategorySummary[]) {
+  return categories.filter((category) => !categories.some((candidate) => isAncestorPath(candidate.path, category.path)));
+}
+
+function isAncestorPath(candidate: CategoryPath, path: CategoryPath) {
+  return candidate.length < path.length && candidate.every((segment, index) => path[index] === segment);
 }
 
 function formatHours(hours: number) {
@@ -380,6 +466,8 @@ function formatHours(hours: number) {
 
 const boardCardGutter = 1;
 const boardCardHalfGutter = boardCardGutter / 2;
+const minCategoryZoom = 1;
+const maxCategoryZoom = 2.4;
 
 function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
   return StyleSheet.create({
@@ -462,5 +550,6 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   cardSlot: { width: '50%', minWidth: 0, paddingVertical: boardCardHalfGutter },
   cardSlotLeft: { paddingLeft: 0, paddingRight: boardCardHalfGutter },
   cardSlotRight: { paddingLeft: boardCardHalfGutter, paddingRight: 0 },
+  cardSlotZoomed: { zIndex: 30, elevation: 8, paddingLeft: 0, paddingRight: 0 },
   });
 }

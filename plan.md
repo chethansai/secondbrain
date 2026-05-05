@@ -1,3 +1,10 @@
+## NON-NEGOTIABLE MUST DO
+AFTER IMPLEMENTING EACH STEP PERFORM
+git status
+git add .
+git commit -m <with proper message>
+git push -u origin main
+
 ## Plan: Exhaustive React Native Firebase Notes
 
 Rebuild the notes app as React Native + Firebase only, with no Django dependency. Store notes in Firestore collection `reactnativecollection` using simple nested JSON: root category keys map to arrays containing note strings and nested single-key category objects. The app should preserve core note/category workflows while deliberately excluding instant/full load, Instagram-specific rendering, OCR/Tesseract, Django APIs, and complex mirror propagation.
