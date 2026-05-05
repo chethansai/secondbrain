@@ -18,7 +18,7 @@ type Props = {
   zoom?: number;
   onOpen: () => void;
   onOpenCategory: (path: CategoryPath) => void;
-  onAddNote: (text: string) => Promise<boolean> | boolean;
+  onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean;
   onRename: () => void;
   onDelete: () => void;
   onEditNote: (note: FlatNote) => void;
@@ -67,7 +67,7 @@ export function WorkspaceCategoryCard({
       return;
     }
     setBusy(true);
-    const ok = await onAddNote(text);
+    const ok = await onAddNote(category.path, text);
     setBusy(false);
     if (ok) {
       setNewNote('');
@@ -142,6 +142,7 @@ export function WorkspaceCategoryCard({
                 styles={styles}
                 onToggleCategory={toggleCategory}
                 onOpenCategory={onOpenCategory}
+                onAddNote={onAddNote}
                 onEditNote={onEditNote}
                 onMoveNote={onMoveNote}
                 onCopyNote={onCopyNote}
@@ -183,7 +184,10 @@ export function WorkspaceCategoryCard({
   );
 }
 
-function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, colors, styles, onToggleCategory, onOpenCategory, onEditNote, onMoveNote, onCopyNote, onSetNotePriority, onDeleteNote }: { category: CategorySummary; depth: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onDeleteNote: (note: FlatNote) => void }) {
+function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, colors, styles, onToggleCategory, onOpenCategory, onAddNote, onEditNote, onMoveNote, onCopyNote, onSetNotePriority, onDeleteNote }: { category: CategorySummary; depth: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onDeleteNote: (note: FlatNote) => void }) {
+  const [adding, setAdding] = useState(false);
+  const [newNote, setNewNote] = useState('');
+  const [busy, setBusy] = useState(false);
   const key = pathKey(category.path);
   const children = childCategoriesByParentKey.get(key) ?? [];
   const childNotes = notesByCategoryKey.get(key) ?? [];
@@ -191,6 +195,22 @@ function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategory
   const hasChildren = children.length > 0;
   const expandable = hasChildren || childNotes.length > 0;
   const indent = Math.min(depth, 4) * styles.subcategoryIndent.width;
+
+  async function submitNote() {
+    const text = normalizeNoteText(newNote);
+    if (!text) {
+      setAdding(false);
+      return;
+    }
+    setBusy(true);
+    const ok = await onAddNote(category.path, text);
+    setBusy(false);
+    if (ok) {
+      setNewNote('');
+      setAdding(false);
+      if (!expanded) onToggleCategory(category.path);
+    }
+  }
 
   return (
     <View style={[styles.subcategoryNode, { zIndex: stackOrder }]}>
@@ -211,7 +231,30 @@ function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategory
             {hasChildren ? <Text style={styles.subcategoryCount}>{children.length}</Text> : null}
           </View>
         </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Add note to ${category.name}`} onPress={(event) => { event.stopPropagation(); setAdding(true); }} style={styles.subcategoryAddButton}>
+          <Icon name="add" size={10} color={colors.primary} />
+        </Pressable>
       </View>
+      {adding ? (
+        <Pressable onPress={(event) => event.stopPropagation()} style={[styles.inlineAdd, styles.subcategoryInlineAdd, { marginLeft: indent + styles.subcategoryIndent.width }]}> 
+          <TextInput
+            value={newNote}
+            onChangeText={(value) => setNewNote(value.toUpperCase())}
+            autoCapitalize="characters"
+            placeholder="Add note"
+            placeholderTextColor={colors.stone}
+            accessibilityLabel={`New note in ${category.name}`}
+            autoFocus
+            editable={!busy}
+            returnKeyType="done"
+            onSubmitEditing={submitNote}
+            style={styles.inlineInput}
+          />
+          <Pressable accessibilityRole="button" accessibilityLabel="Cancel new note" onPress={(event) => { event.stopPropagation(); setAdding(false); setNewNote(''); }} style={styles.inlineIconButton}>
+            <Icon name="close" size={11} color={colors.steel} />
+          </Pressable>
+        </Pressable>
+      ) : null}
       {expanded ? (
         <View style={[styles.subcategoryContents, { marginLeft: indent + styles.subcategoryIndent.width }]}>
           {children.map((child, index) => (
@@ -227,6 +270,7 @@ function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategory
               styles={styles}
               onToggleCategory={onToggleCategory}
               onOpenCategory={onOpenCategory}
+              onAddNote={onAddNote}
               onEditNote={onEditNote}
               onMoveNote={onMoveNote}
               onCopyNote={onCopyNote}
@@ -362,10 +406,12 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   subcategoryToggle: { width: scale(18), height: scale(20), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'rgba(10,11,14,0.62)' : 'rgba(255,255,255,0.72)', borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, flexShrink: 0 },
   subcategoryToggleEmpty: { opacity: 0.45 },
   subcategoryMain: { flex: 1, minWidth: 0, minHeight: scale(22), borderRadius: rounded.xs, flexDirection: 'row', alignItems: 'center', gap: scale(4), paddingHorizontal: scale(4), backgroundColor: isDark ? 'rgba(10,11,14,0.42)' : 'rgba(255,255,255,0.56)' },
+  subcategoryAddButton: { width: scale(18), height: scale(20), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'rgba(10,11,14,0.62)' : 'rgba(255,255,255,0.72)', borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, flexShrink: 0 },
   subcategoryName: { fontSize: scale(10), fontWeight: '700', lineHeight: scale(13), color: colors.charcoal, flex: 1, minWidth: 0 },
   subcategoryCounts: { flexDirection: 'row', alignItems: 'center', gap: scale(2), flexShrink: 0 },
   subcategoryCount: { fontSize: scale(7), fontWeight: '700', lineHeight: scale(9), color: colors.steel },
   inlineAdd: { flexDirection: 'row', alignItems: 'center', gap: scale(4), minHeight: scale(27), borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.82)' : colors.canvas, paddingHorizontal: scale(5) },
+  subcategoryInlineAdd: { marginTop: scale(1), marginBottom: scale(1) },
   inlineInput: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.charcoal, flex: 1, minWidth: 0, paddingVertical: 0 },
   inlineIconButton: { width: scale(22), height: scale(22), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center' },
   previewNote: { position: 'relative', flexDirection: 'row', alignItems: 'flex-start', gap: scale(4), borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.54)' : 'rgba(255,255,255,0.66)', paddingHorizontal: scale(4), paddingVertical: scale(3), marginTop: 0 },

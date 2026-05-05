@@ -362,7 +362,7 @@ export function WorkspaceBoard({
                   zoom={zoom}
                   onOpen={() => onOpenCategory(category.path)}
                   onOpenCategory={onOpenCategory}
-                  onAddNote={(text) => onAddNote(category.path, text)}
+                  onAddNote={onAddNote}
                   onRename={() => onRenameCategory(category.path)}
                   onDelete={() => onDeleteCategory(category.path)}
                   onEditNote={onEditNote}

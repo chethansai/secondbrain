@@ -361,6 +361,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-05: Reconciled workspace card subcategory add-note changes after the move/copy push. Decision: keep the subcategory inline add control, pass the selected category path through the board note-add callback, and add the missing styles so the workspace card remains typecheck-clean.
 - 2026-05-05: Updated note actions and move/copy category selection. Decision: note option menus now show Edit, Move, Order, Delete, and Copy; Copy is only launched from the note options, and choosing a category after Move or Copy immediately performs the selected action without an extra submit button.
 - 2026-05-05: Completed mandatory git handoff for the category card note options stacking fix. Decision: include the finished UI stacking change and current workspace changes in the requested `git status`, `git add .`, commit, and push workflow.
 - 2026-05-05: Fixed Android category card note options stacking. Decision: open note action menus now raise their row above sibling notes and lower-half note menus open upward so the options container stays in front of the card content instead of going behind it.
