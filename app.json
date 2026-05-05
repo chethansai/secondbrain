@@ -14,7 +14,7 @@
       "bundleIdentifier": "com.notes.native"
     },
     "android": {
-      "package": "com.notes.native"
+        "package": "com.notes.nativenotetaking"
     },
     "plugins": [
       "expo-secure-store"

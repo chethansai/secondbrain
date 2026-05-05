@@ -358,8 +358,8 @@ Use Automate's activity/intent block to launch the app locally on the same Andro
 
 Fill the Automate fields with:
 
-1. Package: `com.notes.native`
-2. Activity class: `com.notes.native.MainActivity`
+1. Package: `com.notes.nativenotetaking`
+2. Activity class: `com.notes.nativenotetaking.MainActivity`
 3. Action: `android.intent.action.VIEW`
 4. Data URI: `nativenotes://add-note?category=SEEK&note=Your%20note%20text`
 5. MIME type: leave empty
@@ -377,7 +377,7 @@ Example Data URI values:
 Manual ADB test command after installing a build that includes the `nativenotes` scheme:
 
 ```bash
-adb shell am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "nativenotes://add-note?category=SEEK&note=Intent%20test" com.notes.native
+adb shell am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "nativenotes://add-note?category=SEEK&note=Intent%20test" com.notes.nativenotetaking
 ```
 
 Expected behavior: the app opens, shows the lock screen if locked, then after unlock and sync load it adds the note to category `SEEK` once and navigates to `SEEK`.
