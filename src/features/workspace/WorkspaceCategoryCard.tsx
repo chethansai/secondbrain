@@ -51,7 +51,6 @@ export function WorkspaceCategoryCard({
   const [newNote, setNewNote] = useState('');
   const [actionsOpen, setActionsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [subcategoriesOpen, setSubcategoriesOpen] = useState(false);
   const [expandedCategoryKeys, setExpandedCategoryKeys] = useState<Set<string>>(() => new Set());
   const tint = tints[(priority - 1) % tints.length];
   const childCategoriesByParentKey = useMemo(() => groupChildCategories(allCategories, category.path), [allCategories, category.path]);
@@ -125,37 +124,20 @@ export function WorkspaceCategoryCard({
         showsVerticalScrollIndicator={notes.length > 4}
       >
         {childCategories.length ? (
-          <View style={styles.subcategoryContainer}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${subcategoriesOpen ? 'Collapse' : 'Expand'} ${category.name} subcategories`}
-              onPress={(event) => { event.stopPropagation(); setSubcategoriesOpen((current) => !current); }}
-              style={styles.subcategoryContainerHeader}
-            >
-              <View style={styles.subcategoryContainerIcon}>
-                <Icon name="git-branch-outline" size={10} color={colors.primary} />
-              </View>
-              <Text style={styles.subcategoryContainerTitle} numberOfLines={1}>Subcategories</Text>
-              <Text style={styles.subcategoryContainerCount}>{childCategories.length}</Text>
-              <Icon name={subcategoriesOpen ? 'chevron-down' : 'chevron-forward'} size={11} color={colors.steel} />
-            </Pressable>
-            {subcategoriesOpen ? (
-              <View style={styles.subcategoryList}>
-                {childCategories.map((child) => (
-                  <WorkspaceSubcategoryRow
-                    key={pathKey(child.path)}
-                    category={child}
-                    depth={0}
-                    expandedCategoryKeys={expandedCategoryKeys}
-                    childCategoriesByParentKey={childCategoriesByParentKey}
-                    colors={colors}
-                    styles={styles}
-                    onOpenCategory={onOpenCategory}
-                    onToggleCategory={toggleCategory}
-                  />
-                ))}
-              </View>
-            ) : null}
+          <View style={styles.subcategoryBlock}>
+            {childCategories.map((child) => (
+              <WorkspaceSubcategoryRow
+                key={pathKey(child.path)}
+                category={child}
+                depth={0}
+                expandedCategoryKeys={expandedCategoryKeys}
+                childCategoriesByParentKey={childCategoriesByParentKey}
+                colors={colors}
+                styles={styles}
+                onOpenCategory={onOpenCategory}
+                onToggleCategory={toggleCategory}
+              />
+            ))}
           </View>
         ) : null}
 
@@ -342,12 +324,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   panelButton: { flex: 1, minHeight: scale(32), paddingHorizontal: scale(4) },
   previewScroller: { flex: 1, minHeight: 0, marginTop: scale(1) },
   previewList: { gap: scale(1), paddingBottom: scale(2) },
-  subcategoryContainer: { borderRadius: rounded.xs, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.12)' : colors.hairlineSoft, backgroundColor: isDark ? 'rgba(10,11,14,0.32)' : 'rgba(255,255,255,0.48)', overflow: 'hidden', marginBottom: scale(2) },
-  subcategoryContainerHeader: { minHeight: scale(26), flexDirection: 'row', alignItems: 'center', gap: scale(4), paddingHorizontal: scale(5), paddingVertical: scale(3), backgroundColor: isDark ? 'rgba(10,11,14,0.44)' : 'rgba(255,255,255,0.62)' },
-  subcategoryContainerIcon: { width: scale(16), height: scale(16), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'rgba(216,179,90,0.12)' : colors.cardTintYellow, flexShrink: 0 },
-  subcategoryContainerTitle: { fontSize: scale(10), fontWeight: '800', lineHeight: scale(13), color: colors.charcoal, flex: 1, minWidth: 0 },
-  subcategoryContainerCount: { fontSize: scale(8), fontWeight: '800', lineHeight: scale(10), color: colors.steel, minWidth: scale(14), textAlign: 'center' },
-  subcategoryList: { gap: scale(1), padding: scale(2), borderTopWidth: 1, borderTopColor: isDark ? 'rgba(243,241,236,0.08)' : colors.hairlineSoft },
+  subcategoryBlock: { gap: scale(1), borderRadius: rounded.xs, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, backgroundColor: isDark ? 'rgba(10,11,14,0.32)' : 'rgba(255,255,255,0.48)', padding: scale(2), marginBottom: scale(2) },
   subcategoryNode: { gap: scale(1) },
   subcategoryRow: { minHeight: scale(24), flexDirection: 'row', alignItems: 'center', gap: scale(2) },
   subcategoryIndent: { width: scale(10) },
