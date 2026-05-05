@@ -245,6 +245,7 @@ function WorkspacePreviewNote({ note, noteCount, currentOrder, stackOrder, color
   const [prioritySearch, setPrioritySearch] = useState('');
   const priorityScrollRef = useRef<ScrollView>(null);
   const priorityOptions = createPriorityOptions(noteCount, prioritySearch);
+  const openUpward = currentOrder > Math.ceil(noteCount / 2);
 
   useEffect(() => {
     if (!priorityOpen || prioritySearch) return;
@@ -254,13 +255,13 @@ function WorkspacePreviewNote({ note, noteCount, currentOrder, stackOrder, color
   }, [currentOrder, priorityOpen, prioritySearch]);
 
   return (
-    <View style={[styles.previewNote, { zIndex: stackOrder }]}>
+    <View style={[styles.previewNote, open && styles.previewNoteMenuOpen, { zIndex: open ? 1000 : stackOrder }]}>
       <Text style={styles.previewText} numberOfLines={4}>{note.note}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="Note actions" onPress={() => setOpen((current) => !current)} style={styles.previewMenuButton}>
         <Icon name="settings-outline" size={11} color={colors.steel} />
       </Pressable>
       {open ? (
-        <View style={styles.previewActions}>
+        <View style={[styles.previewActions, openUpward && styles.previewActionsAbove]}>
           <Pressable onPress={() => { setOpen(false); onEdit(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Edit</Text></Pressable>
           <Pressable onPress={() => { setOpen(false); onMove(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Move</Text></Pressable>
           <Pressable onPress={() => setPriorityOpen((current) => !current)} style={styles.previewAction}><Text style={styles.previewActionText}>Order</Text></Pressable>
@@ -363,9 +364,11 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   inlineInput: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.charcoal, flex: 1, minWidth: 0, paddingVertical: 0 },
   inlineIconButton: { width: scale(22), height: scale(22), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center' },
   previewNote: { position: 'relative', flexDirection: 'row', alignItems: 'flex-start', gap: scale(4), borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.54)' : 'rgba(255,255,255,0.66)', paddingHorizontal: scale(4), paddingVertical: scale(3), marginTop: 0 },
+  previewNoteMenuOpen: { elevation: 16 },
   previewText: { fontSize: scale(11), fontWeight: '500', lineHeight: scale(13), color: colors.charcoal, flex: 1, minWidth: 0, paddingRight: scale(24) },
   previewMenuButton: { position: 'absolute', top: scale(3), right: scale(3), width: scale(22), height: scale(16), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, zIndex: 4 },
-  previewActions: { position: 'absolute', top: scale(22), right: scale(3), zIndex: 5, minWidth: scale(94), borderRadius: rounded.xs, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: scale(3), ...shadows.card },
+  previewActions: { position: 'absolute', top: scale(22), right: scale(3), zIndex: 1001, minWidth: scale(94), borderRadius: rounded.xs, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: scale(3), ...shadows.card, elevation: 18 },
+  previewActionsAbove: { top: undefined, bottom: scale(22) },
   previewAction: { minHeight: scale(22), justifyContent: 'center', paddingHorizontal: scale(6) },
   previewActionText: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.charcoal },
   previewActionDanger: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.semanticError },

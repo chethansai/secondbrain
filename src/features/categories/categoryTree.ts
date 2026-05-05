@@ -134,6 +134,7 @@ export function syncStandaloneCategory(data: NotesData, path: CategoryPath): Not
 
   if (path.length > 1) {
     data[name] = cloneItems(sourceItems);
+    replaceNestedCategoriesNamed(data, name, sourceItems);
     return data;
   }
 
