@@ -361,6 +361,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-05: Collapsed exact-name categories in move/copy destination picker. Decision: share the case-sensitive exact-name category collapse helper across the workspace shown-categories picker and note move/copy category picker, so destination choices no longer show both a nested category and its standalone exact-name category.
 - 2026-05-05: Fixed exact-character note editing across nested notes. Decision: preserve user-entered note casing/punctuation by removing forced uppercase normalization, and make edit-note replace every case-sensitive exact matching note string throughout all categories and subcategories.
 - 2026-05-05: Restored category card subcategory views after exact-name collapse. Decision: keep collapsed exact-name categories only for the workspace board and shown-categories picker, while passing the full raw category tree into cards so nested subcategories still render inside their parent cards.
 - 2026-05-05: Collapsed exact-name shown categories. Decision: the workspace board and shown-categories picker now treat categories with exactly matching case-sensitive names as one visible category, preferring the standalone/root category over a nested duplicate while preserving old nested selections.

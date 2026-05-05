@@ -35,6 +35,17 @@ export function listAllCategories(data: NotesData): CategorySummary[] {
   return Object.entries(data).flatMap(([name, items]) => listCategoryBranch(name, [name], items));
 }
 
+export function collapseExactNameCategories(categories: CategorySummary[]): CategorySummary[] {
+  const byName = new Map<string, CategorySummary>();
+  categories.forEach((category) => {
+    const existing = byName.get(category.name);
+    if (!existing || category.path.length < existing.path.length) {
+      byName.set(category.name, category);
+    }
+  });
+  return categories.filter((category) => byName.get(category.name) === category);
+}
+
 export function listChildCategories(items: NoteItem[], parentPath: CategoryPath): CategorySummary[] {
   return items.flatMap((item) => {
     if (!isCategoryNode(item)) return [];

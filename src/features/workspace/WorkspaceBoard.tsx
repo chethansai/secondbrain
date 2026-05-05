@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { GestureResponderEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type DimensionValue } from 'react-native';
-import { formatPath, listAllCategories } from '../categories/categoryTree';
+import { collapseExactNameCategories, formatPath, listAllCategories } from '../categories/categoryTree';
 import { listNotesAtPath } from '../notes/noteMutations';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { colors, rounded, spacing, typography } from '../../shared/design/tokens';
@@ -470,17 +470,6 @@ function findSelectedCategoryIndex(selectedPaths: CategoryPath[], categoriesByKe
     const selectedCategory = categoriesByKey.get(pathKey(path));
     return selectedCategory?.name === category.name;
   });
-}
-
-function collapseExactNameCategories(categories: CategorySummary[]) {
-  const byName = new Map<string, CategorySummary>();
-  categories.forEach((category) => {
-    const existing = byName.get(category.name);
-    if (!existing || category.path.length < existing.path.length) {
-      byName.set(category.name, category);
-    }
-  });
-  return categories.filter((category) => byName.get(category.name) === category);
 }
 
 function isAncestorPath(candidate: CategoryPath, path: CategoryPath) {

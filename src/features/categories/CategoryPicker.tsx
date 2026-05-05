@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { colors, rounded, spacing, typography } from '../../shared/design/tokens';
 import { NotesData, CategoryPath } from '../../shared/types/notes';
-import { formatPath, isCategoryNode } from './categoryTree';
+import { collapseExactNameCategories, formatPath, listAllCategories } from './categoryTree';
 
 type Props = {
   data: NotesData;
@@ -15,7 +15,7 @@ type Props = {
 export function CategoryPicker({ data, selectedPath, onSelect, disabled = false }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const paths = collectPaths(data);
+  const paths = useMemo(() => collapseExactNameCategories(listAllCategories(data)).map((category) => category.path), [data]);
   return (
     <ScrollView style={styles.list} contentContainerStyle={styles.content}>
       {paths.map((path) => {
@@ -28,19 +28,6 @@ export function CategoryPicker({ data, selectedPath, onSelect, disabled = false 
       })}
     </ScrollView>
   );
-}
-
-function collectPaths(data: NotesData): CategoryPath[] {
-  return Object.entries(data).flatMap(([name, items]) => [[name], ...collectChildPaths(items, [name])]);
-}
-
-function collectChildPaths(items: unknown[], parent: CategoryPath): CategoryPath[] {
-  return items.flatMap((item) => {
-    if (!isCategoryNode(item)) return [];
-    const [name, childItems] = Object.entries(item)[0];
-    const path = [...parent, name];
-    return [path, ...collectChildPaths(childItems, path)];
-  });
 }
 
 function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
