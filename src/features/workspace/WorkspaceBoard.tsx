@@ -82,19 +82,22 @@ export function WorkspaceBoard({
   const [authHoursText, setAuthHoursText] = useState(String(authTimeoutHours));
   const [authHoursStatus, setAuthHoursStatus] = useState<string | null>(null);
   const [priorityMenuKey, setPriorityMenuKey] = useState<string | null>(null);
-  const allCategories = useMemo(() => listAllCategories(data), [data]);
+  const rawCategories = useMemo(() => listAllCategories(data), [data]);
+  const allCategories = useMemo(() => collapseExactNameCategories(rawCategories), [rawCategories]);
   const selectedPaths = activeWorkspace?.selectedCategoryPaths ?? [];
-  const selectedKeys = new Set(selectedPaths.map(pathKey));
+  const rawCategoriesByKey = new Map(rawCategories.map((category) => [pathKey(category.path), category]));
+  const visibleCategoriesByName = new Map(allCategories.map((category) => [category.name, category]));
   const categoriesByKey = new Map(allCategories.map((category) => [pathKey(category.path), category]));
   const notesByCategoryKey = new Map(allCategories.map((category) => [pathKey(category.path), listNotesAtPath(data, category.path)]));
   const selectedCategoryRows = selectedPaths.flatMap((path) => {
-    const category = categoriesByKey.get(pathKey(path));
+    const rawCategory = rawCategoriesByKey.get(pathKey(path));
+    const category = rawCategory ? visibleCategoriesByName.get(rawCategory.name) : categoriesByKey.get(pathKey(path));
     return category ? [category] : [];
   });
   const boardCategories = selectedCategoryRows.length ? removeDescendantCategories(selectedCategoryRows) : allCategories.filter((category) => category.path.length === 1);
   const prioritizedCategories = boardCategories.map((category, index) => ({ category, priority: index + 1, notes: notesByCategoryKey.get(pathKey(category.path)) ?? [] }));
   const pickerCategories = allCategories
-    .map((category, index) => ({ category, index, selectedIndex: selectedPaths.findIndex((path) => pathKey(path) === pathKey(category.path)) }))
+    .map((category, index) => ({ category, index, selectedIndex: findSelectedCategoryIndex(selectedPaths, rawCategoriesByKey, category) }))
     .sort((left, right) => {
       const leftSelected = left.selectedIndex >= 0;
       const rightSelected = right.selectedIndex >= 0;
@@ -459,6 +462,25 @@ function pathKey(path: CategoryPath) {
 
 function removeDescendantCategories(categories: CategorySummary[]) {
   return categories.filter((category) => !categories.some((candidate) => isAncestorPath(candidate.path, category.path)));
+}
+
+function findSelectedCategoryIndex(selectedPaths: CategoryPath[], categoriesByKey: Map<string, CategorySummary>, category: CategorySummary) {
+  return selectedPaths.findIndex((path) => {
+    if (pathKey(path) === pathKey(category.path)) return true;
+    const selectedCategory = categoriesByKey.get(pathKey(path));
+    return selectedCategory?.name === category.name;
+  });
+}
+
+function collapseExactNameCategories(categories: CategorySummary[]) {
+  const byName = new Map<string, CategorySummary>();
+  categories.forEach((category) => {
+    const existing = byName.get(category.name);
+    if (!existing || category.path.length < existing.path.length) {
+      byName.set(category.name, category);
+    }
+  });
+  return categories.filter((category) => byName.get(category.name) === category);
 }
 
 function isAncestorPath(candidate: CategoryPath, path: CategoryPath) {
