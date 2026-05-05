@@ -136,6 +136,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const [tab, setTab] = useState<Tab>('workspace');
   const [path, setPath] = useState<CategoryPath>([]);
   const [promptMode, setPromptMode] = useState<ModalMode>(null);
+  const [promptPath, setPromptPath] = useState<CategoryPath | null>(null);
   const [editorMode, setEditorMode] = useState<'add' | 'edit' | null>(null);
   const [selectedNote, setSelectedNote] = useState<FlatNote | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
@@ -183,7 +184,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
       if (ok && result.ok) await includeWorkspaceCategory(value.trim());
       return ok;
     }
-    if (promptMode === 'subcategory') return commit(createSubcategory(data, path, value));
+    if (promptMode === 'subcategory') return commit(createSubcategory(data, promptPath ?? path, value));
     if (promptMode === 'workspace') {
       const ok = await createWorkspace(value);
       if (ok) setPath([]);
@@ -322,6 +323,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onToggleCategory={toggleWorkspaceCategory}
                   onSetCategoryPriority={setWorkspaceCategoryPriority}
                   onAddNote={addBoardNote}
+                  onCreateSubcategory={(categoryPath) => { setPromptPath(categoryPath); setPromptMode('subcategory'); }}
                   onRenameCategory={(categoryPath) => { setPath(categoryPath); setPromptMode('rename'); }}
                   onDeleteCategory={(categoryPath) => setDeleteTarget({ type: 'category', path: categoryPath })}
                   onEditNote={(note) => { setSelectedNote(note); setEditorMode('edit'); }}
@@ -345,7 +347,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   <ActionGrid
                     styles={styles}
                     onAddNote={() => setEditorMode('add')}
-                    onSubcategory={() => setPromptMode('subcategory')}
+                    onSubcategory={() => { setPromptPath(path); setPromptMode('subcategory'); }}
                     onRename={() => setPromptMode('rename')}
                     onDelete={confirmDeleteCategory}
                   />
@@ -385,7 +387,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         label={promptMode === 'workspace' || promptMode === 'renameWorkspace' ? 'Workspace name' : 'Category name'}
         initialValue={promptMode === 'rename' ? activeTitle : promptMode === 'renameWorkspace' ? activeWorkspace?.name ?? '' : ''}
         submitLabel={promptMode === 'workspace' || promptMode === 'renameWorkspace' ? 'Save workspace' : 'Save category'}
-        onClose={() => setPromptMode(null)}
+        onClose={() => { setPromptMode(null); setPromptPath(null); }}
         onSubmit={submitPrompt}
       />
       <NoteEditorModal

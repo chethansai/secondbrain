@@ -18,6 +18,7 @@ export type CategorySummary = {
   path: CategoryPath;
   noteCount: number;
   childCount: number;
+  itemIndex?: number;
 };
 
 export type WorkspaceMeta = {

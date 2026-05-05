@@ -67,21 +67,14 @@ export function setNotePriority(data: NotesData, path: CategoryPath, text: strin
   const index = findNoteIndex(items, text, selectedIndex);
   if (index === -1) return failure('not_found', 'The note could not be found.');
 
-  const noteEntries = items.flatMap((item, itemIndex) => (typeof item === 'string' ? [{ item, itemIndex }] : []));
-  if (noteEntries.length <= 1) return { ok: true, data: next };
-
-  const visibleNotes = [...noteEntries].reverse();
-  const currentVisibleIndex = visibleNotes.findIndex((entry) => entry.itemIndex === index);
+  const visibleItems = [...items].reverse();
+  const currentVisibleIndex = visibleItems.findIndex((_, visibleIndex) => items.length - 1 - visibleIndex === index);
   if (currentVisibleIndex === -1) return failure('not_found', 'The note could not be found.');
 
-  const targetVisibleIndex = Math.max(0, Math.min(priority - 1, visibleNotes.length - 1));
-  const [selectedNote] = visibleNotes.splice(currentVisibleIndex, 1);
-  visibleNotes.splice(targetVisibleIndex, 0, selectedNote);
-
-  const nextNoteOrder = [...visibleNotes].reverse();
-  noteEntries.forEach((entry, entryIndex) => {
-    items[entry.itemIndex] = nextNoteOrder[entryIndex].item;
-  });
+  const targetVisibleIndex = Math.max(0, Math.min(priority - 1, visibleItems.length - 1));
+  const [selectedNote] = visibleItems.splice(currentVisibleIndex, 1);
+  visibleItems.splice(targetVisibleIndex, 0, selectedNote);
+  items.splice(0, items.length, ...visibleItems.reverse());
 
   syncStandaloneCategory(next, path);
   return { ok: true, data: next };

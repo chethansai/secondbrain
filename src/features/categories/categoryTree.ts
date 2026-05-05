@@ -47,10 +47,10 @@ export function collapseExactNameCategories(categories: CategorySummary[]): Cate
 }
 
 export function listChildCategories(items: NoteItem[], parentPath: CategoryPath): CategorySummary[] {
-  return items.flatMap((item) => {
+  return items.flatMap((item, itemIndex) => {
     if (!isCategoryNode(item)) return [];
     const [name, childItems] = Object.entries(item)[0];
-    return [summarizeCategory(name, [...parentPath, name], childItems)];
+    return [summarizeCategory(name, [...parentPath, name], childItems, itemIndex)];
   });
 }
 
@@ -69,13 +69,18 @@ export function createSubcategory(data: NotesData, parentPath: CategoryPath, nam
   if (!cleanName) return failure('empty_name', 'Category name cannot be empty.');
   const next = cloneData(data);
   const parent = getCategoryItems(next, parentPath);
+  const parentName = parentPath[parentPath.length - 1];
   if (!parent) return failure('path_not_found', 'The selected category no longer exists.');
+  if (!parentName) return failure('path_not_found', 'The selected category no longer exists.');
+  if (cleanName === parentName) return failure('duplicate_category', 'A subcategory cannot have the same name as its parent.');
   if (parent.some((item) => isCategoryNode(item) && Object.prototype.hasOwnProperty.call(item, cleanName))) {
     return failure('duplicate_category', 'A subcategory with this name already exists here.');
   }
-  const standaloneItems = next[cleanName] ? cloneItems(next[cleanName]) : [];
-  parent.push({ [cleanName]: cloneItems(standaloneItems) });
-  next[cleanName] = standaloneItems;
+  const standaloneItems = next[cleanName] ? cloneItems(next[cleanName]) : cloneItems(findNestedCategoryItems(next, cleanName) ?? []);
+  addSubcategoryToCategoriesNamed(next, parentName, cleanName, standaloneItems);
+  next[cleanName] = cloneItems(standaloneItems);
+  syncStandaloneCategory(next, parentPath);
+  syncStandaloneCategory(next, [cleanName]);
   return { ok: true, data: next };
 }
 
@@ -167,18 +172,18 @@ export function isCategoryNode(item: unknown): item is Record<string, NoteItem[]
   return typeof item === 'object' && item !== null && !Array.isArray(item) && Object.keys(item).length === 1;
 }
 
-function summarizeCategory(name: string, path: CategoryPath, items: NoteItem[]): CategorySummary {
+function summarizeCategory(name: string, path: CategoryPath, items: NoteItem[], itemIndex?: number): CategorySummary {
   const childCount = items.filter(isCategoryNode).length;
   const noteCount = items.filter((item) => typeof item === 'string').length;
-  return { name, path, noteCount, childCount };
+  return { name, path, noteCount, childCount, itemIndex };
 }
 
-function listCategoryBranch(name: string, path: CategoryPath, items: NoteItem[]): CategorySummary[] {
-  const category = summarizeCategory(name, path, items);
-  const children = items.flatMap((item) => {
+function listCategoryBranch(name: string, path: CategoryPath, items: NoteItem[], itemIndex?: number): CategorySummary[] {
+  const category = summarizeCategory(name, path, items, itemIndex);
+  const children = items.flatMap((item, childIndex) => {
     if (!isCategoryNode(item)) return [];
     const [childName, childItems] = Object.entries(item)[0];
-    return listCategoryBranch(childName, [...path, childName], childItems);
+    return listCategoryBranch(childName, [...path, childName], childItems, childIndex);
   });
   return [category, ...children];
 }
@@ -217,6 +222,30 @@ function findItemsNamed(items: NoteItem[], name: string): NoteItem[] | null {
     if (found) return found;
   }
   return null;
+}
+
+function addSubcategoryToCategoriesNamed(data: NotesData, parentName: string, childName: string, childItems: NoteItem[]) {
+  Object.entries(data).forEach(([rootName, items]) => {
+    if (rootName === parentName && !hasChildCategory(items, childName)) {
+      items.push({ [childName]: cloneItems(childItems) });
+    }
+    addSubcategoryToItemsNamed(items, parentName, childName, childItems);
+  });
+}
+
+function addSubcategoryToItemsNamed(items: NoteItem[], parentName: string, childName: string, childItems: NoteItem[]) {
+  items.forEach((item) => {
+    if (!isCategoryNode(item)) return;
+    const [categoryName, categoryItems] = Object.entries(item)[0];
+    if (categoryName === parentName && !hasChildCategory(categoryItems, childName)) {
+      categoryItems.push({ [childName]: cloneItems(childItems) });
+    }
+    addSubcategoryToItemsNamed(categoryItems, parentName, childName, childItems);
+  });
+}
+
+function hasChildCategory(items: NoteItem[], childName: string) {
+  return items.some((item) => isCategoryNode(item) && Object.prototype.hasOwnProperty.call(item, childName));
 }
 
 function containsCategoryNamed(items: NoteItem[], name: string): boolean {
