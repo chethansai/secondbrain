@@ -77,6 +77,7 @@ export function AiReviewPanel({ data, commit, onIncludeCategory }: Props) {
         const decision = await reviewSeekNote(currentNote, ledger.decisions.length + index);
         updateRunQueueItem(currentNote, { status: 'done', decision });
         addLog('success', `Result ${decision.simpleId}: ${decision.score}/10 -> ${actionLabel(decision)} in ${decision.targetPath.join(' > ')}`);
+        addLog('success', `Saved ${decision.simpleId} to AI Review History${localMode ? ' locally' : ' in Firestore'}.`);
         setBatchProgress({ done: index + 1, total: notesToReview.length });
         if (index < notesToReview.length - 1 && !stopBatchRef.current) await delay(delayMs);
       }
