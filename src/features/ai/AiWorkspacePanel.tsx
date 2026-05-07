@@ -265,6 +265,7 @@ export function AiWorkspacePanel() {
           onRefresh={refresh}
           onOpenSearch={() => undefined}
           onOpenSettings={() => undefined}
+          onOpenAiNotifications={() => undefined}
           onOpenAi={() => undefined}
           onOpenAiWorkspace={() => undefined}
           onAuthTimeoutChange={() => undefined}

@@ -3,6 +3,7 @@ import { ActivityIndicator, AppState, Linking, NativeScrollEvent, NativeSyntheti
 import { AutomationCommand, parseAutomationDeepLink } from './src/features/automation/deepLinks';
 import { clearSavedUnlock, defaultAuthTimeoutHours, markUnlocked, readAuthTimeoutHours, readShouldStartUnlocked, writeAuthTimeoutHours } from './src/features/auth/authSession';
 import { LockScreen } from './src/features/auth/LockScreen';
+import { AiNotificationsPanel } from './src/features/ai/AiNotificationsPanel';
 import { AiReviewPanel } from './src/features/ai/AiReviewPanel';
 import { AiWorkspacePanel } from './src/features/ai/AiWorkspacePanel';
 import { CategoryList } from './src/features/categories/CategoryList';
@@ -26,7 +27,7 @@ import { Icon } from './src/shared/ui/Icon';
 
 type ModalMode = 'root' | 'subcategory' | 'rename' | 'workspace' | 'renameWorkspace' | null;
 type MoveCopyAction = 'move' | 'copy';
-type Tab = 'workspace' | 'search' | 'settings' | 'ai' | 'aiWorkspace';
+type Tab = 'workspace' | 'search' | 'settings' | 'ai' | 'aiWorkspace' | 'aiNotifications';
 type DeleteTarget = { type: 'category'; path: CategoryPath } | { type: 'note'; note: FlatNote } | null;
 
 export default function App() {
@@ -358,6 +359,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onRefresh={refresh}
                   onOpenSearch={() => setTab('search')}
                   onOpenSettings={() => setTab('settings')}
+                  onOpenAiNotifications={() => setTab('aiNotifications')}
                   onOpenAi={() => setTab('ai')}
                   onOpenAiWorkspace={() => setTab('aiWorkspace')}
                   onAuthTimeoutChange={onAuthTimeoutChange}
@@ -387,6 +389,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     onBack={() => setPath(path.slice(0, -1))}
                     onOpenSearch={() => setTab('search')}
                     onOpenSettings={() => setTab('settings')}
+                    onOpenAiNotifications={() => setTab('aiNotifications')}
                     onOpenAi={() => setTab('ai')}
                     onOpenAiWorkspace={() => setTab('aiWorkspace')}
                   />
@@ -422,6 +425,12 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
             <View style={styles.sectionStack}>
               <PanelHeader title="Settings" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
               <SettingsPanel data={data} authTimeoutHours={authTimeoutHours} onAuthTimeoutChange={onAuthTimeoutChange} onImport={importData} />
+            </View>
+          ) : null}
+          {!loading && tab === 'aiNotifications' ? (
+            <View style={styles.sectionStack}>
+              <PanelHeader title="AI Notifications" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
+              <AiNotificationsPanel />
             </View>
           ) : null}
           {!loading && tab === 'ai' ? (
@@ -486,7 +495,7 @@ function startsWithPath(path: CategoryPath, prefix: CategoryPath) {
   return prefix.every((segment, index) => path[index] === segment);
 }
 
-function WorkspaceHeader({ title, path, workspaceName, colors, styles, onBack, onOpenSearch, onOpenSettings, onOpenAi, onOpenAiWorkspace }: { title: string; path: CategoryPath; workspaceName: string; colors: typeof import('./src/shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onBack: () => void; onOpenSearch: () => void; onOpenSettings: () => void; onOpenAi: () => void; onOpenAiWorkspace: () => void }) {
+function WorkspaceHeader({ title, path, workspaceName, colors, styles, onBack, onOpenSearch, onOpenSettings, onOpenAiNotifications, onOpenAi, onOpenAiWorkspace }: { title: string; path: CategoryPath; workspaceName: string; colors: typeof import('./src/shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onBack: () => void; onOpenSearch: () => void; onOpenSettings: () => void; onOpenAiNotifications: () => void; onOpenAi: () => void; onOpenAiWorkspace: () => void }) {
   return (
     <View style={styles.header}>
       {path.length ? (
@@ -507,6 +516,9 @@ function WorkspaceHeader({ title, path, workspaceName, colors, styles, onBack, o
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Open search" onPress={onOpenSearch} style={styles.headerIconButton}>
           <Icon name="search-outline" size={17} color={colors.ink} />
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open AI notifications" onPress={onOpenAiNotifications} style={styles.headerIconButton}>
+          <Icon name="notifications-outline" size={17} color={colors.ink} />
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={onOpenSettings} style={styles.headerIconButton}>
           <Icon name="settings-outline" size={17} color={colors.ink} />
