@@ -3,6 +3,7 @@ import { ActivityIndicator, AppState, Linking, NativeScrollEvent, NativeSyntheti
 import { AutomationCommand, parseAutomationDeepLink } from './src/features/automation/deepLinks';
 import { clearSavedUnlock, defaultAuthTimeoutHours, markUnlocked, readAuthTimeoutHours, readShouldStartUnlocked, writeAuthTimeoutHours } from './src/features/auth/authSession';
 import { LockScreen } from './src/features/auth/LockScreen';
+import { AiChatPanel } from './src/features/ai/AiChatPanel';
 import { CategoryList } from './src/features/categories/CategoryList';
 import { countCategoryContents, createRootCategory, createSubcategory, deleteCategory, formatPath, getCategoryItems, listChildCategories, renameCategory } from './src/features/categories/categoryTree';
 import { TextPromptModal } from './src/features/editor/TextPromptModal';
@@ -423,7 +424,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           {!loading && tab === 'ai' ? (
             <View style={styles.sectionStack}>
               <PanelHeader title="AI" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
-              <EmptyState title="AI" message="Not available in this build." actionLabel="AI Chat" onAction={() => undefined} />
+              <AiChatPanel data={data} />
             </View>
           ) : null}
         </View>

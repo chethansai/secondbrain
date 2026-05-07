@@ -413,3 +413,7 @@ adb shell am start -W -a android.intent.action.VIEW -c android.intent.category.B
 
 Expected behavior: the app opens, shows the lock screen if locked, then after unlock and sync load it adds the note to category `SEEK` once and navigates to `SEEK`.
 
+
+### 2026-05-08 - AI chat interface
+
+Added a simple ChatGPT-style AI tab that sends the current main notes JSON as context to `https://chethan.tailb6229f.ts.net/v1/responses` using model `oca/gpt-5.4`, parses the returned `data:` SSE-style chunks, stores conversations locally in AsyncStorage as chat id plus user/assistant message JSON, and supports deleting conversations. Kept the notes Firestore document path untouched so the app still runs with local chat history when Firestore hosting/storage is unavailable.
