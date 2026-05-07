@@ -27,14 +27,9 @@ export async function streamChatResponse({ data, messages, prompt, onToken }: St
 
 function buildChatInput(data: NotesData, messages: ChatMessage[], prompt: string) {
   const documentContext = buildDocumentContext(data);
-  const recentMessages = messages
-    .filter((message) => message.content.trim())
-    .slice(-10)
-    .map((message) => `${message.role}: ${message.content}`)
-    .join('\n');
+  const recentMessages = messages.slice(-8).map((message) => `${message.role}: ${message.content}`).join('\n');
   return [
     'You are a helpful assistant inside a note-taking app. Answer using the main document context when it is relevant.',
-    'The user expects a ChatGPT-style conversation, so keep continuity with recent messages.',
     'Keep responses concise and practical.',
     '',
     'Main document context:',
@@ -61,10 +56,7 @@ async function requestStream(endpoint: string, input: string, onToken: (token: s
     body: JSON.stringify({ model, input }),
   });
 
-  if (!response.ok) {
-    const details = await safeReadResponseText(response);
-    throw new Error(`AI request failed with status ${response.status}${details ? `: ${details}` : '.'}`);
-  }
+  if (!response.ok) throw new Error(`AI request failed with status ${response.status}.`);
 
   const body = response.body;
   if (body && 'getReader' in body) {
@@ -126,12 +118,4 @@ function consumeCompleteEvents(text: string, onToken: (token: string) => void) {
 
 function compactText(value: string) {
   return value.replace(/\s+/g, ' ').trim().slice(0, 220);
-}
-
-async function safeReadResponseText(response: Response) {
-  try {
-    return (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 180);
-  } catch {
-    return '';
-  }
 }
