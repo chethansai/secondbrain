@@ -211,9 +211,9 @@ export function WorkspaceBoard({
                   <Text style={styles.headerMenuRowText} numberOfLines={1}>Search</Text>
                 </Pressable>
 
-                <Pressable accessibilityRole="button" accessibilityLabel="Open AI" onPress={() => { closeHeaderMenus(); onOpenAi(); }} style={styles.headerMenuRow}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Open AI Review" onPress={() => { closeHeaderMenus(); onOpenAi(); }} style={styles.headerMenuRow}>
                   <View style={styles.headerMenuRowIcon}><Icon name="sparkles-outline" size={16} color={colors.ink} /></View>
-                  <Text style={styles.headerMenuRowText} numberOfLines={1}>AI</Text>
+                  <Text style={styles.headerMenuRowText} numberOfLines={1}>AI Review</Text>
                 </Pressable>
 
                 <Pressable accessibilityRole="button" accessibilityLabel="Open AI workspace" onPress={() => { closeHeaderMenus(); onOpenAiWorkspace(); }} style={styles.headerMenuRow}>

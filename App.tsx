@@ -3,7 +3,7 @@ import { ActivityIndicator, AppState, Linking, NativeScrollEvent, NativeSyntheti
 import { AutomationCommand, parseAutomationDeepLink } from './src/features/automation/deepLinks';
 import { clearSavedUnlock, defaultAuthTimeoutHours, markUnlocked, readAuthTimeoutHours, readShouldStartUnlocked, writeAuthTimeoutHours } from './src/features/auth/authSession';
 import { LockScreen } from './src/features/auth/LockScreen';
-import { AiChatPanel } from './src/features/ai/AiChatPanel';
+import { AiReviewPanel } from './src/features/ai/AiReviewPanel';
 import { AiWorkspacePanel } from './src/features/ai/AiWorkspacePanel';
 import { CategoryList } from './src/features/categories/CategoryList';
 import { countCategoryContents, createRootCategory, createSubcategory, deleteCategory, formatPath, getCategoryItems, listChildCategories, renameCategory } from './src/features/categories/categoryTree';
@@ -426,8 +426,8 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           ) : null}
           {!loading && tab === 'ai' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="AI" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
-              <AiChatPanel data={data} />
+              <PanelHeader title="AI Review" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
+              <AiReviewPanel data={data} commit={commit} onIncludeCategory={includeWorkspaceCategory} />
             </View>
           ) : null}
           {!loading && tab === 'aiWorkspace' ? (
@@ -499,7 +499,7 @@ function WorkspaceHeader({ title, path, workspaceName, colors, styles, onBack, o
         <Text style={styles.heading}>{title}</Text>
       </View>
       <View style={styles.headerActions}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open AI" onPress={onOpenAi} style={styles.headerIconButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open AI Review" onPress={onOpenAi} style={styles.headerIconButton}>
           <Icon name="sparkles-outline" size={17} color={colors.ink} />
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Open AI workspace" onPress={onOpenAiWorkspace} style={styles.headerIconButton}>
