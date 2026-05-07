@@ -451,7 +451,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           ) : null}
           {!loading && tab === 'ai' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="AI" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
+              <PanelHeader title="AI Chat" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
               <AiChatPanel
                 currentPath={path}
                 answer={ai.answer}
@@ -549,7 +549,7 @@ function WorkspaceHeader({ title, path, workspaceName, colors, styles, onBack, o
         <Text style={styles.heading}>{title}</Text>
       </View>
       <View style={styles.headerActions}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open AI" onPress={onOpenAi} style={styles.headerIconButton}>
+  <Pressable accessibilityRole="button" accessibilityLabel="Open AI Chat" onPress={onOpenAi} style={styles.headerIconButton}>
           <Icon name="sparkles-outline" size={17} color={colors.ink} />
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Open search" onPress={onOpenSearch} style={styles.headerIconButton}>
