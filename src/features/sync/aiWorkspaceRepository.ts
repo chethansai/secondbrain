@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, getDocFromServer, onSnapshot, setDoc, Unsubscribe } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, getDocFromServer, onSnapshot, setDoc, Unsubscribe } from 'firebase/firestore';
 import { AiWorkspaceDocumentMeta, AiWorkspaceIndex, NotesData } from '../../shared/types/notes';
 import { firestore } from './firebase';
 import { validateNotesData } from './validation';
@@ -8,7 +8,7 @@ export type AiWorkspaceNotesSnapshot = {
   data: NotesData;
 };
 
-const aiRunsCollection = 'reactnativecollection_ai_runs';
+const aiRunsCollection = 'reactnativecollection';
 const aiWorkspaceIndexId = 'aiworkspaceindex';
 const aiWorkspaceIndexRef = doc(firestore, aiRunsCollection, aiWorkspaceIndexId);
 const localAiWorkspaceIndexKey = 'rnnotetaking.aiWorkspace.index';
@@ -64,6 +64,10 @@ export async function writeAiWorkspaceNotes(documentId: string, data: NotesData)
   await setDoc(aiWorkspaceNotesRef(documentId), { data, updatedAt: new Date().toISOString() }, { merge: false });
 }
 
+export async function deleteAiWorkspaceNotes(documentId: string): Promise<void> {
+  await deleteDoc(aiWorkspaceNotesRef(documentId));
+}
+
 export async function readLocalAiWorkspaceIndex(): Promise<AiWorkspaceIndex> {
   const raw = await AsyncStorage.getItem(localAiWorkspaceIndexKey);
   if (!raw) return defaultAiWorkspaceIndex();
@@ -90,6 +94,10 @@ export async function readLocalAiWorkspaceNotes(documentId: string): Promise<AiW
 
 export async function writeLocalAiWorkspaceNotes(documentId: string, data: NotesData): Promise<void> {
   await AsyncStorage.setItem(localAiWorkspaceNotesKey(documentId), JSON.stringify({ data }));
+}
+
+export async function deleteLocalAiWorkspaceNotes(documentId: string): Promise<void> {
+  await AsyncStorage.removeItem(localAiWorkspaceNotesKey(documentId));
 }
 
 export function createAiWorkspaceDocumentMeta(number: number, createdAt = new Date().toISOString()): AiWorkspaceDocumentMeta {

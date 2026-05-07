@@ -3,6 +3,8 @@ import { AiWorkspaceIndex, MutationResult, NotesData } from '../../shared/types/
 import { validateNotesData } from './validation';
 import {
   createAiWorkspaceDocumentMeta,
+  deleteAiWorkspaceNotes,
+  deleteLocalAiWorkspaceNotes,
   readLatestAiWorkspaceIndex,
   readLatestAiWorkspaceNotes,
   readLocalAiWorkspaceIndex,
@@ -135,6 +137,46 @@ export function useAiWorkspaceSync() {
     return persistIndex({ ...index, activeDocumentId: documentId, version: index.version + 1 });
   }, [index, persistIndex]);
 
+  const deleteDocument = useCallback(async (documentId: string) => {
+    const document = index.documents.find((item) => item.documentId === documentId);
+    if (!document) {
+      setError('AI workspace document no longer exists.');
+      return false;
+    }
+
+    setSaving(true);
+    setError(null);
+    const nextDocuments = index.documents.filter((item) => item.documentId !== documentId);
+    const nextIdMap = Object.fromEntries(Object.entries(index.idMap).filter(([, mappedDocumentId]) => mappedDocumentId !== documentId));
+    const nextActiveDocumentId = index.activeDocumentId === documentId ? nextDocuments[0]?.documentId ?? null : index.activeDocumentId;
+    const nextIndex = {
+      ...index,
+      documents: nextDocuments,
+      idMap: nextIdMap,
+      activeDocumentId: nextActiveDocumentId,
+      version: index.version + 1,
+    };
+
+    setIndex(nextIndex);
+    if (!nextActiveDocumentId) setData({});
+
+    try {
+      await deleteAiWorkspaceNotes(documentId);
+      await writeAiWorkspaceIndex(nextIndex);
+      await deleteLocalAiWorkspaceNotes(documentId);
+      await writeLocalAiWorkspaceIndex(nextIndex);
+      setLocalMode(false);
+      return true;
+    } catch {
+      await deleteLocalAiWorkspaceNotes(documentId);
+      await writeLocalAiWorkspaceIndex(nextIndex);
+      setLocalMode(true);
+      return true;
+    } finally {
+      setSaving(false);
+    }
+  }, [index]);
+
   const commit = useCallback(async (result: MutationResult) => {
     if (result.ok === false) {
       setError(result.message);
@@ -212,6 +254,7 @@ export function useAiWorkspaceSync() {
     setError,
     createFromJson,
     selectDocument,
+    deleteDocument,
     commit,
     refresh,
   };

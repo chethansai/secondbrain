@@ -25,7 +25,7 @@ type PathStateByDocument = Record<string, CategoryPath[]>;
 export function AiWorkspacePanel() {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { data, documents, idMap, activeDocument, activeDocumentId, loading, saving, refreshing, localMode, error, setError, createFromJson, selectDocument, commit, refresh } = useAiWorkspaceSync();
+  const { data, documents, idMap, activeDocument, activeDocumentId, loading, saving, refreshing, localMode, error, setError, createFromJson, selectDocument, deleteDocument, commit, refresh } = useAiWorkspaceSync();
   const [jsonInput, setJsonInput] = useState('');
   const [documentMenuOpen, setDocumentMenuOpen] = useState(false);
   const [path, setPath] = useState<CategoryPath>([]);
@@ -36,6 +36,7 @@ export function AiWorkspacePanel() {
   const [editorMode, setEditorMode] = useState<'add' | 'edit' | null>(null);
   const [selectedNote, setSelectedNote] = useState<FlatNote | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
+  const [deleteDocumentId, setDeleteDocumentId] = useState<string | null>(null);
   const [moveVisible, setMoveVisible] = useState(false);
   const [moveCopyAction, setMoveCopyAction] = useState<MoveCopyAction>('move');
   const activeSelectionKey = activeDocumentId ?? 'none';
@@ -65,6 +66,18 @@ export function AiWorkspacePanel() {
     setPath([]);
     setDocumentMenuOpen(false);
     await selectDocument(documentId);
+  }
+
+  async function runDeleteDocument() {
+    if (!deleteDocumentId) return false;
+    const ok = await deleteDocument(deleteDocumentId);
+    if (ok) {
+      setPath([]);
+      setDocumentMenuOpen(false);
+      setSelectedPathsByDocument((current) => removeDocumentPathState(current, deleteDocumentId));
+      setPinnedPathsByDocument((current) => removeDocumentPathState(current, deleteDocumentId));
+    }
+    return ok;
   }
 
   async function commitWithHistory(result: MutationResult, historyText: string) {
@@ -196,6 +209,9 @@ export function AiWorkspacePanel() {
                   <Pressable key={document.documentId} accessibilityRole="button" accessibilityLabel={`Open ${document.name}`} onPress={() => selectAiDocument(document.documentId)} style={[styles.documentMenuRow, document.documentId === activeDocumentId && styles.documentMenuRowActive]}>
                     <Text style={[styles.documentMenuText, document.documentId === activeDocumentId && styles.documentMenuTextActive]} numberOfLines={1}>{document.name}</Text>
                     <Text style={[styles.documentMenuId, document.documentId === activeDocumentId && styles.documentMenuTextActive]}>{document.id}</Text>
+                    <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${document.name}`} onPress={(event) => { event.stopPropagation(); setDeleteDocumentId(document.documentId); }} style={[styles.documentDeleteButton, document.documentId === activeDocumentId && styles.documentDeleteButtonActive]}>
+                      <Icon name="trash-outline" size={12} color={document.documentId === activeDocumentId ? colors.onPrimary : colors.semanticError} />
+                    </Pressable>
                   </Pressable>
                 )) : <Text style={styles.emptyMenuText}>No documents</Text>}
               </View>
@@ -340,6 +356,13 @@ export function AiWorkspacePanel() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={runDelete}
       />
+      <ConfirmModal
+        visible={deleteDocumentId !== null}
+        title="Delete AI document?"
+        message={aiDocumentDeleteMessage(documents.find((document) => document.documentId === deleteDocumentId)?.id, deleteDocumentId)}
+        onClose={() => setDeleteDocumentId(null)}
+        onConfirm={runDeleteDocument}
+      />
     </View>
   );
 }
@@ -361,6 +384,16 @@ function dedupePaths(paths: CategoryPath[]) {
   return Array.from(new Map(paths.filter((path) => path.length > 0).map((path) => [pathKey(path), path])).values());
 }
 
+function removeDocumentPathState(state: PathStateByDocument, documentId: string) {
+  const { [documentId]: _removed, ...nextState } = state;
+  return nextState;
+}
+
+function aiDocumentDeleteMessage(id: string | undefined, documentId: string | null) {
+  const label = [id, documentId].filter(Boolean).join(' - ');
+  return `${label || 'This AI document'} will be removed from the tracker and its AI JSON document will be deleted.`;
+}
+
 function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
   return StyleSheet.create({
     wrap: { gap: spacing.lg },
@@ -375,6 +408,8 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     documentMenuText: { ...typography.bodySmMedium, color: colors.charcoal, flex: 1, minWidth: 0 },
     documentMenuId: { ...typography.micro, color: colors.slate },
     documentMenuTextActive: { color: colors.onDark },
+    documentDeleteButton: { width: 30, height: 30, borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+    documentDeleteButtonActive: { borderColor: colors.onPrimary, backgroundColor: 'transparent' },
     emptyMenuText: { ...typography.bodySm, color: colors.slate, padding: spacing.sm, textAlign: 'center' },
     reloadButton: { minWidth: 104 },
     jsonInput: { minHeight: 118, maxHeight: 220, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.surface, padding: spacing.md, color: colors.ink, ...typography.bodySm, textAlignVertical: 'top' },
