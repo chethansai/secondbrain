@@ -361,6 +361,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-07: Completed the AI implementation finishing pass. Decision: make SSE streaming robust to split chunks, expose multiple AI providers for fallback configuration, mark AI notifications read when opened, reject generated AI workspaces that omit source note strings, and allow AI run/notification Firestore collections in rules.
 - 2026-05-07: Hardened per-workspace notes implementation after starting implementation from the existing in-progress app state. Decision: allow the new `reactnativecollection_workspace_notes` collection in Firestore rules and preserve a workspace's note document when renaming a workspace ID, because workspace IDs now address note documents.
 - 2026-05-07: Implemented AI assistant, AI workspace generation, AI category requests, note AI review, AI provider settings, run/notification history, and real per-workspace note storage. Decision: keep the existing nested JSON as the source shape, make AI-generated JSON validate through the same `NotesData` contract, retain generated outputs as separate workspaces, store full AI prompts/responses in AI run history, and keep AI writes behind deterministic app mutations or generated-workspace creation.
 - 2026-05-05: Limited the shown-categories drawer to seven visible rows. Decision: keep the existing left drawer interaction, but cap the internal category list height and show its vertical scrollbar when more categories are available.
