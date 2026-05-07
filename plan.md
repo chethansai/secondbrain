@@ -361,6 +361,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-08: Removed the implemented AI feature surface and kept only an AI placeholder entry. Decision: delete the AI feature files and proxy script, remove note-level AI review actions, remove streamed chat/assistant wiring, and leave an AI button beside Search and Settings that opens a simple unavailable panel.
 - 2026-05-08: Labeled the existing AI entry points as AI Chat after rebasing onto the newer AI implementation. Decision: preserve the remote streamed AI chat work and make the workspace menu/category header/tab title consistently read `AI Chat`.
 - 2026-05-07: Completed the AI implementation finishing pass. Decision: make SSE streaming robust to split chunks, expose multiple AI providers for fallback configuration, mark AI notifications read when opened, reject generated AI workspaces that omit source note strings, and allow AI run/notification Firestore collections in rules.
 - 2026-05-07: Hardened per-workspace notes implementation after starting implementation from the existing in-progress app state. Decision: allow the new `reactnativecollection_workspace_notes` collection in Firestore rules and preserve a workspace's note document when renaming a workspace ID, because workspace IDs now address note documents.

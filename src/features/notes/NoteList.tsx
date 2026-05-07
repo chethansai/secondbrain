@@ -12,11 +12,10 @@ type Props = {
   onMove: (note: FlatNote) => void;
   onCopy: (note: FlatNote) => void;
   onSetPriority: (note: FlatNote, priority: number) => void;
-  onAiReview?: (note: FlatNote) => void;
   onDelete: (note: FlatNote) => void;
 };
 
-export function NoteList({ notes, onEdit, onMove, onCopy, onSetPriority, onAiReview, onDelete }: Props) {
+export function NoteList({ notes, onEdit, onMove, onCopy, onSetPriority, onDelete }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -24,7 +23,7 @@ export function NoteList({ notes, onEdit, onMove, onCopy, onSetPriority, onAiRev
       {notes.map((note, index) => (
         <View key={`${note.path.join('/')}-${note.index}-${index}`} style={[styles.card, { zIndex: notes.length - index }]}>
           <NoteText note={note} styles={styles} />
-          <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={index + 1} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onCopy={onCopy} onSetPriority={onSetPriority} onAiReview={onAiReview} onDelete={onDelete} />
+          <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={index + 1} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onCopy={onCopy} onSetPriority={onSetPriority} onDelete={onDelete} />
         </View>
       ))}
     </View>
@@ -46,7 +45,7 @@ function NoteText({ note, styles }: { note: FlatNote; styles: ReturnType<typeof 
   );
 }
 
-function NoteActionsDropdown({ note, noteCount, currentOrder, colors, styles, onEdit, onMove, onCopy, onSetPriority, onAiReview, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onAiReview?: (note: FlatNote) => void; onDelete: (note: FlatNote) => void }) {
+function NoteActionsDropdown({ note, noteCount, currentOrder, colors, styles, onEdit, onMove, onCopy, onSetPriority, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
@@ -100,12 +99,6 @@ function NoteActionsDropdown({ note, noteCount, currentOrder, colors, styles, on
                 })}
               </ScrollView>
             </View>
-          ) : null}
-          {onAiReview ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Review note with AI" onPress={() => { close(); onAiReview(note); }} style={styles.dropdownItem}>
-              <Icon name="sparkles-outline" size={15} color={colors.ink} />
-              <Text style={styles.dropdownItemText}>AI review</Text>
-            </Pressable>
           ) : null}
           <Pressable accessibilityRole="button" accessibilityLabel="Delete note" onPress={() => { close(); onDelete(note); }} style={styles.dropdownItem}>
             <Icon name="trash-outline" size={15} color={colors.semanticError} />

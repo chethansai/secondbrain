@@ -7,7 +7,6 @@ import { Icon } from '../../shared/ui/Icon';
 import { TextInputField } from '../../shared/ui/TextInputField';
 import { NotesData, NoteItem } from '../../shared/types/notes';
 import { authTimeoutOptions } from '../auth/authSession';
-import { AiSettingsPanel } from '../ai/AiSettingsPanel';
 import { cloneItems, isCategoryNode } from '../categories/categoryTree';
 import { validateNotesData } from '../sync/validation';
 import { copyText } from './clipboard';
@@ -78,7 +77,6 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
       <Button label="Copy export JSON" icon="copy-outline" onPress={exportJson} />
       <TextInputField value={importText} onChangeText={setImportText} multiline placeholder="Paste simple nested JSON" accessibilityLabel="Import JSON" autoCapitalize="none" autoCorrect={false} />
       <Button label="Import JSON" icon="cloud-upload-outline" variant="dark" onPress={importJson} disabled={!importText.trim()} />
-      <AiSettingsPanel />
       {status ? <Text style={styles.status}>{status}</Text> : null}
     </View>
   );
