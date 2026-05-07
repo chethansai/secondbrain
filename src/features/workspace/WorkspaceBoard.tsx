@@ -26,6 +26,7 @@ type Props = {
   onRefresh: () => void;
   onOpenSearch: () => void;
   onOpenSettings: () => void;
+  onOpenAi: () => void;
   onAuthTimeoutChange: (hours: number) => Promise<void> | void;
   onLogout: () => void;
   onOpenCategory: (path: CategoryPath) => void;
@@ -40,6 +41,7 @@ type Props = {
   onMoveNote: (note: FlatNote) => void;
   onCopyNote: (note: FlatNote) => void;
   onSetNotePriority: (note: FlatNote, priority: number) => void;
+  onAiReview?: (note: FlatNote) => void;
   onDeleteNote: (note: FlatNote) => void;
 };
 
@@ -60,6 +62,7 @@ export function WorkspaceBoard({
   onRefresh,
   onOpenSearch,
   onOpenSettings,
+  onOpenAi,
   onAuthTimeoutChange,
   onLogout,
   onOpenCategory,
@@ -74,6 +77,7 @@ export function WorkspaceBoard({
   onMoveNote,
   onCopyNote,
   onSetNotePriority,
+  onAiReview,
   onDeleteNote,
 }: Props) {
   const { colors, isDark, toggleTheme } = useTheme();
@@ -84,6 +88,7 @@ export function WorkspaceBoard({
   const [authHoursText, setAuthHoursText] = useState(String(authTimeoutHours));
   const [authHoursStatus, setAuthHoursStatus] = useState<string | null>(null);
   const [priorityMenuKey, setPriorityMenuKey] = useState<string | null>(null);
+  const [categorySearch, setCategorySearch] = useState('');
   const rawCategories = useMemo(() => listAllCategories(data), [data]);
   const visibleCategories = useMemo(() => collapseExactNameCategories(rawCategories), [rawCategories]);
   const selectedPaths = activeWorkspace?.selectedCategoryPaths ?? [];
@@ -98,7 +103,12 @@ export function WorkspaceBoard({
   });
   const boardCategories = selectedCategoryRows.length ? removeDescendantCategories(selectedCategoryRows) : visibleCategories.filter((category) => category.path.length === 1);
   const prioritizedCategories = boardCategories.map((category, index) => ({ category, priority: index + 1, notes: notesByCategoryKey.get(pathKey(category.path)) ?? [] }));
+  const categorySearchText = categorySearch.trim().toLowerCase();
   const pickerCategories = visibleCategories
+    .filter((category) => {
+      if (!categorySearchText) return true;
+      return category.name.toLowerCase().includes(categorySearchText) || formatPath(category.path).toLowerCase().includes(categorySearchText);
+    })
     .map((category, index) => ({ category, index, selectedIndex: findSelectedCategoryIndex(selectedPaths, rawCategoriesByKey, category) }))
     .sort((left, right) => {
       const leftSelected = left.selectedIndex >= 0;
@@ -106,7 +116,7 @@ export function WorkspaceBoard({
       if (leftSelected && rightSelected) return left.selectedIndex - right.selectedIndex;
       if (leftSelected) return -1;
       if (rightSelected) return 1;
-      return left.index - right.index;
+      return compareCategoriesAlphabetically(left.category, right.category) || left.index - right.index;
     });
 
   function setCategoryPriority(path: CategoryPath, priority: number) {
@@ -199,6 +209,11 @@ export function WorkspaceBoard({
                 <Pressable accessibilityRole="button" accessibilityLabel="Open search" onPress={() => { closeHeaderMenus(); onOpenSearch(); }} style={styles.headerMenuRow}>
                   <View style={styles.headerMenuRowIcon}><Icon name="search-outline" size={16} color={colors.ink} /></View>
                   <Text style={styles.headerMenuRowText} numberOfLines={1}>Search</Text>
+                </Pressable>
+
+                <Pressable accessibilityRole="button" accessibilityLabel="Open AI" onPress={() => { closeHeaderMenus(); onOpenAi(); }} style={styles.headerMenuRow}>
+                  <View style={styles.headerMenuRowIcon}><Icon name="sparkles-outline" size={16} color={colors.ink} /></View>
+                  <Text style={styles.headerMenuRowText} numberOfLines={1}>AI</Text>
                 </Pressable>
 
                 <Pressable accessibilityRole="button" accessibilityLabel="Log out" onPress={() => { closeHeaderMenus(); onLogout(); }} style={styles.headerMenuRow}>
@@ -306,6 +321,18 @@ export function WorkspaceBoard({
               </Pressable>
             </View>
 
+            <TextInput
+              accessibilityLabel="Search shown categories"
+              value={categorySearch}
+              onChangeText={(text) => { setPriorityMenuKey(null); setCategorySearch(text); }}
+              placeholder="Search categories"
+              placeholderTextColor={colors.stone}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+              style={styles.categorySearchInput}
+            />
+
             <ScrollView style={styles.paneScroll} contentContainerStyle={styles.paneList} nestedScrollEnabled showsVerticalScrollIndicator>
               {pickerCategories.length ? pickerCategories.map(({ category, selectedIndex }) => {
                 const key = pathKey(category.path);
@@ -341,7 +368,7 @@ export function WorkspaceBoard({
                     </View>
                   </View>
                 );
-              }) : <Text style={styles.emptyPickerText}>Create a category to show it here.</Text>}
+              }) : <Text style={styles.emptyPickerText}>{categorySearchText ? 'No matching categories.' : 'Create a category to show it here.'}</Text>}
             </ScrollView>
           </View>
         </View>
@@ -375,6 +402,7 @@ export function WorkspaceBoard({
                   onMoveNote={onMoveNote}
                   onCopyNote={onCopyNote}
                   onSetNotePriority={onSetNotePriority}
+                  onAiReview={onAiReview}
                   onDeleteNote={onDeleteNote}
                 />
               )}
@@ -475,6 +503,10 @@ function findSelectedCategoryIndex(selectedPaths: CategoryPath[], categoriesByKe
   });
 }
 
+function compareCategoriesAlphabetically(left: CategorySummary, right: CategorySummary) {
+  return formatPath(left.path).localeCompare(formatPath(right.path), undefined, { sensitivity: 'base' });
+}
+
 function isAncestorPath(candidate: CategoryPath, path: CategoryPath) {
   return candidate.length < path.length && candidate.every((segment, index) => path[index] === segment);
 }
@@ -546,6 +578,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   paneKicker: { ...typography.micro, color: colors.primary, textTransform: 'uppercase' },
   paneTitle: { ...typography.heading5, color: colors.ink },
   paneCloseButton: { width: 32, height: 32, borderRadius: rounded.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface },
+  categorySearchInput: { minHeight: 40, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.surfaceSoft, color: colors.ink, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, ...typography.bodySm },
   paneScroll: { flexGrow: 0, maxHeight: shownCategoryListMaxHeight },
   paneList: { gap: spacing.xs, paddingBottom: spacing.xl },
   paneCategoryRow: { position: 'relative', minHeight: 52, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surfaceSoft, padding: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, zIndex: 1 },

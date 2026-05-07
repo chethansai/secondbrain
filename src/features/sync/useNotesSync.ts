@@ -5,7 +5,6 @@ import { createWorkspaceMeta, defaultWorkspaceId, readLatestWorkspaceIndex, read
 
 export function useNotesSync() {
   const [data, setData] = useState<NotesData>({});
-  const [version, setVersion] = useState(1);
   const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndex>({
     workspaces: [createWorkspaceMeta(defaultWorkspaceId, defaultWorkspaceId)],
     activeWorkspaceId: defaultWorkspaceId,
@@ -45,7 +44,6 @@ export function useNotesSync() {
       activeWorkspaceId,
       (snapshot) => {
         setData(snapshot.data);
-        setVersion(snapshot.version);
         setLoading(false);
         setError(null);
         setLocalMode(false);
@@ -53,7 +51,6 @@ export function useNotesSync() {
       async () => {
         const snapshot = await readLocalWorkspaceNotes(activeWorkspaceId);
         setData(snapshot.data);
-        setVersion(snapshot.version);
         setLocalMode(true);
         setError(null);
         setLoading(false);
@@ -78,22 +75,20 @@ export function useNotesSync() {
 
   const commit = useCallback(
     async (result: MutationResult) => {
-      if (!result.ok) {
+      if (result.ok === false) {
         setError(result.message);
         return false;
       }
-      const nextVersion = version + 1;
       setSaving(true);
       setError(null);
       setData(result.data);
-      setVersion(nextVersion);
       try {
-        await writeWorkspaceNotes(activeWorkspaceId, result.data, nextVersion);
-        await writeLocalWorkspaceNotes(activeWorkspaceId, result.data, nextVersion);
+        await writeWorkspaceNotes(activeWorkspaceId, result.data);
+        await writeLocalWorkspaceNotes(activeWorkspaceId, result.data);
         setLocalMode(false);
         return true;
       } catch {
-        await writeLocalWorkspaceNotes(activeWorkspaceId, result.data, nextVersion);
+        await writeLocalWorkspaceNotes(activeWorkspaceId, result.data);
         setLocalMode(true);
         setError(null);
         return true;
@@ -101,7 +96,7 @@ export function useNotesSync() {
         setSaving(false);
       }
     },
-    [activeWorkspaceId, version],
+    [activeWorkspaceId],
   );
 
   const createWorkspace = useCallback(async (name: string) => {
@@ -122,6 +117,43 @@ export function useNotesSync() {
       version: workspaceIndex.version + 1,
     };
     return persistWorkspaceIndex(nextIndex);
+  }, [persistWorkspaceIndex, workspaceIndex]);
+
+  const createWorkspaceWithData = useCallback(async (name: string, notesData: NotesData) => {
+    const cleanName = name.trim();
+    if (!cleanName) {
+      setError('Workspace name cannot be empty.');
+      return false;
+    }
+    if (isReservedWorkspaceName(cleanName) || workspaceIndex.workspaces.some((workspace) => workspace.id === cleanName)) {
+      setError('A workspace with this name already exists or is reserved.');
+      return false;
+    }
+    const workspace = createWorkspaceMeta(cleanName, cleanName);
+    const nextIndex = {
+      workspaces: [...workspaceIndex.workspaces, workspace],
+      activeWorkspaceId: workspace.id,
+      defaultWorkspaceId: workspaceIndex.defaultWorkspaceId,
+      version: workspaceIndex.version + 1,
+    };
+    setSaving(true);
+    setError(null);
+    try {
+      await writeWorkspaceNotes(workspace.id, notesData);
+      await writeLocalWorkspaceNotes(workspace.id, notesData);
+      await persistWorkspaceIndex(nextIndex);
+      setData(notesData);
+      setLocalMode(false);
+      return true;
+    } catch {
+      await writeLocalWorkspaceNotes(workspace.id, notesData);
+      await persistWorkspaceIndex(nextIndex);
+      setData(notesData);
+      setLocalMode(true);
+      return true;
+    } finally {
+      setSaving(false);
+    }
   }, [persistWorkspaceIndex, workspaceIndex]);
 
   const selectWorkspace = useCallback(async (workspaceId: string) => {
@@ -146,6 +178,9 @@ export function useNotesSync() {
       return false;
     }
     if (cleanName === workspaceId) return true;
+    const notesSnapshot = await readWorkspaceNotes(workspaceId);
+    await writeWorkspaceNotes(cleanName, notesSnapshot.data);
+    await writeLocalWorkspaceNotes(cleanName, notesSnapshot.data);
     const nextWorkspaces = workspaceIndex.workspaces.map((workspace) => workspace.id === workspaceId ? { ...workspace, id: cleanName, name: cleanName } : workspace);
     const nextActiveWorkspaceId = workspaceIndex.activeWorkspaceId === workspaceId ? cleanName : workspaceIndex.activeWorkspaceId;
     const nextDefaultWorkspaceId = workspaceIndex.defaultWorkspaceId === workspaceId ? cleanName : workspaceIndex.defaultWorkspaceId;
@@ -156,6 +191,13 @@ export function useNotesSync() {
     const validSelections = selectedCategoryPaths.filter((path) => path.length > 0 && path.every((segment) => segment.trim().length > 0));
     const dedupedSelections = Array.from(new Map(validSelections.map((path) => [path.join('\u001f'), path])).values());
     const nextWorkspaces = workspaceIndex.workspaces.map((workspace) => workspace.id === activeWorkspaceId ? { ...workspace, selectedCategoryPaths: dedupedSelections } : workspace);
+    return persistWorkspaceIndex({ ...workspaceIndex, workspaces: nextWorkspaces, version: workspaceIndex.version + 1 });
+  }, [activeWorkspaceId, persistWorkspaceIndex, workspaceIndex]);
+
+  const updatePinnedCategoryPaths = useCallback(async (pinnedCategoryPaths: CategoryPath[]) => {
+    const validPins = pinnedCategoryPaths.filter((path) => path.length > 0 && path.every((segment) => segment.trim().length > 0));
+    const dedupedPins = Array.from(new Map(validPins.map((path) => [path.join('\u001f'), path])).values());
+    const nextWorkspaces = workspaceIndex.workspaces.map((workspace) => workspace.id === activeWorkspaceId ? { ...workspace, pinnedCategoryPaths: dedupedPins } : workspace);
     return persistWorkspaceIndex({ ...workspaceIndex, workspaces: nextWorkspaces, version: workspaceIndex.version + 1 });
   }, [activeWorkspaceId, persistWorkspaceIndex, workspaceIndex]);
 
@@ -170,10 +212,9 @@ export function useNotesSync() {
       ]);
       setWorkspaceIndex(indexSnapshot);
       setData(notesSnapshot.data);
-      setVersion(notesSnapshot.version);
       await Promise.all([
         writeLocalWorkspaceIndex(indexSnapshot),
-        writeLocalWorkspaceNotes(activeWorkspaceId, notesSnapshot.data, notesSnapshot.version),
+        writeLocalWorkspaceNotes(activeWorkspaceId, notesSnapshot.data),
       ]);
       setLocalMode(false);
       return true;
@@ -188,7 +229,6 @@ export function useNotesSync() {
 
   return {
     data,
-    version,
     workspaceIndex,
     workspaces: workspaceIndex.workspaces,
     activeWorkspace,
@@ -201,10 +241,12 @@ export function useNotesSync() {
     setError,
     commit,
     createWorkspace,
+    createWorkspaceWithData,
     selectWorkspace,
     setDefaultWorkspace,
     renameWorkspace,
     updateSelectedCategoryPaths,
+    updatePinnedCategoryPaths,
     refresh,
   };
 }

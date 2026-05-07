@@ -1,15 +1,15 @@
-import { doc, getDoc, getDocFromServer, onSnapshot, serverTimestamp, setDoc, Unsubscribe } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer, onSnapshot, setDoc, Unsubscribe } from 'firebase/firestore';
 import { CategoryPath, NotesData, WorkspaceIndex, WorkspaceListDocument, WorkspaceMeta } from '../../shared/types/notes';
 import { firestore } from './firebase';
 import { validateNotesData } from './validation';
 
 export type NotesSnapshot = {
   data: NotesData;
-  version: number;
 };
 
-const notesRef = doc(firestore, 'reactnativecollection', 'main');
+const legacyNotesRef = doc(firestore, 'reactnativecollection', 'main');
 const workspaceListRef = doc(firestore, 'reactnativecollection', 'workspaceslist');
+const workspaceNotesCollection = 'reactnativecollection_workspace_notes';
 
 export const defaultWorkspaceId = 'workspace1';
 
@@ -20,42 +20,60 @@ export function subscribeToNotes(onChange: (snapshot: NotesSnapshot) => void, on
 }
 
 export function subscribeToWorkspaceNotes(workspaceId: string, onChange: (snapshot: NotesSnapshot) => void, onError: (message: string) => void): Unsubscribe {
+  const workspaceRef = workspaceNotesRef(workspaceId);
   return onSnapshot(
-    notesRef,
+    workspaceRef,
     async (snapshot) => {
       if (!snapshot.exists()) {
-        onChange({ data: {}, version: 1 });
+        if (workspaceId === defaultWorkspaceId) {
+          try {
+            const legacy = await getDoc(legacyNotesRef);
+            onChange(parseNotesSnapshot(legacy.exists() ? legacy.data() : undefined));
+          } catch (error) {
+            onError(error instanceof Error ? error.message : 'Could not read workspace notes.');
+          }
+          return;
+        }
+        onChange({ data: {} });
         return;
       }
 
       const raw = snapshot.data();
       const parsed = validateNotesData(raw.data ?? {});
-      if (!parsed.ok) {
+      if (parsed.ok === false) {
         onError(parsed.message);
         return;
       }
-      onChange({ data: parsed.data, version: typeof raw.version === 'number' ? raw.version : 1 });
+      onChange({ data: parsed.data });
     },
     (error) => onError(error.message),
   );
 }
 
 export async function readWorkspaceNotes(workspaceId: string): Promise<NotesSnapshot> {
-  const snapshot = await getDoc(notesRef);
+  const snapshot = await getDoc(workspaceNotesRef(workspaceId));
+  if (!snapshot.exists() && workspaceId === defaultWorkspaceId) {
+    const legacy = await getDoc(legacyNotesRef);
+    return parseNotesSnapshot(legacy.exists() ? legacy.data() : undefined);
+  }
   return parseNotesSnapshot(snapshot.exists() ? snapshot.data() : undefined);
 }
 
 export async function readLatestWorkspaceNotes(workspaceId: string): Promise<NotesSnapshot> {
-  const snapshot = await getDocFromServer(notesRef);
+  const snapshot = await getDocFromServer(workspaceNotesRef(workspaceId));
+  if (!snapshot.exists() && workspaceId === defaultWorkspaceId) {
+    const legacy = await getDocFromServer(legacyNotesRef);
+    return parseNotesSnapshot(legacy.exists() ? legacy.data() : undefined);
+  }
   return parseNotesSnapshot(snapshot.exists() ? snapshot.data() : undefined);
 }
 
 function parseNotesSnapshot(raw: Record<string, unknown> | undefined): NotesSnapshot {
-  if (!raw) return { data: {}, version: 1 };
+  if (!raw) return { data: {} };
 
   const parsed = validateNotesData(raw.data ?? {});
-  if (!parsed.ok) throw new Error(parsed.message);
-  return { data: parsed.data, version: typeof raw.version === 'number' ? raw.version : 1 };
+  if (parsed.ok === false) throw new Error(parsed.message);
+  return { data: parsed.data };
 }
 
 export async function readLatestWorkspaceIndex(): Promise<WorkspaceSnapshot> {
@@ -66,26 +84,25 @@ export async function readLatestWorkspaceIndex(): Promise<WorkspaceSnapshot> {
   return parsed.workspaces.length ? parsed : defaultWorkspaceIndex();
 }
 
-export async function writeNotes(data: NotesData, version: number): Promise<void> {
-  await writeWorkspaceNotes(defaultWorkspaceId, data, version);
+export async function writeNotes(data: NotesData): Promise<void> {
+  await writeWorkspaceNotes(defaultWorkspaceId, data);
 }
 
-export async function writeWorkspaceNotes(workspaceId: string, data: NotesData, version: number): Promise<void> {
+export async function writeWorkspaceNotes(workspaceId: string, data: NotesData): Promise<void> {
   await setDoc(
-    notesRef,
-    {
-      data,
-      version,
-      updatedAt: serverTimestamp(),
-    },
+    workspaceNotesRef(workspaceId),
+    { data },
     { merge: false },
   );
+  if (workspaceId === defaultWorkspaceId) {
+    await setDoc(legacyNotesRef, { data }, { merge: false });
+  }
 }
 
 export async function readWorkspaceIndex(): Promise<WorkspaceSnapshot> {
   const snapshot = await getDoc(workspaceListRef);
   if (!snapshot.exists()) {
-    const legacy = await getDoc(notesRef);
+    const legacy = await getDoc(legacyNotesRef);
     const index = defaultWorkspaceIndex();
     await writeWorkspaceIndex(index);
 
@@ -93,7 +110,7 @@ export async function readWorkspaceIndex(): Promise<WorkspaceSnapshot> {
       const raw = legacy.data();
       const parsed = validateNotesData(raw.data ?? {});
       if (parsed.ok) {
-        await writeWorkspaceNotes(defaultWorkspaceId, parsed.data, typeof raw.version === 'number' ? raw.version : 1);
+        await writeWorkspaceNotes(defaultWorkspaceId, parsed.data);
       }
     }
 
@@ -107,6 +124,15 @@ export async function readWorkspaceIndex(): Promise<WorkspaceSnapshot> {
     return index;
   }
   return parsed;
+}
+
+function workspaceNotesRef(workspaceId: string) {
+  return doc(firestore, workspaceNotesCollection, encodeWorkspaceId(workspaceId));
+}
+
+function encodeWorkspaceId(workspaceId: string) {
+  const cleanId = workspaceId.trim() || defaultWorkspaceId;
+  return cleanId.replace(/[\/]/g, '_');
 }
 
 export function subscribeToWorkspaceIndex(onChange: (snapshot: WorkspaceSnapshot) => void, onError: (message: string) => void): Unsubscribe {
@@ -131,11 +157,12 @@ export async function writeWorkspaceIndex(index: WorkspaceIndex): Promise<void> 
   await setDoc(workspaceListRef, serializeWorkspaceIndex(index), { merge: false });
 }
 
-export function createWorkspaceMeta(id: string, name: string, selectedCategoryNames: string[] = []): WorkspaceMeta {
+export function createWorkspaceMeta(id: string, name: string, selectedCategoryNames: string[] = [], pinnedCategoryNames: string[] = []): WorkspaceMeta {
   return {
     id,
     name,
     selectedCategoryPaths: selectedCategoryNames.map((categoryName) => parseCategoryPath(categoryName)),
+    pinnedCategoryPaths: pinnedCategoryNames.map((categoryName) => parseCategoryPath(categoryName)),
   };
 }
 
@@ -152,7 +179,13 @@ export function parseWorkspaceIndex(raw: Record<string, unknown>): WorkspaceInde
     ? workspaceNames
     : [defaultWorkspaceName, ...workspaceNames];
   const uniqueWorkspaceNames = [...new Set(normalizedWorkspaceNames)];
-  const workspaces = uniqueWorkspaceNames.map((workspaceName) => createWorkspaceMeta(workspaceName, workspaceName, parseSelectedCategoryNames(raw[workspaceName])));
+  const pinnedCategoryNamesByWorkspace = parsePinnedCategoryNamesByWorkspace(raw.pinnedcategories);
+  const workspaces = uniqueWorkspaceNames.map((workspaceName) => createWorkspaceMeta(
+    workspaceName,
+    workspaceName,
+    parseSelectedCategoryNames(raw[workspaceName]),
+    pinnedCategoryNamesByWorkspace.get(workspaceName) ?? [],
+  ));
 
   return {
     workspaces,
@@ -165,9 +198,13 @@ export function parseWorkspaceIndex(raw: Record<string, unknown>): WorkspaceInde
 export function serializeWorkspaceIndex(index: WorkspaceIndex): WorkspaceListDocument {
   const defaultWorkspace = index.workspaces.find((workspace) => workspace.id === index.defaultWorkspaceId) ?? index.workspaces.find((workspace) => workspace.id === index.activeWorkspaceId) ?? index.workspaces[0] ?? createWorkspaceMeta(defaultWorkspaceId, defaultWorkspaceId);
   const document: WorkspaceListDocument = { defaultworkspace: defaultWorkspace.id };
+  const pinnedCategories: Record<string, string[]> = {};
   for (const workspace of index.workspaces) {
     document[workspace.id] = selectedCategoryNamesFromPaths(workspace.selectedCategoryPaths);
+    const pinnedNames = selectedCategoryNamesFromPaths(workspace.pinnedCategoryPaths);
+    if (pinnedNames.length) pinnedCategories[workspace.id] = pinnedNames;
   }
+  if (Object.keys(pinnedCategories).length) document.pinnedcategories = pinnedCategories;
   if (!Array.isArray(document[defaultWorkspace.id])) {
     document[defaultWorkspace.id] = [];
   }
@@ -186,6 +223,11 @@ function isReservedWorkspaceListKey(key: string) {
 function parseSelectedCategoryNames(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map((item) => item.trim());
+}
+
+function parsePinnedCategoryNamesByWorkspace(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return new Map<string, string[]>();
+  return new Map(Object.entries(value).map(([workspaceName, categoryNames]) => [workspaceName, parseSelectedCategoryNames(categoryNames)]));
 }
 
 function selectedCategoryNamesFromPaths(paths: CategoryPath[]) {

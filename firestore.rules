@@ -5,5 +5,17 @@ service cloud.firestore {
     match /reactnativecollection/{documentId} {
       allow read, write: if true;
     }
+
+    match /reactnativecollection_workspace_notes/{documentId} {
+      allow read, write: if true;
+    }
+
+    match /reactnativecollection_ai_runs/{documentId} {
+      allow read, write: if true;
+    }
+
+    match /reactnativecollection_notifications/{documentId} {
+      allow read, write: if true;
+    }
   }
 }

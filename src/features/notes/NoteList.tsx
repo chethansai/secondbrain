@@ -4,6 +4,7 @@ import { useTheme } from '../../shared/design/ThemeProvider';
 import { colors, rounded, spacing, typography } from '../../shared/design/tokens';
 import { FlatNote } from '../../shared/types/notes';
 import { Icon } from '../../shared/ui/Icon';
+import { isHistoryPath, parseHistoryNote } from './noteMutations';
 
 type Props = {
   notes: FlatNote[];
@@ -11,25 +12,41 @@ type Props = {
   onMove: (note: FlatNote) => void;
   onCopy: (note: FlatNote) => void;
   onSetPriority: (note: FlatNote, priority: number) => void;
+  onAiReview?: (note: FlatNote) => void;
   onDelete: (note: FlatNote) => void;
 };
 
-export function NoteList({ notes, onEdit, onMove, onCopy, onSetPriority, onDelete }: Props) {
+export function NoteList({ notes, onEdit, onMove, onCopy, onSetPriority, onAiReview, onDelete }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.list}>
       {notes.map((note, index) => (
         <View key={`${note.path.join('/')}-${note.index}-${index}`} style={[styles.card, { zIndex: notes.length - index }]}>
-          <Text style={styles.text}>{note.note}</Text>
-          <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={index + 1} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onCopy={onCopy} onSetPriority={onSetPriority} onDelete={onDelete} />
+          <NoteText note={note} styles={styles} />
+          <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={index + 1} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onCopy={onCopy} onSetPriority={onSetPriority} onAiReview={onAiReview} onDelete={onDelete} />
         </View>
       ))}
     </View>
   );
 }
 
-function NoteActionsDropdown({ note, noteCount, currentOrder, colors, styles, onEdit, onMove, onCopy, onSetPriority, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
+function NoteText({ note, styles }: { note: FlatNote; styles: ReturnType<typeof createStyles> }) {
+  const historyNote = isHistoryPath(note.path) ? parseHistoryNote(note.note) : null;
+  if (!historyNote) return <Text style={styles.text}>{note.note}</Text>;
+
+  return (
+    <View style={styles.historyTextBlock}>
+      <Text style={styles.historyPrimary}>{historyNote.primary}</Text>
+      <View style={styles.historyMetaRow}>
+        {historyNote.event ? <Text style={styles.historyEvent}>{formatHistoryEvent(historyNote.event)}</Text> : null}
+        <Text style={styles.historyMeta}>{historyNote.metadata.join(' · ')}</Text>
+      </View>
+    </View>
+  );
+}
+
+function NoteActionsDropdown({ note, noteCount, currentOrder, colors, styles, onEdit, onMove, onCopy, onSetPriority, onAiReview, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onAiReview?: (note: FlatNote) => void; onDelete: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
@@ -84,6 +101,12 @@ function NoteActionsDropdown({ note, noteCount, currentOrder, colors, styles, on
               </ScrollView>
             </View>
           ) : null}
+          {onAiReview ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Review note with AI" onPress={() => { close(); onAiReview(note); }} style={styles.dropdownItem}>
+              <Icon name="sparkles-outline" size={15} color={colors.ink} />
+              <Text style={styles.dropdownItemText}>AI review</Text>
+            </Pressable>
+          ) : null}
           <Pressable accessibilityRole="button" accessibilityLabel="Delete note" onPress={() => { close(); onDelete(note); }} style={styles.dropdownItem}>
             <Icon name="trash-outline" size={15} color={colors.semanticError} />
             <Text style={styles.dropdownItemDanger}>Delete</Text>
@@ -105,11 +128,20 @@ function createPriorityOptions(count: number, search: string) {
   return Array.from({ length: count }, (_, index) => index + 1).filter((option) => !cleanSearch || String(option).includes(cleanSearch));
 }
 
+function formatHistoryEvent(event: string) {
+  return event.replace(/_/g, ' ').toLowerCase();
+}
+
 function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
   return StyleSheet.create({
   list: { gap: spacing.sm },
   card: { position: 'relative', backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, borderRadius: rounded.lg, padding: spacing.lg, gap: 1 },
   text: { ...typography.body, color: colors.charcoal },
+  historyTextBlock: { gap: spacing.xs, paddingRight: 42 },
+  historyPrimary: { ...typography.body, color: colors.ink, fontWeight: '700' },
+  historyMetaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs },
+  historyMeta: { ...typography.bodySm, color: colors.slate, flexShrink: 1 },
+  historyEvent: { ...typography.captionBold, color: colors.steel, textTransform: 'uppercase' },
   actions: { position: 'relative', flexDirection: 'row', gap: spacing.xs, justifyContent: 'flex-end', zIndex: 3 },
   iconButton: { width: 40, height: 40, borderRadius: rounded.md, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   dropdown: { position: 'absolute', top: 44, right: 0, width: 172, borderRadius: rounded.md, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: spacing.xs, gap: 3, zIndex: 5, elevation: 8 },

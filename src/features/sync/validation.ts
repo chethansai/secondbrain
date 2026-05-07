@@ -10,7 +10,7 @@ export function validateNotesData(value: unknown): { ok: true; data: NotesData }
     if (!name.trim()) return { ok: false, message: 'Category names cannot be empty.' };
     if (!Array.isArray(items)) return { ok: false, message: `Category ${name} must contain an array.` };
     const child = validateItems(items as NoteItem[], name);
-    if (!child.ok) return child;
+    if (child.ok === false) return child;
   }
 
   return { ok: true, data: value as NotesData };
@@ -24,7 +24,7 @@ function validateItems(items: NoteItem[], label: string): { ok: true } | { ok: f
     if (!name.trim()) return { ok: false, message: 'Nested category names cannot be empty.' };
     if (!Array.isArray(childItems)) return { ok: false, message: `Nested category ${name} must contain an array.` };
     const child = validateItems(childItems, name);
-    if (!child.ok) return child;
+    if (child.ok === false) return child;
   }
   return { ok: true };
 }

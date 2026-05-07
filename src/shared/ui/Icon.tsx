@@ -16,6 +16,7 @@ export type IconName =
   | 'git-branch-outline'
   | 'log-out-outline'
   | 'lock-open-outline'
+  | 'pin-outline'
   | 'reload-outline'
   | 'search-outline'
   | 'settings-outline'
@@ -47,6 +48,7 @@ const labels: Record<IconName, string> = {
   'git-branch-outline': '↗',
   'log-out-outline': 'L',
   'lock-open-outline': 'U',
+  'pin-outline': 'P',
   'reload-outline': 'R',
   'search-outline': '?',
   'settings-outline': '*',

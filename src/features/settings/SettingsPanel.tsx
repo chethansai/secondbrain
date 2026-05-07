@@ -5,8 +5,10 @@ import { colors, rounded, spacing, typography } from '../../shared/design/tokens
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { TextInputField } from '../../shared/ui/TextInputField';
-import { NotesData } from '../../shared/types/notes';
+import { NotesData, NoteItem } from '../../shared/types/notes';
 import { authTimeoutOptions } from '../auth/authSession';
+import { AiSettingsPanel } from '../ai/AiSettingsPanel';
+import { cloneItems, isCategoryNode } from '../categories/categoryTree';
 import { validateNotesData } from '../sync/validation';
 import { copyText } from './clipboard';
 
@@ -32,12 +34,12 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
   async function importJson() {
     try {
       const parsed = JSON.parse(importText);
-      const validation = validateNotesData(parsed);
+      const validation = parseImportNotesData(parsed);
       if (!validation.ok) {
         setStatus(validation.message);
         return;
       }
-      const ok = await onImport(validation.data);
+      const ok = await onImport(normalizeDuplicateCategoryNames(validation.data));
       setStatus(ok ? 'Import saved.' : 'Import failed.');
     } catch {
       setStatus('Import JSON could not be parsed.');
@@ -74,11 +76,64 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
         ) : null}
       </View>
       <Button label="Copy export JSON" icon="copy-outline" onPress={exportJson} />
-      <TextInputField value={importText} onChangeText={setImportText} multiline placeholder="Paste simple nested JSON" accessibilityLabel="Import JSON" />
+      <TextInputField value={importText} onChangeText={setImportText} multiline placeholder="Paste simple nested JSON" accessibilityLabel="Import JSON" autoCapitalize="none" autoCorrect={false} />
       <Button label="Import JSON" icon="cloud-upload-outline" variant="dark" onPress={importJson} disabled={!importText.trim()} />
+      <AiSettingsPanel />
       {status ? <Text style={styles.status}>{status}</Text> : null}
     </View>
   );
+}
+
+function parseImportNotesData(value: unknown) {
+  const direct = validateNotesData(value);
+  if (direct.ok) return direct;
+
+  if (value && typeof value === 'object' && !Array.isArray(value) && 'data' in value) {
+    const wrapped = validateNotesData((value as { data?: unknown }).data);
+    if (wrapped.ok) return wrapped;
+  }
+
+  return direct;
+}
+
+function normalizeDuplicateCategoryNames(data: NotesData): NotesData {
+  const latestItemsByName = new Map<string, NoteItem[]>();
+
+  Object.entries(data).forEach(([name, items]) => collectLatestCategoryItems(name, items, latestItemsByName));
+
+  const normalized: NotesData = {};
+  Object.entries(data).forEach(([name]) => {
+    normalized[name] = cloneItems(latestItemsByName.get(name) ?? []);
+  });
+
+  Object.entries(normalized).forEach(([name, items]) => {
+    normalized[name] = replaceDuplicateCategoryItems(items, latestItemsByName, new Set([name]));
+  });
+
+  return normalized;
+}
+
+function collectLatestCategoryItems(name: string, items: NoteItem[], latestItemsByName: Map<string, NoteItem[]>) {
+  latestItemsByName.set(name, cloneItems(items));
+  items.forEach((item) => {
+    if (!isCategoryNode(item)) return;
+    const [childName, childItems] = Object.entries(item)[0];
+    collectLatestCategoryItems(childName, childItems, latestItemsByName);
+  });
+}
+
+function replaceDuplicateCategoryItems(items: NoteItem[], latestItemsByName: Map<string, NoteItem[]>, parents: Set<string>): NoteItem[] {
+  return items.map((item) => {
+    if (!isCategoryNode(item)) return item;
+
+    const [name, childItems] = Object.entries(item)[0];
+    const sourceItems = latestItemsByName.get(name) ?? childItems;
+    if (parents.has(name)) return { [name]: cloneItems(sourceItems) };
+
+    const nextParents = new Set(parents);
+    nextParents.add(name);
+    return { [name]: replaceDuplicateCategoryItems(cloneItems(sourceItems), latestItemsByName, nextParents) };
+  });
 }
 
 function formatHours(hours: number) {

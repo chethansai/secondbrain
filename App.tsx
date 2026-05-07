@@ -3,13 +3,16 @@ import { ActivityIndicator, AppState, Linking, NativeScrollEvent, NativeSyntheti
 import { AutomationCommand, parseAutomationDeepLink } from './src/features/automation/deepLinks';
 import { clearSavedUnlock, defaultAuthTimeoutHours, markUnlocked, readAuthTimeoutHours, readShouldStartUnlocked, writeAuthTimeoutHours } from './src/features/auth/authSession';
 import { LockScreen } from './src/features/auth/LockScreen';
+import { AiChatPanel } from './src/features/ai/AiChatPanel';
+import { AiReviewModal } from './src/features/ai/AiReviewModal';
+import { useAiAssistant } from './src/features/ai/useAiAssistant';
 import { CategoryList } from './src/features/categories/CategoryList';
 import { countCategoryContents, createRootCategory, createSubcategory, deleteCategory, formatPath, getCategoryItems, listChildCategories, renameCategory } from './src/features/categories/categoryTree';
 import { TextPromptModal } from './src/features/editor/TextPromptModal';
 import { NoteEditorModal } from './src/features/editor/NoteEditorModal';
 import { MoveCopyModal } from './src/features/notes/MoveCopyModal';
 import { NoteList } from './src/features/notes/NoteList';
-import { addNote, copyNote, deleteNote, editNote, listNotesAtPath, moveNote, setNotePriority } from './src/features/notes/noteMutations';
+import { addNote, appendHistoryNote, copyNote, deleteNote, editNote, formatAddedNoteHistory, formatHistoryPath, formatHistoryTime, HISTORY_CATEGORY, listNotesAtPath, moveNote, setNotePriority } from './src/features/notes/noteMutations';
 import { SearchPanel } from './src/features/search/SearchPanel';
 import { SettingsPanel } from './src/features/settings/SettingsPanel';
 import { useNotesSync } from './src/features/sync/useNotesSync';
@@ -24,7 +27,7 @@ import { Icon } from './src/shared/ui/Icon';
 
 type ModalMode = 'root' | 'subcategory' | 'rename' | 'workspace' | 'renameWorkspace' | null;
 type MoveCopyAction = 'move' | 'copy';
-type Tab = 'workspace' | 'search' | 'settings';
+type Tab = 'workspace' | 'search' | 'settings' | 'ai';
 type DeleteTarget = { type: 'category'; path: CategoryPath } | { type: 'note'; note: FlatNote } | null;
 
 export default function App() {
@@ -132,7 +135,7 @@ const authLoadingStyles = StyleSheet.create({
 function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHours, onAuthTimeoutChange, onLogout }: { automationCommand: AutomationCommand | null; onAutomationComplete: (commandKey: string) => void; authTimeoutHours: number; onAuthTimeoutChange: (hours: number) => Promise<void>; onLogout: () => void }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { data, workspaces, activeWorkspace, activeWorkspaceId, defaultWorkspaceId, loading, saving, refreshing, error, setError, commit, createWorkspace, selectWorkspace, setDefaultWorkspace, renameWorkspace, updateSelectedCategoryPaths, refresh } = useNotesSync();
+  const { data, workspaces, activeWorkspace, activeWorkspaceId, defaultWorkspaceId, loading, saving, refreshing, error, setError, commit, createWorkspace, createWorkspaceWithData, selectWorkspace, setDefaultWorkspace, renameWorkspace, updateSelectedCategoryPaths, updatePinnedCategoryPaths, refresh } = useNotesSync();
   const [tab, setTab] = useState<Tab>('workspace');
   const [path, setPath] = useState<CategoryPath>([]);
   const [promptMode, setPromptMode] = useState<ModalMode>(null);
@@ -142,6 +145,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [moveVisible, setMoveVisible] = useState(false);
   const [moveCopyAction, setMoveCopyAction] = useState<MoveCopyAction>('move');
+  const [aiReviewNote, setAiReviewNote] = useState<FlatNote | null>(null);
   const [boardTopActionsVisible, setBoardTopActionsVisible] = useState(true);
   const runningAutomationKey = useRef<string | null>(null);
 
@@ -151,12 +155,21 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const activeTitle = path.length ? path[path.length - 1] : activeWorkspace?.name ?? 'Workspace';
   const showingRootBoard = !loading && tab === 'workspace' && path.length === 0;
 
+  const ai = useAiAssistant({
+    data,
+    activeWorkspaceId,
+    activeWorkspaceName: activeWorkspace?.name ?? activeWorkspaceId,
+    currentPath: path,
+    onCreateWorkspaceFromAi: createAiWorkspace,
+    onCommitMutation: commitWithHistory,
+  });
+
   useEffect(() => {
     if (!automationCommand || loading || runningAutomationKey.current === automationCommand.key) return;
     runningAutomationKey.current = automationCommand.key;
 
     async function runAutomationCommand(command: AutomationCommand) {
-      const ok = await commit(addNote(data, command.categoryPath, command.note));
+      const ok = await commitWithHistory(addNote(data, command.categoryPath, command.note), formatAddedNoteHistory(command.note, command.categoryPath));
       if (ok) {
         setTab('workspace');
         setPath(command.categoryPath);
@@ -177,14 +190,27 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     selectWorkspace(workspaceId);
   }
 
+  async function commitWithHistory(result: ReturnType<typeof addNote>, historyText: string) {
+    if (!result.ok) return commit(result);
+    const ok = await commit(appendHistoryNote(result.data, historyText));
+    if (ok) await includeWorkspaceCategory(HISTORY_CATEGORY);
+    return ok;
+  }
+
   async function submitPrompt(value: string) {
     if (promptMode === 'root') {
       const result = createRootCategory(data, value);
-      const ok = await commit(result);
+      const cleanName = value.trim();
+      const ok = await commitWithHistory(result, `${cleanName} category created - ${cleanName} - ${formatHistoryTime()} - Event: CATEGORY_CREATED`);
       if (ok && result.ok) await includeWorkspaceCategory(value.trim());
       return ok;
     }
-    if (promptMode === 'subcategory') return commit(createSubcategory(data, promptPath ?? path, value));
+    if (promptMode === 'subcategory') {
+      const parentPath = promptPath ?? path;
+      const cleanName = value.trim();
+      const nextPath = [...parentPath, cleanName];
+      return commitWithHistory(createSubcategory(data, parentPath, value), `${formatHistoryPath(nextPath)} category created - ${formatHistoryPath(nextPath)} - ${formatHistoryTime()} - Event: SUBCATEGORY_CREATED - Parent: ${formatHistoryPath(parentPath)}`);
+    }
     if (promptMode === 'workspace') {
       const ok = await createWorkspace(value);
       if (ok) setPath([]);
@@ -194,11 +220,12 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     if (promptMode === 'rename') {
       const oldPath = path;
       const result = renameCategory(data, oldPath, value);
-      const ok = await commit(result);
+      const newPath = [...oldPath.slice(0, -1), value.trim()];
+      const ok = await commitWithHistory(result, `${formatHistoryPath(oldPath)} renamed to ${formatHistoryPath(newPath)} - ${formatHistoryPath(newPath)} - ${formatHistoryTime()} - Event: CATEGORY_RENAMED`);
       if (ok && result.ok) {
-        const nextPath = [...oldPath.slice(0, -1), value.trim()];
-        setPath(nextPath);
-        await replaceWorkspaceCategoryPath(oldPath, nextPath);
+        setPath(newPath);
+        await replaceWorkspaceCategoryPath(oldPath, newPath);
+        await replaceWorkspacePinnedCategoryPath(oldPath, newPath);
       }
       return ok;
     }
@@ -222,14 +249,15 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   async function runDelete() {
     if (!deleteTarget) return false;
     if (deleteTarget.type === 'note') {
-      return commit(deleteNote(data, deleteTarget.note.path, deleteTarget.note.note, deleteTarget.note.index));
+      return commitWithHistory(deleteNote(data, deleteTarget.note.path, deleteTarget.note.note, deleteTarget.note.index), `${deleteTarget.note.note} deleted - ${formatHistoryPath(deleteTarget.note.path)} - ${formatHistoryTime()} - Event: NOTE_DELETED`);
     }
 
     const parent = deleteTarget.path.slice(0, -1);
-    const ok = await commit(deleteCategory(data, deleteTarget.path));
+    const ok = await commitWithHistory(deleteCategory(data, deleteTarget.path), `${formatHistoryPath(deleteTarget.path)} category deleted - ${formatHistoryPath(deleteTarget.path)} - ${formatHistoryTime()} - Event: CATEGORY_DELETED`);
     if (ok) {
       await removeWorkspaceCategoryPath(deleteTarget.path);
-      setPath(parent);
+      await removeWorkspacePinnedCategoryPath(deleteTarget.path);
+      if (startsWithPath(path, deleteTarget.path)) setPath(parent);
     }
     return ok;
   }
@@ -238,8 +266,26 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     return commit({ ok: true, data: nextData });
   }
 
+  async function createAiWorkspace(name: string, nextData: NotesData) {
+    const workspaceName = uniqueWorkspaceName(name, workspaces.map((workspace) => workspace.id));
+    const ok = await createWorkspaceWithData(workspaceName, nextData);
+    if (!ok) return null;
+    setPath([]);
+    setTab('workspace');
+    return workspaceName;
+  }
+
+  function openWorkspaceFromAi(workspaceId: string) {
+    selectWorkspaceAndReset(workspaceId);
+    setTab('workspace');
+  }
+
   async function addBoardNote(notePath: CategoryPath, text: string) {
-    return commit(addNote(data, notePath, text));
+    return addWorkspaceNote(notePath, text);
+  }
+
+  async function addWorkspaceNote(notePath: CategoryPath, text: string) {
+    return commitWithHistory(addNote(data, notePath, text), formatAddedNoteHistory(text, notePath));
   }
 
   async function setNoteOrderPriority(note: FlatNote, priority: number) {
@@ -283,6 +329,27 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     return updateSelectedCategoryPaths(selected.filter((item) => !startsWithPath(item, categoryPath)));
   }
 
+  async function togglePinnedMoveCopyCategory(categoryPath: CategoryPath) {
+    const pinned = activeWorkspace?.pinnedCategoryPaths ?? [];
+    const key = categoryPath.join('\u001f');
+    const exists = pinned.some((item) => item.join('\u001f') === key);
+    const nextPinned = exists ? pinned.filter((item) => item.join('\u001f') !== key) : [...pinned, categoryPath];
+    return updatePinnedCategoryPaths(nextPinned);
+  }
+
+  async function replaceWorkspacePinnedCategoryPath(oldPath: CategoryPath, newPath: CategoryPath) {
+    if (!oldPath.length || !newPath.length) return false;
+    const pinned = activeWorkspace?.pinnedCategoryPaths ?? [];
+    const nextPinned = pinned.map((item) => startsWithPath(item, oldPath) ? [...newPath, ...item.slice(oldPath.length)] : item);
+    return updatePinnedCategoryPaths(nextPinned);
+  }
+
+  async function removeWorkspacePinnedCategoryPath(categoryPath: CategoryPath) {
+    if (!categoryPath.length) return false;
+    const pinned = activeWorkspace?.pinnedCategoryPaths ?? [];
+    return updatePinnedCategoryPaths(pinned.filter((item) => !startsWithPath(item, categoryPath)));
+  }
+
   function handleScreenScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const atTop = event.nativeEvent.contentOffset.y <= 8;
     setBoardTopActionsVisible((current) => (current === atTop ? current : atTop));
@@ -316,6 +383,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onRefresh={refresh}
                   onOpenSearch={() => setTab('search')}
                   onOpenSettings={() => setTab('settings')}
+                  onOpenAi={() => setTab('ai')}
                   onAuthTimeoutChange={onAuthTimeoutChange}
                   onLogout={onLogout}
                   onOpenCategory={setPath}
@@ -330,6 +398,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onMoveNote={(note) => openMoveCopy(note, 'move')}
                   onCopyNote={(note) => openMoveCopy(note, 'copy')}
                   onSetNotePriority={setNoteOrderPriority}
+                  onAiReview={(note) => setAiReviewNote(note)}
                   onDeleteNote={confirmDeleteNote}
                 />
               ) : (
@@ -343,6 +412,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     onBack={() => setPath(path.slice(0, -1))}
                     onOpenSearch={() => setTab('search')}
                     onOpenSettings={() => setTab('settings')}
+                    onOpenAi={() => setTab('ai')}
                   />
                   <ActionGrid
                     styles={styles}
@@ -359,6 +429,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                       onMove={(note) => openMoveCopy(note, 'move')}
                       onCopy={(note) => openMoveCopy(note, 'copy')}
                       onSetPriority={setNoteOrderPriority}
+                      onAiReview={(note) => setAiReviewNote(note)}
                       onDelete={confirmDeleteNote}
                     />
                   ) : <EmptyState title="No notes here" message="This category is ready for notes or subcategories." actionLabel="Add note" onAction={() => setEditorMode('add')} />}
@@ -378,6 +449,26 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
               <SettingsPanel data={data} authTimeoutHours={authTimeoutHours} onAuthTimeoutChange={onAuthTimeoutChange} onImport={importData} />
             </View>
           ) : null}
+          {!loading && tab === 'ai' ? (
+            <View style={styles.sectionStack}>
+              <PanelHeader title="AI" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
+              <AiChatPanel
+                currentPath={path}
+                answer={ai.answer}
+                status={ai.status}
+                busy={ai.busy}
+                runs={ai.runs}
+                notifications={ai.notifications}
+                unreadCount={ai.unreadCount}
+                onAsk={ai.ask}
+                onGenerateWorkspace={ai.generateWorkspace}
+                onCategoryRequest={ai.requestCategory}
+                onStop={ai.stop}
+                onOpenNotification={ai.openNotification}
+                onOpenWorkspace={openWorkspaceFromAi}
+              />
+            </View>
+          ) : null}
         </View>
       </ScrollView>
 
@@ -395,15 +486,27 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         title={editorMode === 'edit' ? 'Edit note' : 'Add note'}
         initialText={editorMode === 'edit' ? selectedNote?.note ?? '' : ''}
         onClose={() => { setEditorMode(null); setSelectedNote(null); }}
-        onSubmit={(text) => editorMode === 'edit' && selectedNote ? commit(editNote(data, selectedNote.path, selectedNote.note, text, selectedNote.index)) : commit(addNote(data, path, text))}
+        onSubmit={(text) => editorMode === 'edit' && selectedNote ? commitWithHistory(editNote(data, selectedNote.path, selectedNote.note, text, selectedNote.index), `${selectedNote.note} edited to ${text.trim()} - ${formatHistoryPath(selectedNote.path)} - ${formatHistoryTime()} - Event: NOTE_EDITED`) : addWorkspaceNote(path, text)}
       />
       <MoveCopyModal
         visible={moveVisible}
         action={moveCopyAction}
         data={data}
+        pinnedPaths={activeWorkspace?.pinnedCategoryPaths ?? []}
         onClose={() => { setMoveVisible(false); setSelectedNote(null); }}
-        onMove={(destination) => selectedNote ? commit(moveNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index)) : false}
-        onCopy={(destination) => selectedNote ? commit(copyNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index)) : false}
+        onTogglePin={togglePinnedMoveCopyCategory}
+        onResetPins={() => updatePinnedCategoryPaths([])}
+        onMove={(destination) => selectedNote ? commitWithHistory(moveNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index), `${selectedNote.note} moved - ${formatHistoryPath(destination)} - ${formatHistoryTime()} - Event: NOTE_MOVED - From: ${formatHistoryPath(selectedNote.path)}`) : false}
+        onCopy={(destination) => selectedNote ? commitWithHistory(copyNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index), `${selectedNote.note} copied - ${formatHistoryPath(destination)} - ${formatHistoryTime()} - Event: NOTE_COPIED - From: ${formatHistoryPath(selectedNote.path)}`) : false}
+      />
+      <AiReviewModal
+        visible={aiReviewNote !== null}
+        note={aiReviewNote}
+        busy={ai.busy}
+        onClose={() => setAiReviewNote(null)}
+        onClassify={ai.classifyNote}
+        onReplace={(text) => aiReviewNote ? commitWithHistory(editNote(data, aiReviewNote.path, aiReviewNote.note, text, aiReviewNote.index), `${aiReviewNote.note} AI cleaned to ${text.trim()} - ${formatHistoryPath(aiReviewNote.path)} - ${formatHistoryTime()} - Event: AI_NOTE_REVIEW`) : false}
+        onCreateAction={(text) => addWorkspaceNote(aiReviewNote?.path ?? path, text)}
       />
       <ConfirmModal
         visible={deleteTarget !== null}
@@ -425,7 +528,15 @@ function startsWithPath(path: CategoryPath, prefix: CategoryPath) {
   return prefix.every((segment, index) => path[index] === segment);
 }
 
-function WorkspaceHeader({ title, path, workspaceName, colors, styles, onBack, onOpenSearch, onOpenSettings }: { title: string; path: CategoryPath; workspaceName: string; colors: typeof import('./src/shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onBack: () => void; onOpenSearch: () => void; onOpenSettings: () => void }) {
+function uniqueWorkspaceName(name: string, existingNames: string[]) {
+  const cleanName = name.trim() || `AI Workspace ${new Date().toISOString().slice(0, 10)}`;
+  if (!existingNames.includes(cleanName)) return cleanName;
+  let index = 2;
+  while (existingNames.includes(`${cleanName} ${index}`)) index += 1;
+  return `${cleanName} ${index}`;
+}
+
+function WorkspaceHeader({ title, path, workspaceName, colors, styles, onBack, onOpenSearch, onOpenSettings, onOpenAi }: { title: string; path: CategoryPath; workspaceName: string; colors: typeof import('./src/shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onBack: () => void; onOpenSearch: () => void; onOpenSettings: () => void; onOpenAi: () => void }) {
   return (
     <View style={styles.header}>
       {path.length ? (
@@ -438,6 +549,9 @@ function WorkspaceHeader({ title, path, workspaceName, colors, styles, onBack, o
         <Text style={styles.heading}>{title}</Text>
       </View>
       <View style={styles.headerActions}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open AI" onPress={onOpenAi} style={styles.headerIconButton}>
+          <Icon name="sparkles-outline" size={17} color={colors.ink} />
+        </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Open search" onPress={onOpenSearch} style={styles.headerIconButton}>
           <Icon name="search-outline" size={17} color={colors.ink} />
         </Pressable>

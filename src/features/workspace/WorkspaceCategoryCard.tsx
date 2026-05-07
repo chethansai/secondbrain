@@ -5,7 +5,7 @@ import { rounded, shadows, spacing, typography } from '../../shared/design/token
 import { CategoryPath, CategorySummary, FlatNote } from '../../shared/types/notes';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
-import { normalizeNoteText } from '../notes/noteMutations';
+import { isHistoryPath, normalizeNoteText, parseHistoryNote } from '../notes/noteMutations';
 
 type Props = {
   category: CategorySummary;
@@ -26,6 +26,7 @@ type Props = {
   onMoveNote: (note: FlatNote) => void;
   onCopyNote: (note: FlatNote) => void;
   onSetNotePriority: (note: FlatNote, priority: number) => void;
+  onAiReview?: (note: FlatNote) => void;
   onDeleteNote: (note: FlatNote) => void;
 };
 
@@ -52,6 +53,7 @@ export function WorkspaceCategoryCard({
   onMoveNote,
   onCopyNote,
   onSetNotePriority,
+  onAiReview,
   onDeleteNote,
 }: Props) {
   const { colors, isDark } = useTheme();
@@ -180,6 +182,7 @@ export function WorkspaceCategoryCard({
                   onMoveNote={onMoveNote}
                   onCopyNote={onCopyNote}
                   onSetNotePriority={onSetNotePriority}
+                  onAiReview={onAiReview}
                   onDeleteNote={onDeleteNote}
                 />
               </View>
@@ -187,7 +190,7 @@ export function WorkspaceCategoryCard({
           }
 
           return (
-            <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={previewItems.length} currentOrder={index + 1} stackOrder={stackOrder} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onSetPriority={onSetNotePriority} onDelete={onDeleteNote} />
+            <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={previewItems.length} currentOrder={index + 1} stackOrder={stackOrder} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onSetPriority={onSetNotePriority} onAiReview={onAiReview} onDelete={onDeleteNote} />
           );
         }) : !adding ? (
           <View style={styles.emptyPreview}><Text style={styles.emptyPreviewText}>No notes yet.</Text></View>
@@ -197,7 +200,7 @@ export function WorkspaceCategoryCard({
   );
 }
 
-function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, colors, styles, onToggleCategory, onOpenCategory, onAddNote, onCreateSubcategory, onRenameCategory, onDeleteCategory, onEditNote, onMoveNote, onCopyNote, onSetNotePriority, onDeleteNote }: { category: CategorySummary; depth: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean; onCreateSubcategory: (path: CategoryPath) => void; onRenameCategory: (path: CategoryPath) => void; onDeleteCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onDeleteNote: (note: FlatNote) => void }) {
+function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, colors, styles, onToggleCategory, onOpenCategory, onAddNote, onCreateSubcategory, onRenameCategory, onDeleteCategory, onEditNote, onMoveNote, onCopyNote, onSetNotePriority, onAiReview, onDeleteNote }: { category: CategorySummary; depth: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean; onCreateSubcategory: (path: CategoryPath) => void; onRenameCategory: (path: CategoryPath) => void; onDeleteCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onAiReview?: (note: FlatNote) => void; onDeleteNote: (note: FlatNote) => void }) {
   const [adding, setAdding] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -306,13 +309,14 @@ function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategory
                   onMoveNote={onMoveNote}
                   onCopyNote={onCopyNote}
                   onSetNotePriority={onSetNotePriority}
+                  onAiReview={onAiReview}
                   onDeleteNote={onDeleteNote}
                 />
               );
             }
 
             return (
-              <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={childItems.length} currentOrder={index + 1} stackOrder={childStackOrder} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onSetPriority={onSetNotePriority} onDelete={onDeleteNote} />
+              <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={childItems.length} currentOrder={index + 1} stackOrder={childStackOrder} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onSetPriority={onSetNotePriority} onAiReview={onAiReview} onDelete={onDeleteNote} />
             );
           })}
         </View>
@@ -321,13 +325,14 @@ function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategory
   );
 }
 
-function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, colors, styles, onEdit, onMove, onCopy, onSetPriority, onDelete }: { note: FlatNote; itemCount: number; currentOrder: number; stackOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
+function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, colors, styles, onEdit, onMove, onCopy, onSetPriority, onAiReview, onDelete }: { note: FlatNote; itemCount: number; currentOrder: number; stackOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onAiReview?: (note: FlatNote) => void; onDelete: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
   const priorityScrollRef = useRef<ScrollView>(null);
   const priorityOptions = createPriorityOptions(itemCount, prioritySearch);
   const openUpward = currentOrder > Math.ceil(itemCount / 2);
+  const historyNote = isHistoryPath(note.path) ? parseHistoryNote(note.note) : null;
 
   useEffect(() => {
     if (!priorityOpen || prioritySearch) return;
@@ -338,7 +343,12 @@ function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, color
 
   return (
     <View style={[styles.previewNote, open && styles.previewNoteMenuOpen, { zIndex: open ? 1000 : stackOrder }]}>
-      <Text style={styles.previewText} numberOfLines={4}>{note.note}</Text>
+      {historyNote ? (
+        <View style={styles.previewHistoryBlock}>
+          <Text style={styles.previewHistoryPrimary} numberOfLines={3}>{historyNote.primary}</Text>
+          <Text style={styles.previewHistoryMeta} numberOfLines={2}>{[historyNote.event ? formatHistoryEvent(historyNote.event) : null, ...historyNote.metadata].filter(Boolean).join(' · ')}</Text>
+        </View>
+      ) : <Text style={styles.previewText} numberOfLines={4}>{note.note}</Text>}
       <Pressable accessibilityRole="button" accessibilityLabel="Note actions" onPress={() => setOpen((current) => !current)} style={styles.previewMenuButton}>
         <Icon name="settings-outline" size={11} color={colors.steel} />
       </Pressable>
@@ -362,6 +372,7 @@ function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, color
               </ScrollView>
             </View>
           ) : null}
+          {onAiReview ? <Pressable onPress={() => { setOpen(false); onAiReview(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>AI</Text></Pressable> : null}
           <Pressable onPress={() => { setOpen(false); onDelete(note); }} style={styles.previewAction}><Text style={styles.previewActionDanger}>Delete</Text></Pressable>
           <Pressable onPress={() => { setOpen(false); onCopy(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Copy</Text></Pressable>
         </View>
@@ -375,6 +386,10 @@ const previewPriorityOptionHeight = 26;
 function createPriorityOptions(count: number, search: string) {
   const cleanSearch = search.replace(/[^0-9]/g, '');
   return Array.from({ length: count }, (_, index) => index + 1).filter((option) => !cleanSearch || String(option).includes(cleanSearch));
+}
+
+function formatHistoryEvent(event: string) {
+  return event.replace(/_/g, ' ').toLowerCase();
 }
 
 function createOrderedPreviewItems(categories: CategorySummary[], notes: FlatNote[]): PreviewItem[] {
@@ -460,6 +475,9 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   previewNote: { position: 'relative', flexDirection: 'row', alignItems: 'flex-start', gap: scale(4), borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.54)' : 'rgba(255,255,255,0.66)', paddingHorizontal: scale(4), paddingVertical: scale(3), marginTop: 0 },
   previewNoteMenuOpen: { elevation: 16 },
   previewText: { fontSize: scale(11), fontWeight: '500', lineHeight: scale(13), color: colors.charcoal, flex: 1, minWidth: 0, paddingRight: scale(24) },
+  previewHistoryBlock: { flex: 1, minWidth: 0, gap: scale(1), paddingRight: scale(24) },
+  previewHistoryPrimary: { fontSize: scale(11), fontWeight: '700', lineHeight: scale(13), color: colors.charcoal },
+  previewHistoryMeta: { fontSize: scale(8), fontWeight: '500', lineHeight: scale(10), color: colors.steel },
   previewMenuButton: { position: 'absolute', top: scale(3), right: scale(3), width: scale(22), height: scale(16), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, zIndex: 4 },
   previewActions: { position: 'absolute', top: scale(22), right: scale(3), zIndex: 1001, minWidth: scale(94), borderRadius: rounded.xs, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: scale(3), ...shadows.card, elevation: 18 },
   previewActionsAbove: { top: undefined, bottom: scale(22) },

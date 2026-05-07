@@ -4,6 +4,7 @@ import { createWorkspaceMeta, defaultWorkspaceId, NotesSnapshot, parseWorkspaceI
 import { validateNotesData } from './validation';
 
 const localNotesKey = 'rnnotetaking.notes.main';
+const localWorkspaceNotesPrefix = 'rnnotetaking.notes.workspace.';
 const localWorkspaceListKey = 'rnnotetaking.workspaces.list';
 const legacyLocalWorkspaceIndexKey = 'rnnotetaking.workspaces.index';
 
@@ -12,25 +13,30 @@ export async function readLocalNotes(): Promise<NotesSnapshot> {
 }
 
 export async function readLocalWorkspaceNotes(workspaceId: string): Promise<NotesSnapshot> {
-  const raw = await AsyncStorage.getItem(localNotesKey);
-  if (!raw) return { data: {}, version: 1 };
+  const raw = await AsyncStorage.getItem(localWorkspaceNotesKey(workspaceId)) ?? (workspaceId === defaultWorkspaceId ? await AsyncStorage.getItem(localNotesKey) : null);
+  if (!raw) return { data: {} };
 
-  const parsed = JSON.parse(raw) as { data?: unknown; version?: unknown };
+  const parsed = JSON.parse(raw) as { data?: unknown };
   const validation = validateNotesData(parsed.data ?? {});
-  if (!validation.ok) return { data: {}, version: 1 };
+  if (!validation.ok) return { data: {} };
 
-  return {
-    data: validation.data,
-    version: typeof parsed.version === 'number' ? parsed.version : 1,
-  };
+  return { data: validation.data };
 }
 
-export async function writeLocalNotes(data: NotesData, version: number): Promise<void> {
-  await writeLocalWorkspaceNotes(defaultWorkspaceId, data, version);
+export async function writeLocalNotes(data: NotesData): Promise<void> {
+  await writeLocalWorkspaceNotes(defaultWorkspaceId, data);
 }
 
-export async function writeLocalWorkspaceNotes(workspaceId: string, data: NotesData, version: number): Promise<void> {
-  await AsyncStorage.setItem(localNotesKey, JSON.stringify({ data, version }));
+export async function writeLocalWorkspaceNotes(workspaceId: string, data: NotesData): Promise<void> {
+  await AsyncStorage.setItem(localWorkspaceNotesKey(workspaceId), JSON.stringify({ data }));
+  if (workspaceId === defaultWorkspaceId) {
+    await AsyncStorage.setItem(localNotesKey, JSON.stringify({ data }));
+  }
+}
+
+function localWorkspaceNotesKey(workspaceId: string) {
+  const cleanId = (workspaceId.trim() || defaultWorkspaceId).replace(/[\/]/g, '_');
+  return `${localWorkspaceNotesPrefix}${cleanId}`;
 }
 
 export async function readLocalWorkspaceIndex(): Promise<WorkspaceIndex> {
@@ -64,7 +70,12 @@ function parseLegacyWorkspaceIndex(parsed: Partial<WorkspaceIndex>): WorkspaceIn
     const workspace = item as Partial<WorkspaceMeta>;
     const name = typeof workspace.name === 'string' && workspace.name.trim() ? workspace.name.trim() : typeof workspace.id === 'string' && workspace.id.trim() ? workspace.id.trim() : '';
     if (!name) return [];
-    return [{ id: name, name, selectedCategoryPaths: Array.isArray(workspace.selectedCategoryPaths) ? workspace.selectedCategoryPaths : [] }];
+    return [{
+      id: name,
+      name,
+      selectedCategoryPaths: Array.isArray(workspace.selectedCategoryPaths) ? workspace.selectedCategoryPaths : [],
+      pinnedCategoryPaths: Array.isArray(workspace.pinnedCategoryPaths) ? workspace.pinnedCategoryPaths : [],
+    }];
   }) : [];
   const activeWorkspace = workspaces.find((workspace) => workspace.id === parsed.activeWorkspaceId || workspace.name === parsed.activeWorkspaceId) ?? workspaces[0];
   const defaultWorkspace = workspaces.find((workspace) => workspace.id === parsed.defaultWorkspaceId || workspace.name === parsed.defaultWorkspaceId) ?? activeWorkspace;

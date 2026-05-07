@@ -25,6 +25,7 @@ export type WorkspaceMeta = {
   id: string;
   name: string;
   selectedCategoryPaths: CategoryPath[];
+  pinnedCategoryPaths: CategoryPath[];
 };
 
 export type WorkspaceIndex = {
@@ -36,4 +37,5 @@ export type WorkspaceIndex = {
 
 export type WorkspaceListDocument = Record<string, string[] | string | unknown> & {
   defaultworkspace?: string;
+  pinnedcategories?: Record<string, string[]>;
 };

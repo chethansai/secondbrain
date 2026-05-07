@@ -1,6 +1,8 @@
 import { CategoryPath, FlatNote, MutationResult, NotesData } from '../../shared/types/notes';
 import { cloneData, getCategoryItems, isCategoryNode, syncStandaloneCategory } from '../categories/categoryTree';
 
+export const HISTORY_CATEGORY = 'HISTORY';
+
 export function addNote(data: NotesData, path: CategoryPath, text: string): MutationResult {
   const cleanText = normalizeNoteText(text);
   if (!cleanText) return failure('empty_note', 'Note text cannot be empty.');
@@ -131,6 +133,61 @@ export function normalizeNoteText(text: string) {
   return text.trim();
 }
 
+function padDatePart(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+function isHistoryTime(value: string) {
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(value);
+}
+
 function failure(code: string, message: string): MutationResult {
   return { ok: false, code, message };
+}
+
+export function appendHistoryNote(data: NotesData, text: string): MutationResult {
+  const cleanText = normalizeNoteText(text);
+  if (!cleanText) return failure('empty_history_note', 'History note cannot be empty.');
+  const next = cloneData(data);
+  if (!Array.isArray(next[HISTORY_CATEGORY])) next[HISTORY_CATEGORY] = [];
+  next[HISTORY_CATEGORY].push(cleanText);
+  syncStandaloneCategory(next, [HISTORY_CATEGORY]);
+  return { ok: true, data: next };
+}
+
+export function isHistoryPath(path: CategoryPath) {
+  return path.length === 1 && path[0] === HISTORY_CATEGORY;
+}
+
+export function formatHistoryTime(date = new Date()) {
+  const year = date.getFullYear();
+  const month = padDatePart(date.getMonth() + 1);
+  const day = padDatePart(date.getDate());
+  const hours = padDatePart(date.getHours());
+  const minutes = padDatePart(date.getMinutes());
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+export function formatAddedNoteHistory(text: string, path: CategoryPath, date = new Date()) {
+  return `${normalizeNoteText(text)} - ${formatHistoryPath(path)} - ${formatHistoryTime(date)}`;
+}
+
+export function formatHistoryPath(path: CategoryPath) {
+  return path.length ? path.join(' > ') : 'Workspace';
+}
+
+export function parseHistoryNote(text: string): { primary: string; metadata: string[]; event?: string } | null {
+  const parts = text.split(' - ').map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 3) return null;
+
+  const timeIndex = parts.findIndex(isHistoryTime);
+  if (timeIndex < 2) return null;
+
+  const primary = parts.slice(0, timeIndex - 1).join(' - ') || parts[0];
+  const category = parts[timeIndex - 1];
+  const time = parts[timeIndex];
+  const tail = parts.slice(timeIndex + 1);
+  const event = tail.find((part) => part.startsWith('Event: '))?.replace('Event: ', '');
+  const otherDetails = tail.filter((part) => !part.startsWith('Event: '));
+  return { primary, metadata: [category, time, ...otherDetails], event };
 }

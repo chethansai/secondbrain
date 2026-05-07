@@ -7,12 +7,15 @@ type Props = {
   visible: boolean;
   action: 'move' | 'copy';
   data: NotesData;
+  pinnedPaths: CategoryPath[];
   onClose: () => void;
+  onTogglePin: (path: CategoryPath) => void;
+  onResetPins: () => void;
   onMove: (path: CategoryPath) => Promise<boolean> | boolean;
   onCopy: (path: CategoryPath) => Promise<boolean> | boolean;
 };
 
-export function MoveCopyModal({ visible, action, data, onClose, onMove, onCopy }: Props) {
+export function MoveCopyModal({ visible, action, data, pinnedPaths, onClose, onTogglePin, onResetPins, onMove, onCopy }: Props) {
   const [selectedPath, setSelectedPath] = useState<CategoryPath | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -34,7 +37,7 @@ export function MoveCopyModal({ visible, action, data, onClose, onMove, onCopy }
 
   return (
     <ModalShell visible={visible} title={action === 'move' ? 'Move to category' : 'Copy to category'} onClose={onClose}>
-      <CategoryPicker data={data} selectedPath={selectedPath} onSelect={run} disabled={busy} />
+      <CategoryPicker data={data} selectedPath={selectedPath} onSelect={run} disabled={busy} pinnedPaths={pinnedPaths} onTogglePin={onTogglePin} onResetPins={onResetPins} />
     </ModalShell>
   );
 }
