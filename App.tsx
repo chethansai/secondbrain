@@ -25,7 +25,7 @@ import { Icon } from './src/shared/ui/Icon';
 
 type ModalMode = 'root' | 'subcategory' | 'rename' | 'workspace' | 'renameWorkspace' | null;
 type MoveCopyAction = 'move' | 'copy';
-type Tab = 'workspace' | 'search' | 'settings' | 'ai';
+type Tab = 'workspace' | 'search' | 'settings' | 'ai' | 'aiWorkspace';
 type DeleteTarget = { type: 'category'; path: CategoryPath } | { type: 'note'; note: FlatNote } | null;
 
 export default function App() {
@@ -358,6 +358,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onOpenSearch={() => setTab('search')}
                   onOpenSettings={() => setTab('settings')}
                   onOpenAi={() => setTab('ai')}
+                  onOpenAiWorkspace={() => setTab('aiWorkspace')}
                   onAuthTimeoutChange={onAuthTimeoutChange}
                   onLogout={onLogout}
                   onOpenCategory={setPath}
@@ -386,6 +387,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     onOpenSearch={() => setTab('search')}
                     onOpenSettings={() => setTab('settings')}
                     onOpenAi={() => setTab('ai')}
+                    onOpenAiWorkspace={() => setTab('aiWorkspace')}
                   />
                   <ActionGrid
                     styles={styles}
@@ -425,6 +427,11 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
             <View style={styles.sectionStack}>
               <PanelHeader title="AI" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
               <AiChatPanel data={data} />
+            </View>
+          ) : null}
+          {!loading && tab === 'aiWorkspace' ? (
+            <View style={styles.sectionStack}>
+              <PanelHeader title="AI WORKSPACE" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
             </View>
           ) : null}
         </View>
@@ -477,7 +484,7 @@ function startsWithPath(path: CategoryPath, prefix: CategoryPath) {
   return prefix.every((segment, index) => path[index] === segment);
 }
 
-function WorkspaceHeader({ title, path, workspaceName, colors, styles, onBack, onOpenSearch, onOpenSettings, onOpenAi }: { title: string; path: CategoryPath; workspaceName: string; colors: typeof import('./src/shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onBack: () => void; onOpenSearch: () => void; onOpenSettings: () => void; onOpenAi: () => void }) {
+function WorkspaceHeader({ title, path, workspaceName, colors, styles, onBack, onOpenSearch, onOpenSettings, onOpenAi, onOpenAiWorkspace }: { title: string; path: CategoryPath; workspaceName: string; colors: typeof import('./src/shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onBack: () => void; onOpenSearch: () => void; onOpenSettings: () => void; onOpenAi: () => void; onOpenAiWorkspace: () => void }) {
   return (
     <View style={styles.header}>
       {path.length ? (
@@ -492,6 +499,9 @@ function WorkspaceHeader({ title, path, workspaceName, colors, styles, onBack, o
       <View style={styles.headerActions}>
         <Pressable accessibilityRole="button" accessibilityLabel="Open AI" onPress={onOpenAi} style={styles.headerIconButton}>
           <Icon name="sparkles-outline" size={17} color={colors.ink} />
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open AI workspace" onPress={onOpenAiWorkspace} style={styles.headerIconButton}>
+          <Icon name="albums-outline" size={17} color={colors.ink} />
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Open search" onPress={onOpenSearch} style={styles.headerIconButton}>
           <Icon name="search-outline" size={17} color={colors.ink} />

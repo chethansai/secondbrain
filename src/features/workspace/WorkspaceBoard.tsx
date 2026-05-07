@@ -27,6 +27,7 @@ type Props = {
   onOpenSearch: () => void;
   onOpenSettings: () => void;
   onOpenAi: () => void;
+  onOpenAiWorkspace: () => void;
   onAuthTimeoutChange: (hours: number) => Promise<void> | void;
   onLogout: () => void;
   onOpenCategory: (path: CategoryPath) => void;
@@ -62,6 +63,7 @@ export function WorkspaceBoard({
   onOpenSearch,
   onOpenSettings,
   onOpenAi,
+  onOpenAiWorkspace,
   onAuthTimeoutChange,
   onLogout,
   onOpenCategory,
@@ -212,6 +214,11 @@ export function WorkspaceBoard({
                 <Pressable accessibilityRole="button" accessibilityLabel="Open AI" onPress={() => { closeHeaderMenus(); onOpenAi(); }} style={styles.headerMenuRow}>
                   <View style={styles.headerMenuRowIcon}><Icon name="sparkles-outline" size={16} color={colors.ink} /></View>
                   <Text style={styles.headerMenuRowText} numberOfLines={1}>AI</Text>
+                </Pressable>
+
+                <Pressable accessibilityRole="button" accessibilityLabel="Open AI workspace" onPress={() => { closeHeaderMenus(); onOpenAiWorkspace(); }} style={styles.headerMenuRow}>
+                  <View style={styles.headerMenuRowIcon}><Icon name="albums-outline" size={16} color={colors.ink} /></View>
+                  <Text style={styles.headerMenuRowText} numberOfLines={1}>AI WORKSPACE</Text>
                 </Pressable>
 
                 <Pressable accessibilityRole="button" accessibilityLabel="Log out" onPress={() => { closeHeaderMenus(); onLogout(); }} style={styles.headerMenuRow}>
