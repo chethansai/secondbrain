@@ -361,6 +361,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-08: Added an AI Chat button inside the AI placeholder space. Decision: keep AI unavailable in this build, but show a visible `AI Chat` entry button inside the AI panel without restoring chat/client behavior.
 - 2026-05-08: Restored shared notes data for workspace category selection after AI cleanup. Decision: workspaces again read/write the single `reactnativecollection/main` notes document while `workspaceslist` only stores selected/pinned category metadata, so the shown-categories picker can see all existing categories regardless of the active workspace.
 - 2026-05-08: Removed the implemented AI feature surface and kept only an AI placeholder entry. Decision: delete the AI feature files and proxy script, remove note-level AI review actions, remove streamed chat/assistant wiring, and leave an AI button beside Search and Settings that opens a simple unavailable panel.
 - 2026-05-08: Labeled the existing AI entry points as AI Chat after rebasing onto the newer AI implementation. Decision: preserve the remote streamed AI chat work and make the workspace menu/category header/tab title consistently read `AI Chat`.

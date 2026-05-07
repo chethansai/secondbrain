@@ -423,7 +423,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           {!loading && tab === 'ai' ? (
             <View style={styles.sectionStack}>
               <PanelHeader title="AI" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
-              <EmptyState title="AI" message="Not available in this build." />
+              <EmptyState title="AI" message="Not available in this build." actionLabel="AI Chat" onAction={() => undefined} />
             </View>
           ) : null}
         </View>
