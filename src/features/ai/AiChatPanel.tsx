@@ -129,7 +129,13 @@ export function AiChatPanel({ data }: Props) {
           ))}
         </ScrollView>
       </View>
-      <ScrollView ref={scrollRef} style={styles.messages} contentContainerStyle={styles.messageContent} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        ref={scrollRef}
+        style={styles.messages}
+        contentContainerStyle={styles.messageContent}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+      >
         {activeConversation?.messages.length ? activeConversation.messages.map((message) => (
           <View key={message.id} style={[styles.messageBubble, message.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
             <Text style={[styles.messageRole, message.role === 'user' ? styles.userRole : styles.assistantRole]}>{message.role === 'user' ? 'You' : 'Assistant'}</Text>
