@@ -9,8 +9,6 @@ export type NotesSnapshot = {
 
 const legacyNotesRef = doc(firestore, 'reactnativecollection', 'main');
 const workspaceListRef = doc(firestore, 'reactnativecollection', 'workspaceslist');
-const workspaceNotesCollection = 'reactnativecollection_workspace_notes';
-
 export const defaultWorkspaceId = 'workspace1';
 
 export type WorkspaceSnapshot = WorkspaceIndex;
@@ -20,20 +18,10 @@ export function subscribeToNotes(onChange: (snapshot: NotesSnapshot) => void, on
 }
 
 export function subscribeToWorkspaceNotes(workspaceId: string, onChange: (snapshot: NotesSnapshot) => void, onError: (message: string) => void): Unsubscribe {
-  const workspaceRef = workspaceNotesRef(workspaceId);
   return onSnapshot(
-    workspaceRef,
-    async (snapshot) => {
+    legacyNotesRef,
+    (snapshot) => {
       if (!snapshot.exists()) {
-        if (workspaceId === defaultWorkspaceId) {
-          try {
-            const legacy = await getDoc(legacyNotesRef);
-            onChange(parseNotesSnapshot(legacy.exists() ? legacy.data() : undefined));
-          } catch (error) {
-            onError(error instanceof Error ? error.message : 'Could not read workspace notes.');
-          }
-          return;
-        }
         onChange({ data: {} });
         return;
       }
@@ -51,20 +39,12 @@ export function subscribeToWorkspaceNotes(workspaceId: string, onChange: (snapsh
 }
 
 export async function readWorkspaceNotes(workspaceId: string): Promise<NotesSnapshot> {
-  const snapshot = await getDoc(workspaceNotesRef(workspaceId));
-  if (!snapshot.exists() && workspaceId === defaultWorkspaceId) {
-    const legacy = await getDoc(legacyNotesRef);
-    return parseNotesSnapshot(legacy.exists() ? legacy.data() : undefined);
-  }
+  const snapshot = await getDoc(legacyNotesRef);
   return parseNotesSnapshot(snapshot.exists() ? snapshot.data() : undefined);
 }
 
 export async function readLatestWorkspaceNotes(workspaceId: string): Promise<NotesSnapshot> {
-  const snapshot = await getDocFromServer(workspaceNotesRef(workspaceId));
-  if (!snapshot.exists() && workspaceId === defaultWorkspaceId) {
-    const legacy = await getDocFromServer(legacyNotesRef);
-    return parseNotesSnapshot(legacy.exists() ? legacy.data() : undefined);
-  }
+  const snapshot = await getDocFromServer(legacyNotesRef);
   return parseNotesSnapshot(snapshot.exists() ? snapshot.data() : undefined);
 }
 
@@ -89,14 +69,7 @@ export async function writeNotes(data: NotesData): Promise<void> {
 }
 
 export async function writeWorkspaceNotes(workspaceId: string, data: NotesData): Promise<void> {
-  await setDoc(
-    workspaceNotesRef(workspaceId),
-    { data },
-    { merge: false },
-  );
-  if (workspaceId === defaultWorkspaceId) {
-    await setDoc(legacyNotesRef, { data }, { merge: false });
-  }
+  await setDoc(legacyNotesRef, { data }, { merge: false });
 }
 
 export async function readWorkspaceIndex(): Promise<WorkspaceSnapshot> {
@@ -124,15 +97,6 @@ export async function readWorkspaceIndex(): Promise<WorkspaceSnapshot> {
     return index;
   }
   return parsed;
-}
-
-function workspaceNotesRef(workspaceId: string) {
-  return doc(firestore, workspaceNotesCollection, encodeWorkspaceId(workspaceId));
-}
-
-function encodeWorkspaceId(workspaceId: string) {
-  const cleanId = workspaceId.trim() || defaultWorkspaceId;
-  return cleanId.replace(/[\/]/g, '_');
 }
 
 export function subscribeToWorkspaceIndex(onChange: (snapshot: WorkspaceSnapshot) => void, onError: (message: string) => void): Unsubscribe {

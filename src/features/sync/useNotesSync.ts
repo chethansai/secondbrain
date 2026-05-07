@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CategoryPath, NotesData, MutationResult, WorkspaceIndex } from '../../shared/types/notes';
 import { readLocalWorkspaceIndex, readLocalWorkspaceNotes, writeLocalWorkspaceIndex, writeLocalWorkspaceNotes } from './localNotesRepository';
-import { createWorkspaceMeta, defaultWorkspaceId, readLatestWorkspaceIndex, readLatestWorkspaceNotes, readWorkspaceIndex, readWorkspaceNotes, subscribeToWorkspaceIndex, subscribeToWorkspaceNotes, writeWorkspaceIndex, writeWorkspaceNotes } from './notesRepository';
+import { createWorkspaceMeta, defaultWorkspaceId, readLatestWorkspaceIndex, readLatestWorkspaceNotes, subscribeToWorkspaceIndex, subscribeToWorkspaceNotes, writeWorkspaceIndex, writeWorkspaceNotes } from './notesRepository';
 
 export function useNotesSync() {
   const [data, setData] = useState<NotesData>({});
@@ -41,7 +41,7 @@ export function useNotesSync() {
   useEffect(() => {
     setLoading(true);
     const unsubscribe = subscribeToWorkspaceNotes(
-      activeWorkspaceId,
+      defaultWorkspaceId,
       (snapshot) => {
         setData(snapshot.data);
         setLoading(false);
@@ -49,7 +49,7 @@ export function useNotesSync() {
         setLocalMode(false);
       },
       async () => {
-        const snapshot = await readLocalWorkspaceNotes(activeWorkspaceId);
+        const snapshot = await readLocalWorkspaceNotes(defaultWorkspaceId);
         setData(snapshot.data);
         setLocalMode(true);
         setError(null);
@@ -57,7 +57,7 @@ export function useNotesSync() {
       },
     );
     return unsubscribe;
-  }, [activeWorkspaceId]);
+  }, []);
 
   const persistWorkspaceIndex = useCallback(async (index: WorkspaceIndex) => {
     setWorkspaceIndex(index);
@@ -83,12 +83,12 @@ export function useNotesSync() {
       setError(null);
       setData(result.data);
       try {
-        await writeWorkspaceNotes(activeWorkspaceId, result.data);
-        await writeLocalWorkspaceNotes(activeWorkspaceId, result.data);
+        await writeWorkspaceNotes(defaultWorkspaceId, result.data);
+        await writeLocalWorkspaceNotes(defaultWorkspaceId, result.data);
         setLocalMode(false);
         return true;
       } catch {
-        await writeLocalWorkspaceNotes(activeWorkspaceId, result.data);
+        await writeLocalWorkspaceNotes(defaultWorkspaceId, result.data);
         setLocalMode(true);
         setError(null);
         return true;
@@ -96,7 +96,7 @@ export function useNotesSync() {
         setSaving(false);
       }
     },
-    [activeWorkspaceId],
+    [],
   );
 
   const createWorkspace = useCallback(async (name: string) => {
@@ -117,43 +117,6 @@ export function useNotesSync() {
       version: workspaceIndex.version + 1,
     };
     return persistWorkspaceIndex(nextIndex);
-  }, [persistWorkspaceIndex, workspaceIndex]);
-
-  const createWorkspaceWithData = useCallback(async (name: string, notesData: NotesData) => {
-    const cleanName = name.trim();
-    if (!cleanName) {
-      setError('Workspace name cannot be empty.');
-      return false;
-    }
-    if (isReservedWorkspaceName(cleanName) || workspaceIndex.workspaces.some((workspace) => workspace.id === cleanName)) {
-      setError('A workspace with this name already exists or is reserved.');
-      return false;
-    }
-    const workspace = createWorkspaceMeta(cleanName, cleanName);
-    const nextIndex = {
-      workspaces: [...workspaceIndex.workspaces, workspace],
-      activeWorkspaceId: workspace.id,
-      defaultWorkspaceId: workspaceIndex.defaultWorkspaceId,
-      version: workspaceIndex.version + 1,
-    };
-    setSaving(true);
-    setError(null);
-    try {
-      await writeWorkspaceNotes(workspace.id, notesData);
-      await writeLocalWorkspaceNotes(workspace.id, notesData);
-      await persistWorkspaceIndex(nextIndex);
-      setData(notesData);
-      setLocalMode(false);
-      return true;
-    } catch {
-      await writeLocalWorkspaceNotes(workspace.id, notesData);
-      await persistWorkspaceIndex(nextIndex);
-      setData(notesData);
-      setLocalMode(true);
-      return true;
-    } finally {
-      setSaving(false);
-    }
   }, [persistWorkspaceIndex, workspaceIndex]);
 
   const selectWorkspace = useCallback(async (workspaceId: string) => {
@@ -178,9 +141,6 @@ export function useNotesSync() {
       return false;
     }
     if (cleanName === workspaceId) return true;
-    const notesSnapshot = await readWorkspaceNotes(workspaceId);
-    await writeWorkspaceNotes(cleanName, notesSnapshot.data);
-    await writeLocalWorkspaceNotes(cleanName, notesSnapshot.data);
     const nextWorkspaces = workspaceIndex.workspaces.map((workspace) => workspace.id === workspaceId ? { ...workspace, id: cleanName, name: cleanName } : workspace);
     const nextActiveWorkspaceId = workspaceIndex.activeWorkspaceId === workspaceId ? cleanName : workspaceIndex.activeWorkspaceId;
     const nextDefaultWorkspaceId = workspaceIndex.defaultWorkspaceId === workspaceId ? cleanName : workspaceIndex.defaultWorkspaceId;
@@ -208,13 +168,13 @@ export function useNotesSync() {
     try {
       const [indexSnapshot, notesSnapshot] = await Promise.all([
         readLatestWorkspaceIndex(),
-        readLatestWorkspaceNotes(activeWorkspaceId),
+        readLatestWorkspaceNotes(defaultWorkspaceId),
       ]);
       setWorkspaceIndex(indexSnapshot);
       setData(notesSnapshot.data);
       await Promise.all([
         writeLocalWorkspaceIndex(indexSnapshot),
-        writeLocalWorkspaceNotes(activeWorkspaceId, notesSnapshot.data),
+        writeLocalWorkspaceNotes(defaultWorkspaceId, notesSnapshot.data),
       ]);
       setLocalMode(false);
       return true;
@@ -225,7 +185,7 @@ export function useNotesSync() {
     } finally {
       setRefreshing(false);
     }
-  }, [activeWorkspaceId, refreshing]);
+  }, [refreshing]);
 
   return {
     data,
@@ -241,7 +201,6 @@ export function useNotesSync() {
     setError,
     commit,
     createWorkspace,
-    createWorkspaceWithData,
     selectWorkspace,
     setDefaultWorkspace,
     renameWorkspace,
