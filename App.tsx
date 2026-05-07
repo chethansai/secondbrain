@@ -3,7 +3,7 @@ import { ActivityIndicator, AppState, Linking, NativeScrollEvent, NativeSyntheti
 import { AutomationCommand, parseAutomationDeepLink } from './src/features/automation/deepLinks';
 import { clearSavedUnlock, defaultAuthTimeoutHours, markUnlocked, readAuthTimeoutHours, readShouldStartUnlocked, writeAuthTimeoutHours } from './src/features/auth/authSession';
 import { LockScreen } from './src/features/auth/LockScreen';
-import { AiChatPanel } from './src/features/ai/AiChatPanel';
+import { AIPanel } from './src/features/ai/AIPanel';
 import { AiReviewModal } from './src/features/ai/AiReviewModal';
 import { useAiAssistant } from './src/features/ai/useAiAssistant';
 import { CategoryList } from './src/features/categories/CategoryList';
@@ -275,11 +275,6 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     return workspaceName;
   }
 
-  function openWorkspaceFromAi(workspaceId: string) {
-    selectWorkspaceAndReset(workspaceId);
-    setTab('workspace');
-  }
-
   async function addBoardNote(notePath: CategoryPath, text: string) {
     return addWorkspaceNote(notePath, text);
   }
@@ -452,21 +447,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           {!loading && tab === 'ai' ? (
             <View style={styles.sectionStack}>
               <PanelHeader title="AI Chat" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
-              <AiChatPanel
-                currentPath={path}
-                answer={ai.answer}
-                status={ai.status}
-                busy={ai.busy}
-                runs={ai.runs}
-                notifications={ai.notifications}
-                unreadCount={ai.unreadCount}
-                onAsk={ai.ask}
-                onGenerateWorkspace={ai.generateWorkspace}
-                onCategoryRequest={ai.requestCategory}
-                onStop={ai.stop}
-                onOpenNotification={ai.openNotification}
-                onOpenWorkspace={openWorkspaceFromAi}
-              />
+              <AIPanel data={data} />
             </View>
           ) : null}
         </View>

@@ -22,7 +22,7 @@ export function AIPanel({ data }: Props) {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? conversations[0] ?? null;
+  const activeConversation = activeConversationId ? conversations.find((conversation) => conversation.id === activeConversationId) ?? null : null;
   const latestConversationsRef = useRef<ChatConversation[]>([]);
   const activeConversationRef = useRef<ChatConversation | null>(null);
 
@@ -115,14 +115,17 @@ export function AIPanel({ data }: Props) {
   async function removeConversation(conversationId: string) {
     const nextConversations = await deleteChatConversation(conversationId);
     applyConversations(nextConversations);
-    setActiveConversationId((current) => current === conversationId ? nextConversations[0]?.id ?? null : current);
+    setActiveConversationId((current) => current === conversationId ? null : current);
   }
 
   return (
     <View style={styles.wrap}>
       <View style={styles.topBar}>
-        <Text style={styles.title}>Chat</Text>
-        <Button label="New" icon="add" variant="secondary" onPress={startNewChat} style={styles.newButton} />
+        <View style={styles.titleBlock}>
+          <Text style={styles.title}>Chat</Text>
+          <Text style={styles.subtitle}>Main document context is included automatically.</Text>
+        </View>
+        <Button label="New" icon="add" variant="secondary" onPress={startNewChat} style={styles.newButton} accessibilityLabel="Start new AI chat" />
       </View>
 
       {loadingHistory ? (
@@ -131,6 +134,9 @@ export function AIPanel({ data }: Props) {
 
       {!loadingHistory && conversations.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyRow}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Start new AI chat" onPress={startNewChat} style={[styles.historyPill, !activeConversation && styles.historyPillSelected]}>
+            <Text style={[styles.historyText, !activeConversation && styles.historyTextSelected]}>New chat</Text>
+          </Pressable>
           {conversations.map((conversation) => (
             <View key={conversation.id} style={[styles.historyPill, activeConversation?.id === conversation.id && styles.historyPillSelected]}>
               <Pressable accessibilityRole="button" accessibilityLabel={`Open ${conversation.title}`} onPress={() => setActiveConversationId(conversation.id)} style={styles.historyTitleButton}>
@@ -144,20 +150,20 @@ export function AIPanel({ data }: Props) {
         </ScrollView>
       ) : null}
 
-      <View style={styles.chatBox}>
+      <ScrollView style={styles.chatBox} contentContainerStyle={styles.chatContent}>
         {activeConversation?.messages.length ? activeConversation.messages.map((message) => (
           <View key={message.id} style={[styles.messageBubble, message.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
-            <Text style={[styles.roleLabel, message.role === 'user' ? styles.userRoleLabel : styles.assistantRoleLabel]}>{message.role === 'user' ? 'You' : 'Assistant'}</Text>
+            <Text style={[styles.roleLabel, message.role === 'user' ? styles.userRoleLabel : styles.assistantRoleLabel]}>{message.role === 'user' ? 'You' : 'AI'}</Text>
             <Text style={[styles.messageText, message.role === 'user' ? styles.userMessageText : styles.assistantMessageText]}>{message.content || (sending ? 'Thinking...' : '')}</Text>
           </View>
         )) : (
           <View style={styles.emptyState}>
             <Icon name="sparkles-outline" size={22} color={colors.primary} />
             <Text style={styles.emptyTitle}>Ask about your notes</Text>
-            <Text style={styles.emptyText}>The main document is included as context for each conversation.</Text>
+            <Text style={styles.emptyText}>Start a conversation or reopen one from history.</Text>
           </View>
         )}
-      </View>
+      </ScrollView>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -170,6 +176,7 @@ export function AIPanel({ data }: Props) {
         style={styles.promptInput}
       />
       <View style={styles.actionRow}>
+        <Text style={styles.storageText}>Stored on this device as chat id, user message, and assistant response JSON.</Text>
         <Button label={sending ? 'Sending' : 'Send'} icon="arrow-forward" onPress={sendPrompt} disabled={sending || !prompt.trim()} style={styles.sendButton} />
       </View>
     </View>
@@ -193,18 +200,21 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   return StyleSheet.create({
   wrap: { gap: spacing.md },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  title: { ...typography.heading5, color: colors.ink, flex: 1 },
+  titleBlock: { flex: 1, gap: 2 },
+  title: { ...typography.heading5, color: colors.ink },
+  subtitle: { ...typography.bodySm, color: colors.slate },
   newButton: { minWidth: 92 },
   loading: { minHeight: 52, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: spacing.sm },
   mutedText: { ...typography.bodySm, color: colors.slate },
   historyRow: { gap: spacing.xs, paddingVertical: spacing.xs },
-  historyPill: { height: 40, maxWidth: 220, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.canvas, flexDirection: 'row', alignItems: 'center' },
+  historyPill: { height: 40, maxWidth: 220, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.canvas, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm },
   historyPillSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  historyTitleButton: { flex: 1, minWidth: 96, paddingLeft: spacing.md, paddingRight: spacing.xs, justifyContent: 'center' },
+  historyTitleButton: { flex: 1, minWidth: 96, paddingRight: spacing.xs, justifyContent: 'center' },
   historyText: { ...typography.bodySmMedium, color: colors.ink },
   historyTextSelected: { color: colors.onPrimary },
-  deleteButton: { width: 34, height: 38, alignItems: 'center', justifyContent: 'center' },
-  chatBox: { minHeight: 300, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surfaceSoft, padding: spacing.md, gap: spacing.sm },
+  deleteButton: { width: 30, height: 38, alignItems: 'center', justifyContent: 'center' },
+  chatBox: { minHeight: 360, maxHeight: 520, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surfaceSoft },
+  chatContent: { padding: spacing.md, gap: spacing.sm, flexGrow: 1 },
   messageBubble: { maxWidth: '94%', borderRadius: rounded.md, padding: spacing.md, gap: spacing.xxs },
   userBubble: { alignSelf: 'flex-end', backgroundColor: colors.primary },
   assistantBubble: { alignSelf: 'flex-start', backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline },
@@ -219,7 +229,8 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   emptyText: { ...typography.bodySm, color: colors.slate, textAlign: 'center' },
   errorText: { ...typography.bodySmMedium, color: colors.semanticError },
   promptInput: { minHeight: 92 },
-  actionRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  storageText: { ...typography.micro, color: colors.steel, flex: 1 },
   sendButton: { minWidth: 120 },
   });
 }

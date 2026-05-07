@@ -10,6 +10,10 @@ Before running the Git commands, update the `## history` section with a dated su
 
 This post-step Git workflow is mandatory and must not be skipped after any implemented change.
 
+## history
+
+2026-05-08 - Implemented the AI chat button flow as a simple ChatGPT-style local conversation interface. Routed the AI tab to the chat panel, included main document context in each streamed `/v1/responses` request, stored conversations locally as chat id plus user/assistant message JSON, kept delete conversation support, and verified the app still does not require Firestore hosting for chat history.
+
 ## Plan: Exhaustive React Native Firebase Notes
 
 Rebuild the notes app as React Native + Firebase only, with no Django dependency. Store notes in Firestore collection `reactnativecollection` using simple nested JSON: root category keys map to arrays containing note strings and nested single-key category objects. The app should preserve core note/category workflows while deliberately excluding instant/full load, Instagram-specific rendering, OCR/Tesseract, Django APIs, and complex mirror propagation.
