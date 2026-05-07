@@ -417,3 +417,7 @@ Expected behavior: the app opens, shows the lock screen if locked, then after un
 ### 2026-05-08 - AI chat interface
 
 Added a simple ChatGPT-style AI tab that sends the current main notes JSON as context to `https://chethan.tailb6229f.ts.net/v1/responses` using model `oca/gpt-5.4`, parses the returned `data:` SSE-style chunks, stores conversations locally in AsyncStorage as chat id plus user/assistant message JSON, and supports deleting conversations. Kept the notes Firestore document path untouched so the app still runs with local chat history when Firestore hosting/storage is unavailable.
+
+### 2026-05-08 - AI chat fetch failure handling
+
+Investigated the AI chat `Failed to fetch` response. Direct POST to the Tailnet endpoint works, but browser-style CORS preflight returns 404 and POST responses do not include `Access-Control-Allow-Origin`, so Expo web cannot call it directly. Updated the AI chat error handling to explain that web is blocked by endpoint CORS and that Android/iOS native or server-side CORS/OPTIONS support is required.

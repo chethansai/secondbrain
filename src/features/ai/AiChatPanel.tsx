@@ -101,7 +101,7 @@ export function AiChatPanel({ data }: Props) {
         setConversations((current) => updateAssistantMessage(current, pendingConversation.id, assistantMessage.id, assistantText));
       });
     } catch (requestError) {
-      assistantText = requestError instanceof Error ? requestError.message : 'AI request failed.';
+      assistantText = formatAiRequestError(requestError);
       setError(assistantText);
     }
 
@@ -174,6 +174,13 @@ async function requestAiChat(data: NotesData, messages: AiChatMessage[], input: 
   if (!response.ok) throw new Error(`AI request failed with ${response.status}.`);
   const text = await response.text();
   return consumeSseText(text, onToken);
+}
+
+function formatAiRequestError(error: unknown) {
+  if (Platform.OS === 'web' && error instanceof TypeError && error.message.toLowerCase().includes('fetch')) {
+    return 'AI endpoint blocked this browser request. Open the app on Android/iOS, or enable CORS and OPTIONS on the AI server for this web origin.';
+  }
+  return error instanceof Error ? error.message : 'AI request failed.';
 }
 
 function parseConversation(value: unknown): AiChatConversation[] {
