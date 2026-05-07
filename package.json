@@ -8,6 +8,7 @@
     "android": "expo start --lan --android",
     "ios": "expo start --lan --ios",
     "web": "expo start --web",
+    "ai:proxy": "node scripts/ai-cors-proxy.js",
     "deploy:rules": "firebase deploy --only firestore:rules --project notes-55c97 --config firebase.json",
     "typecheck": "tsc --noEmit"
   },
