@@ -39,3 +39,19 @@ export type WorkspaceListDocument = Record<string, string[] | string | unknown> 
   defaultworkspace?: string;
   pinnedcategories?: Record<string, string[]>;
 };
+
+export type AiWorkspaceDocumentMeta = {
+  id: string;
+  documentId: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiWorkspaceIndex = {
+  documents: AiWorkspaceDocumentMeta[];
+  idMap: Record<string, string>;
+  activeDocumentId: string | null;
+  nextNumber: number;
+  version: number;
+};

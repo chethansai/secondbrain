@@ -4,6 +4,7 @@ import { AutomationCommand, parseAutomationDeepLink } from './src/features/autom
 import { clearSavedUnlock, defaultAuthTimeoutHours, markUnlocked, readAuthTimeoutHours, readShouldStartUnlocked, writeAuthTimeoutHours } from './src/features/auth/authSession';
 import { LockScreen } from './src/features/auth/LockScreen';
 import { AiChatPanel } from './src/features/ai/AiChatPanel';
+import { AiWorkspacePanel } from './src/features/ai/AiWorkspacePanel';
 import { CategoryList } from './src/features/categories/CategoryList';
 import { countCategoryContents, createRootCategory, createSubcategory, deleteCategory, formatPath, getCategoryItems, listChildCategories, renameCategory } from './src/features/categories/categoryTree';
 import { TextPromptModal } from './src/features/editor/TextPromptModal';
@@ -432,6 +433,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           {!loading && tab === 'aiWorkspace' ? (
             <View style={styles.sectionStack}>
               <PanelHeader title="AI WORKSPACE" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
+              <AiWorkspacePanel />
             </View>
           ) : null}
         </View>
