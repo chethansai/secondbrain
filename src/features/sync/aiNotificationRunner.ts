@@ -94,8 +94,8 @@ export async function getAiNotificationBackgroundStatus(localOnly = false): Prom
       permissionGranted: permissions.granted,
       localOnly,
       details: nativeWorkerStatus.registered
-        ? 'Android native worker is scheduled. AI result delivery can still be delayed by battery and network limits.'
-        : 'Android native worker is available and will be scheduled with AI notifications.',
+        ? 'Android native worker is scheduled for background execution at the set time. Results delivered via notification without needing to open the app, though delays possible due to battery/network.'
+        : 'Android native worker available for true background scheduling without app launch.',
     };
   }
 
@@ -194,7 +194,7 @@ export async function scheduleNativeAiNotificationPlaceholder(job: AiNotificatio
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
       title: job.title,
-      body: 'AI notification is scheduled. Open the app near this time to trigger processing and receive the result.',
+      body: 'AI processing scheduled in background. Result notification will arrive when complete.',
       sound: true,
       data: { type: 'ai-notification', jobId: job.id },
     },

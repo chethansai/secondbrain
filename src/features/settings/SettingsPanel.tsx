@@ -170,6 +170,8 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
             <Icon name="pin-outline" size={16} color={colors.primary} />
             <Text style={styles.overlayStatusText}>{overlayAvailable ? overlayPermissionGranted ? 'Permission granted' : 'Permission needed' : 'Android APK only'}</Text>
           </View>
+          <LineControl label="Transparency" value={overlayOpacity} min={0.25} max={1} formatter={(value) => `${Math.round(value * 100)}%`} disabled={!overlayAvailable} colors={colors} styles={styles} onChange={changeOverlayOpacity} />
+          <LineControl label="Size" value={overlaySize} min={42} max={86} formatter={(value) => `${Math.round(value)}px`} disabled={!overlayAvailable} colors={colors} styles={styles} onChange={changeOverlaySize} />
           <View style={styles.buttonRow}>
             <Button label={overlayPermissionGranted ? 'Start floating icon' : 'Allow permission'} icon="pin-outline" onPress={enableFloatingIcon} disabled={overlaySaving || !overlayAvailable} style={styles.rowButton} />
             <Button label="Stop" icon="close" variant="secondary" onPress={stopFloatingIcon} disabled={overlaySaving || !overlayAvailable} style={styles.rowButton} />
@@ -241,6 +243,31 @@ function formatHours(hours: number) {
   return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
 }
 
+function LineControl({ label, value, min, max, formatter, disabled, colors, styles, onChange }: { label: string; value: number; min: number; max: number; formatter: (value: number) => string; disabled?: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onChange: (value: number) => void | Promise<void> }) {
+  const ratio = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  const [trackWidth, setTrackWidth] = useState(1);
+
+  function updateFromEvent(event: GestureResponderEvent) {
+    if (disabled) return;
+    const locationX = event.nativeEvent.locationX;
+    const nextRatio = Math.max(0, Math.min(1, locationX / trackWidth));
+    onChange(min + (max - min) * nextRatio);
+  }
+
+  return (
+    <View style={styles.lineControl}>
+      <View style={styles.lineControlHeader}>
+        <Text style={styles.lineControlLabel}>{label}</Text>
+        <Text style={styles.lineControlValue}>{formatter(value)}</Text>
+      </View>
+      <Pressable accessibilityRole="adjustable" accessibilityLabel={`${label} ${formatter(value)}`} disabled={disabled} onLayout={(event) => setTrackWidth(Math.max(1, event.nativeEvent.layout.width))} onPress={updateFromEvent} onResponderMove={updateFromEvent} onStartShouldSetResponder={() => !disabled} style={[styles.sliderTrack, disabled && styles.sliderTrackDisabled]}>
+        <View style={[styles.sliderFill, { width: `${ratio * 100}%`, backgroundColor: disabled ? colors.hairlineStrong : colors.primary }]} />
+        <View style={[styles.sliderThumb, { left: `${ratio * 100}%`, backgroundColor: disabled ? colors.stone : colors.primary }]} />
+      </Pressable>
+    </View>
+  );
+}
+
 function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
   return StyleSheet.create({
   wrap: { gap: spacing.md },
@@ -249,6 +276,14 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   overlayPanel: { gap: spacing.sm, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.surfaceSoft, padding: spacing.md },
   overlayStatusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   overlayStatusText: { ...typography.bodySmMedium, color: colors.ink, flex: 1 },
+  lineControl: { gap: spacing.xs },
+  lineControlHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  lineControlLabel: { ...typography.micro, color: colors.slate },
+  lineControlValue: { ...typography.micro, color: colors.ink },
+  sliderTrack: { height: 32, borderRadius: rounded.full, backgroundColor: colors.hairline, justifyContent: 'center', overflow: 'visible' },
+  sliderTrackDisabled: { opacity: 0.55 },
+  sliderFill: { position: 'absolute', left: 0, height: 4, borderRadius: rounded.full },
+  sliderThumb: { position: 'absolute', width: 18, height: 18, marginLeft: -9, borderRadius: 9, borderWidth: 2, borderColor: colors.canvas },
   buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   rowButton: { flex: 1, minWidth: 130 },
   dropdownButton: { minHeight: 44, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
