@@ -152,9 +152,13 @@ export function useAiNotificationsSync() {
     const hasDueJob = stateRef.current.jobs.some((job) => job.status === 'scheduled' && new Date(job.scheduledAt).getTime() <= Date.now());
     if (!hasDueJob) return;
     processDueAiNotifications()
-      .then((result) => persist(result.state))
+      .then((result) => {
+        setState(result.state);
+        stateRef.current = result.state;
+        writeLocalAiNotifications(result.state).catch(() => undefined);
+      })
       .catch((runError) => setError(runError instanceof Error ? runError.message : 'AI notification could not run.'));
-  }, [persist]);
+  }, []);
 
   useEffect(() => {
     if (loading) return;

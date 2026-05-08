@@ -1,67 +1,56 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, doc, getDoc, getDocFromServer, getDocs, onSnapshot, runTransaction, setDoc, Unsubscribe } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer, onSnapshot, runTransaction, setDoc, Unsubscribe } from 'firebase/firestore';
 import { AiNotificationJob, AiNotificationState, AiNotificationStatus } from '../../shared/types/notes';
 import { firestore } from './firebase';
 
 const aiNotificationsCollection = 'reactnativecollection_notifications';
 const aiNotificationsStateId = 'ainotifications';
-const aiNotificationJobDocPrefix = 'job_';
-const aiNotificationsCollectionRef = collection(firestore, aiNotificationsCollection);
 const aiNotificationsStateRef = doc(firestore, aiNotificationsCollection, aiNotificationsStateId);
 const localAiNotificationsKey = 'rnnotetaking.aiNotifications.state.v1';
 
 export function subscribeToAiNotifications(onChange: (state: AiNotificationState) => void, onError: (message: string) => void): Unsubscribe {
   return onSnapshot(
-    aiNotificationsCollectionRef,
-    (snapshot) => onChange(parseAiNotificationCollection(snapshot.docs.map((item) => ({ id: item.id, data: item.data() })))),
+    aiNotificationsStateRef,
+    (snapshot) => onChange(parseAiNotificationState(snapshot.exists() ? (snapshot.data() as Record<string, unknown>) : undefined)),
     (error) => onError(error.message),
   );
 }
 
 export async function readAiNotifications(): Promise<AiNotificationState> {
-  const [snapshot, jobsSnapshot] = await Promise.all([getDoc(aiNotificationsStateRef), getDocs(aiNotificationsCollectionRef)]);
-  return mergeNotificationStates(
-    parseAiNotificationState(snapshot.exists() ? snapshot.data() : undefined),
-    parseAiNotificationCollection(jobsSnapshot.docs.map((item) => ({ id: item.id, data: item.data() }))),
-  );
+  const snapshot = await getDoc(aiNotificationsStateRef);
+  return parseAiNotificationState(snapshot.exists() ? (snapshot.data() as Record<string, unknown>) : undefined);
 }
 
 export async function readLatestAiNotifications(): Promise<AiNotificationState> {
-  const [snapshot, jobsSnapshot] = await Promise.all([getDocFromServer(aiNotificationsStateRef), getDocs(aiNotificationsCollectionRef)]);
-  return mergeNotificationStates(
-    parseAiNotificationState(snapshot.exists() ? snapshot.data() : undefined),
-    parseAiNotificationCollection(jobsSnapshot.docs.map((item) => ({ id: item.id, data: item.data() }))),
-  );
+  const snapshot = await getDocFromServer(aiNotificationsStateRef);
+  return parseAiNotificationState(snapshot.exists() ? (snapshot.data() as Record<string, unknown>) : undefined);
 }
 
 export async function writeAiNotifications(state: AiNotificationState): Promise<void> {
   await setDoc(aiNotificationsStateRef, serializeAiNotificationState(state), { merge: false });
-  await Promise.all(state.jobs.map((job) => setDoc(aiNotificationJobRef(job.id), serializeAiNotificationJob(job), { merge: false })));
 }
 
 export async function addAiNotificationJob(job: AiNotificationJob): Promise<AiNotificationState> {
-  const localState = await readLocalAiNotifications().catch(() => defaultAiNotificationState());
-  const jobsState = await readAiNotificationJobDocuments().catch(() => defaultAiNotificationState());
-  const nextState = await runNotificationTransaction((remoteState) => mergeNotificationStates(remoteState, jobsState, localState, { jobs: [job], version: 1 }));
+  console.log('[aiNotifications] add job request', { jobId: job.id, scheduledAt: job.scheduledAt, title: job.title });
+  const nextState = await runNotificationTransaction((remoteState) => ({
+    jobs: [job, ...remoteState.jobs],
+    version: remoteState.version + 1,
+  }), { source: 'addAiNotificationJob' });
+  console.log('[aiNotifications] add job committed', { version: nextState.version, jobIds: nextState.jobs.map((item) => item.id) });
   await writeLocalAiNotifications(nextState);
   return nextState;
 }
 
 export async function removeAiNotificationJob(jobId: string): Promise<AiNotificationState> {
-  const localState = await readLocalAiNotifications().catch(() => defaultAiNotificationState());
-  const jobsState = await readAiNotificationJobDocuments().catch(() => defaultAiNotificationState());
   const nextState = await runNotificationTransaction((remoteState) => {
-    const merged = mergeNotificationStates(remoteState, jobsState, localState);
-    return { jobs: merged.jobs.filter((job) => job.id !== jobId), version: merged.version + 1 };
-  }, { deleteJobId: jobId });
+    return { jobs: remoteState.jobs.filter((job) => job.id !== jobId), version: remoteState.version + 1 };
+  }, { deleteJobId: jobId, source: 'removeAiNotificationJob' });
   await writeLocalAiNotifications(nextState);
   return nextState;
 }
 
 export async function mergeAndWriteAiNotifications(state: AiNotificationState): Promise<AiNotificationState> {
-  const localState = await readLocalAiNotifications().catch(() => defaultAiNotificationState());
-  const jobsState = await readAiNotificationJobDocuments().catch(() => defaultAiNotificationState());
-  const nextState = await runNotificationTransaction((remoteState) => mergeNotificationStates(remoteState, jobsState, localState, state));
+  const nextState = await runNotificationTransaction((remoteState) => mergeNotificationStates(remoteState, state), { source: 'mergeAndWriteAiNotifications' });
   await writeLocalAiNotifications(nextState);
   return nextState;
 }
@@ -76,17 +65,12 @@ export async function readLocalAiNotifications(): Promise<AiNotificationState> {
   }
 }
 
-async function readAiNotificationJobDocuments(): Promise<AiNotificationState> {
-  const snapshot = await getDocs(aiNotificationsCollectionRef);
-  return parseAiNotificationCollection(snapshot.docs.map((item) => ({ id: item.id, data: item.data() })));
-}
-
 export async function writeLocalAiNotifications(state: AiNotificationState): Promise<void> {
   await AsyncStorage.setItem(localAiNotificationsKey, JSON.stringify(serializeAiNotificationState(state)));
 }
 
 export function createAiNotificationJob(input: { title: string; prompt: string; documentId: string; documentName: string; scheduledAt: string; repeatEveryHours?: number }, createdAt = new Date().toISOString()): AiNotificationJob {
-  return {
+  const job: AiNotificationJob = {
     id: `ain-${createdAt.replace(/[^0-9]/g, '')}-${Math.random().toString(36).slice(2, 8)}`,
     title: input.title.trim() || 'AI notification',
     prompt: input.prompt.trim(),
@@ -98,6 +82,8 @@ export function createAiNotificationJob(input: { title: string; prompt: string; 
     createdAt,
     updatedAt: createdAt,
   };
+  console.log('[aiNotifications] created job', { jobId: job.id, createdAt: job.createdAt, scheduledAt: job.scheduledAt });
+  return job;
 }
 
 export function parseAiNotificationState(raw: Record<string, unknown> | undefined): AiNotificationState {
@@ -109,13 +95,32 @@ export function parseAiNotificationState(raw: Record<string, unknown> | undefine
 
 export function serializeAiNotificationState(state: AiNotificationState) {
   return {
-    jobs: state.jobs,
+    jobs: state.jobs.map(serializeAiNotificationJob),
     version: state.version,
   };
 }
 
 export function serializeAiNotificationJob(job: AiNotificationJob) {
-  return job;
+  return {
+    jobId: job.id,
+    title: job.title,
+    prompt: job.prompt,
+    documentId: job.documentId,
+    documentName: job.documentName,
+    scheduledAt: job.scheduledAt,
+    timeToRun: job.scheduledAt,
+    durationMinutes: job.repeatEveryHours ? job.repeatEveryHours * 60 : null,
+    repeatEveryHours: job.repeatEveryHours ?? null,
+    status: job.status,
+    result: job.result ?? null,
+    error: job.error ?? null,
+    nativeNotificationId: job.nativeNotificationId ?? null,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+    sentAt: job.sentAt ?? null,
+    notifiedAt: job.notifiedAt ?? null,
+    lastRunScheduledAt: job.lastRunScheduledAt ?? null,
+  };
 }
 
 export function defaultAiNotificationState(): AiNotificationState {
@@ -132,35 +137,49 @@ export function mergeNotificationStates(...states: AiNotificationState[]): AiNot
       if (!current || job.updatedAt.localeCompare(current.updatedAt) >= 0) jobsById.set(job.id, job);
     }
   }
-  return { jobs: [...jobsById.values()].sort((left, right) => right.scheduledAt.localeCompare(left.scheduledAt)), version: version + 1 };
+  return {
+    jobs: [...jobsById.values()].sort((left, right) => right.scheduledAt.localeCompare(left.scheduledAt)),
+    version,
+  };
 }
 
-async function runNotificationTransaction(update: (remoteState: AiNotificationState) => AiNotificationState, options: { deleteJobId?: string } = {}) {
+async function runNotificationTransaction(update: (remoteState: AiNotificationState) => AiNotificationState, options: { deleteJobId?: string; source?: string } = {}) {
   return runTransaction(firestore, async (transaction) => {
     const snapshot = await transaction.get(aiNotificationsStateRef);
-    const remoteState = parseAiNotificationState(snapshot.exists() ? snapshot.data() : undefined);
+    const remoteState = parseAiNotificationState(snapshot.exists() ? (snapshot.data() as Record<string, unknown>) : undefined);
+    console.log('[aiNotifications] transaction remote state', { source: options.source, version: remoteState.version, jobIds: remoteState.jobs.map((job) => job.id), deleteJobId: options.deleteJobId });
     const nextState = update(remoteState);
+    console.log('[aiNotifications] transaction next state', { source: options.source, version: nextState.version, jobIds: nextState.jobs.map((job) => job.id) });
     transaction.set(aiNotificationsStateRef, serializeAiNotificationState(nextState));
-    for (const job of nextState.jobs) transaction.set(aiNotificationJobRef(job.id), serializeAiNotificationJob(job));
-    if (options.deleteJobId) transaction.delete(aiNotificationJobRef(options.deleteJobId));
     return nextState;
   });
 }
 
 function parseAiNotificationJob(value: unknown): AiNotificationJob[] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
-  const raw = value as Partial<AiNotificationJob>;
-  if (typeof raw.id !== 'string' || typeof raw.prompt !== 'string' || typeof raw.documentId !== 'string' || typeof raw.scheduledAt !== 'string') return [];
+  const raw = value as Record<string, unknown>;
+  const jobId = typeof raw.jobId === 'string' ? raw.jobId : typeof raw.id === 'string' ? raw.id : undefined;
+  const prompt = typeof raw.prompt === 'string' ? raw.prompt : undefined;
+  const documentId = typeof raw.documentId === 'string' && raw.documentId.trim() ? raw.documentId : 'main';
+  const scheduledAt = typeof raw.scheduledAt === 'string' ? raw.scheduledAt : typeof raw.timeToRun === 'string' ? raw.timeToRun : undefined;
+  if (!jobId || !prompt || !scheduledAt) return [];
   const status = parseStatus(raw.status);
-  const createdAt = typeof raw.createdAt === 'string' ? raw.createdAt : raw.scheduledAt;
+  const createdAt = typeof raw.createdAt === 'string' ? raw.createdAt : scheduledAt;
+  const repeatEveryHours = normalizeRepeatHours(
+    typeof raw.repeatEveryHours === 'number'
+      ? raw.repeatEveryHours
+      : typeof raw.durationMinutes === 'number'
+        ? raw.durationMinutes / 60
+        : undefined,
+  );
   return [{
-    id: raw.id,
+    id: jobId,
     title: typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : 'AI notification',
-    prompt: raw.prompt,
-    documentId: raw.documentId,
-    documentName: typeof raw.documentName === 'string' && raw.documentName.trim() ? raw.documentName.trim() : raw.documentId,
-    scheduledAt: raw.scheduledAt,
-    repeatEveryHours: normalizeRepeatHours(raw.repeatEveryHours),
+    prompt,
+    documentId,
+    documentName: typeof raw.documentName === 'string' && raw.documentName.trim() ? raw.documentName.trim() : documentId,
+    scheduledAt,
+    repeatEveryHours,
     status,
     result: typeof raw.result === 'string' ? raw.result : undefined,
     error: typeof raw.error === 'string' ? raw.error : undefined,
@@ -171,11 +190,6 @@ function parseAiNotificationJob(value: unknown): AiNotificationJob[] {
     notifiedAt: typeof raw.notifiedAt === 'string' ? raw.notifiedAt : undefined,
     lastRunScheduledAt: typeof raw.lastRunScheduledAt === 'string' ? raw.lastRunScheduledAt : undefined,
   }];
-}
-
-function parseAiNotificationCollection(documents: { id: string; data: Record<string, unknown> }[]): AiNotificationState {
-  const jobs = documents.flatMap((item) => item.id.startsWith(aiNotificationJobDocPrefix) ? parseAiNotificationJob(item.data) : []);
-  return { jobs: jobs.sort((left, right) => right.scheduledAt.localeCompare(left.scheduledAt)), version: 1 };
 }
 
 function parseStatus(value: unknown): AiNotificationStatus {
@@ -189,10 +203,3 @@ function normalizeRepeatHours(value: unknown) {
   return hours > 0 ? hours : undefined;
 }
 
-function aiNotificationJobRef(jobId: string) {
-  return doc(firestore, aiNotificationsCollection, `${aiNotificationJobDocPrefix}${sanitizeJobId(jobId)}`);
-}
-
-function sanitizeJobId(jobId: string) {
-  return jobId.trim().replace(/[\/]/g, '_') || 'unknown';
-}

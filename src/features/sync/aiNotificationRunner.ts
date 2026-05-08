@@ -100,9 +100,13 @@ export async function processDueAiNotifications() {
   const state = await readNotificationStateForRunner();
   const now = Date.now();
   const dueJobs = state.jobs.filter((job) => job.status === 'scheduled' && new Date(job.scheduledAt).getTime() <= now && !processingJobIds.has(job.id));
-  let nextState = state;
+  if (!dueJobs.length) return { state, processed: 0 };
+
+  const latestState = await readNotificationStateForRunner();
+  const refreshedDueJobs = latestState.jobs.filter((job) => job.status === 'scheduled' && new Date(job.scheduledAt).getTime() <= now && !processingJobIds.has(job.id));
+  let nextState = latestState;
   let processed = 0;
-  for (const job of dueJobs) {
+  for (const job of refreshedDueJobs) {
     processingJobIds.add(job.id);
     try {
       nextState = await processAiNotificationJob(job, nextState);

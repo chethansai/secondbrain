@@ -361,6 +361,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-08: Simplified AI notification persistence to a single Firestore queue document. Decision: stop trying to mirror each scheduled notification into separate `job_*` Firestore documents and instead store `jobs` as one array inside `reactnativecollection_notifications/ainotifications`, using explicit queue-style fields such as `jobId`, `prompt`, `timeToRun`, `durationMinutes`, and `status`.
+
 - 2026-05-08: Added an AI Notifications entry beside Settings/Search. Decision: create a dedicated AI Notifications section backed by the AI review ledger, route it from the workspace menu and category header, and keep the section read-only with reload/status summaries.
 - 2026-05-08: Fixed AI Review history persistence visibility. Decision: sanitize the AI review ledger before Firestore writes so optional undefined fields do not cause silent local-only fallback, and add processing-log messages that state when each AI result is saved to history.
 - 2026-05-08: Implemented AI Review queue/history refinement. Decision: Reload now only considers SEEK notes that have no prior AI review decision, Queue is an in-memory current-run processing table, all AI-run results remain in History, and History can filter All, Below Threshold Action Taken, Below Threshold Action Not Taken, Above Threshold Action Taken, and Above Threshold Action Not Taken.
