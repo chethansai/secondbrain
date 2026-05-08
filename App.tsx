@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AutomationCommand, parseAutomationDeepLink } from './src/features/automation/deepLinks';
+import { clearAutomationFileQueue, ensureDefaultAutomationQueueFile, getDefaultAutomationQueueUri, readAutomationFileQueue, rewriteAutomationFileQueue } from './src/features/automation/fileQueue';
 import { clearSavedUnlock, defaultAuthTimeoutHours, markUnlocked, readAuthTimeoutHours, readShouldStartUnlocked, writeAuthTimeoutHours } from './src/features/auth/authSession';
 import { LockScreen } from './src/features/auth/LockScreen';
 import { AiNotificationsPanel } from './src/features/ai/AiNotificationsPanel';
@@ -147,6 +148,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const [moveCopyAction, setMoveCopyAction] = useState<MoveCopyAction>('move');
   const [boardTopActionsVisible, setBoardTopActionsVisible] = useState(true);
   const runningAutomationKey = useRef<string | null>(null);
+  const fileAutomationRunKey = useRef<string | null>(null);
 
   const currentItems = path.length ? getCategoryItems(data, path) : null;
   const childCategories = useMemo(() => (currentItems ? listChildCategories(currentItems, path) : []), [currentItems, path]);
@@ -159,10 +161,14 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     runningAutomationKey.current = automationCommand.key;
 
     async function runAutomationCommand(command: AutomationCommand) {
-      const ok = await commitWithHistory(addNote(data, command.categoryPath, command.note), formatAddedNoteHistory(command.note, command.categoryPath));
-      if (ok) {
-        setTab('workspace');
-        setPath(command.categoryPath);
+      if (command.type === 'importFile') {
+        await drainAutomationFileQueue(command.fileUri);
+      } else {
+        const ok = await commitWithHistory(addNote(data, command.categoryPath, command.note), formatAddedNoteHistory(command.note, command.categoryPath));
+        if (ok) {
+          setTab('workspace');
+          setPath(command.categoryPath);
+        }
       }
       onAutomationComplete(command.key);
       runningAutomationKey.current = null;
@@ -174,6 +180,19 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
       runningAutomationKey.current = null;
     });
   }, [automationCommand, commit, data, loading, onAutomationComplete, setError]);
+
+  useEffect(() => {
+    if (loading) return;
+    let cancelled = false;
+    ensureDefaultAutomationQueueFile().then((queueUri) => {
+      if (cancelled || !queueUri || fileAutomationRunKey.current === queueUri) return;
+      fileAutomationRunKey.current = queueUri;
+      drainAutomationFileQueue(queueUri).finally(() => {
+        fileAutomationRunKey.current = null;
+      });
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [loading, data]);
 
   function selectWorkspaceAndReset(workspaceId: string) {
     setPath([]);
@@ -262,6 +281,69 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
 
   async function addWorkspaceNote(notePath: CategoryPath, text: string) {
     return commitWithHistory(addNote(data, notePath, text), formatAddedNoteHistory(text, notePath));
+  }
+
+  async function drainAutomationFileQueue(fileUri?: string) {
+    const queue = await readAutomationFileQueue(fileUri);
+    if (!queue.ok) {
+      if (queue.code !== 'not_found' && queue.code !== 'not_available') setError(queue.message);
+      return false;
+    }
+    if (queue.notes.length === 0) {
+      await clearAutomationFileQueue(queue.fileUri);
+      return true;
+    }
+
+    let nextData = data;
+    const remaining = [];
+    let importedCount = 0;
+    for (const item of queue.notes) {
+      const preparedData = ensureAutomationCategoryPath(nextData, item.categoryPath);
+      if (!preparedData) {
+        remaining.push(item);
+        continue;
+      }
+      nextData = preparedData;
+      const result = addNote(nextData, item.categoryPath, item.note);
+      if (!result.ok) {
+        remaining.push(item);
+        continue;
+      }
+      const historyResult = appendHistoryNote(result.data, formatAddedNoteHistory(item.note, item.categoryPath));
+      if (!historyResult.ok) {
+        remaining.push(item);
+        continue;
+      }
+      nextData = historyResult.data;
+      importedCount += 1;
+    }
+
+    if (importedCount === 0) {
+      setError('Automation queue was found, but no notes could be imported into SEEK.');
+      return false;
+    }
+
+    const ok = await commit({ ok: true, data: nextData });
+    if (!ok) return false;
+    await rewriteAutomationFileQueue(queue.fileUri, remaining);
+    await includeWorkspaceCategory('SEEK');
+    setTab('workspace');
+    setPath(['SEEK']);
+    return true;
+  }
+
+  function ensureAutomationCategoryPath(sourceData: NotesData, categoryPath: CategoryPath) {
+    let nextData = sourceData;
+    for (let index = 0; index < categoryPath.length; index += 1) {
+      const currentPath = categoryPath.slice(0, index + 1);
+      if (getCategoryItems(nextData, currentPath)) continue;
+      const result = index === 0
+        ? createRootCategory(nextData, currentPath[0])
+        : createSubcategory(nextData, categoryPath.slice(0, index), currentPath[index]);
+      if (!result.ok) return null;
+      nextData = result.data;
+    }
+    return nextData;
   }
 
   async function setNoteOrderPriority(note: FlatNote, priority: number) {
@@ -430,7 +512,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           {!loading && tab === 'aiNotifications' ? (
             <View style={styles.sectionStack}>
               <PanelHeader title="AI Notifications" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
-              <AiNotificationsPanel />
+              <AiNotificationsPanel data={data} />
             </View>
           ) : null}
           {!loading && tab === 'ai' ? (

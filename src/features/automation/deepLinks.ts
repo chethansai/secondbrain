@@ -6,6 +6,11 @@ export type AutomationCommand = {
   rawUrl: string;
   categoryPath: CategoryPath;
   note: string;
+} | {
+  type: 'importFile';
+  key: string;
+  rawUrl: string;
+  fileUri?: string;
 };
 
 export type DeepLinkParseResult =
@@ -14,6 +19,7 @@ export type DeepLinkParseResult =
 
 const supportedScheme = 'nativenotes:';
 const addNoteAction = 'add-note';
+const importFileAction = 'import-file';
 const defaultCategoryPath = ['SEEK'];
 
 export function parseAutomationDeepLink(rawUrl: string): DeepLinkParseResult {
@@ -24,6 +30,19 @@ export function parseAutomationDeepLink(rawUrl: string): DeepLinkParseResult {
     }
 
     const action = normalizeAction(url);
+    if (action === importFileAction) {
+      const fileUri = url.searchParams.get('file') ?? url.searchParams.get('uri') ?? undefined;
+      return {
+        ok: true,
+        command: {
+          type: 'importFile',
+          key: rawUrl,
+          rawUrl,
+          fileUri,
+        },
+      };
+    }
+
     if (action !== addNoteAction) {
       return { ok: false, message: 'Unsupported automation action.' };
     }

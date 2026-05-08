@@ -55,3 +55,29 @@ export type AiWorkspaceIndex = {
   nextNumber: number;
   version: number;
 };
+
+export type AiNotificationStatus = 'scheduled' | 'running' | 'sent' | 'failed';
+
+export type AiNotificationJob = {
+  id: string;
+  title: string;
+  prompt: string;
+  documentId: string;
+  documentName: string;
+  scheduledAt: string;
+  repeatEveryHours?: number;
+  status: AiNotificationStatus;
+  result?: string;
+  error?: string;
+  nativeNotificationId?: string;
+  createdAt: string;
+  updatedAt: string;
+  sentAt?: string;
+  notifiedAt?: string;
+  lastRunScheduledAt?: string;
+};
+
+export type AiNotificationState = {
+  jobs: AiNotificationJob[];
+  version: number;
+};

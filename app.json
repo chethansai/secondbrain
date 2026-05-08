@@ -14,10 +14,11 @@
       "bundleIdentifier": "com.notes.native"
     },
     "android": {
-        "package": "com.notes.nativenotetaking"
+      "package": "com.notes.nativenotetaking"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-background-task"
     ],
     "extra": {
       "eas": {

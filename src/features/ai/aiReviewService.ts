@@ -42,7 +42,7 @@ export function defaultPromptConfig(): AiReviewPromptConfig {
   return { scorePromptTemplate: defaultScorePromptTemplate, actionPromptTemplate: defaultActionPromptTemplate };
 }
 
-async function requestAiText(input: string) {
+export async function requestAiText(input: string) {
   const response = await fetch('https://chethan.tailb6229f.ts.net/v1/responses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer dummy' },

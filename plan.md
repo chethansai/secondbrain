@@ -416,6 +416,23 @@ adb shell am start -W -a android.intent.action.VIEW -c android.intent.category.B
 
 Expected behavior: the app opens, shows the lock screen if locked, then after unlock and sync load it adds the note to category `SEEK` once and navigates to `SEEK`.
 
+### File-based SEEK automation queue
+
+The app now drains a JSON array queue named `seek-notes.json` from its Expo document automation folder on startup, imports every valid entry into `SEEK`, writes history notes, and deletes the queue file when all entries are imported. If only some entries fail, the file is rewritten with just the remaining failed entries.
+
+Accepted JSON shapes:
+
+```json
+[
+   "Plain note text",
+   { "note": "Object note text" },
+   { "text": "Alternate text field", "category": "SEEK" },
+   { "note": "Nested path", "categoryPath": ["SEEK"] }
+]
+```
+
+Automate can still launch `nativenotes://import-file` to trigger an immediate drain after writing the file, or pass an accessible file/content URI with `nativenotes://import-file?file=<encoded-file-uri>`. The default import target is always `SEEK` unless an entry supplies a non-empty category/categoryPath.
+
 
 ### 2026-05-08 - AI chat interface
 
