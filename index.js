@@ -1,7 +1,8 @@
 import { registerRootComponent } from 'expo';
 import App from './App';
-import { defineAiNotificationBackgroundTask } from './src/features/sync/aiNotificationRunner';
+import { defineAiNotificationBackgroundTask, defineAiNotificationHeadlessTask } from './src/features/sync/aiNotificationRunner';
 
 defineAiNotificationBackgroundTask();
+defineAiNotificationHeadlessTask();
 
 registerRootComponent(App);

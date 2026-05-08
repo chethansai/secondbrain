@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AiNotificationState } from '../../shared/types/notes';
+import { AppState } from 'react-native';
+import { AiNotificationBackgroundStatus, AiNotificationState } from '../../shared/types/notes';
 import {
   createAiNotificationJob,
   defaultAiNotificationState,
@@ -9,10 +10,18 @@ import {
   readLatestAiNotifications,
   readLocalAiNotifications,
   subscribeToAiNotifications,
-  writeAiNotifications,
   writeLocalAiNotifications,
 } from './aiNotificationsRepository';
-import { cancelNativeAiNotification, cancelScheduledAiPlaceholderNotifications, processDueAiNotifications, registerAiNotificationBackgroundTask } from './aiNotificationRunner';
+import { cancelNativeAiNotification, cancelNativeAiNotificationWorker, getAiNotificationBackgroundStatus, processDueAiNotifications, registerAiNotificationBackgroundTask, scheduleNativeAiNotificationPlaceholder } from './aiNotificationRunner';
+
+const defaultBackgroundStatus: AiNotificationBackgroundStatus = {
+  mode: 'foreground-catchup',
+  available: false,
+  registered: false,
+  permissionGranted: false,
+  localOnly: false,
+  details: 'Checking background worker availability.',
+};
 
 export function useAiNotificationsSync() {
   const [state, setState] = useState<AiNotificationState>(defaultAiNotificationState());
@@ -21,6 +30,7 @@ export function useAiNotificationsSync() {
   const [refreshing, setRefreshing] = useState(false);
   const [localMode, setLocalMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [backgroundStatus, setBackgroundStatus] = useState<AiNotificationBackgroundStatus>(defaultBackgroundStatus);
   const stateRef = useRef(state);
 
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -31,37 +41,26 @@ export function useAiNotificationsSync() {
         setState(snapshot);
         setLoading(false);
         setError(null);
+        setLocalMode(false);
         writeLocalAiNotifications(snapshot).catch(() => undefined);
+        getAiNotificationBackgroundStatus(false).then(setBackgroundStatus).catch(() => undefined);
       },
       async () => {
         const snapshot = await readLocalAiNotifications();
         setState(snapshot);
         setLoading(false);
         setLocalMode(true);
+        const status = await getAiNotificationBackgroundStatus(true).catch(() => defaultBackgroundStatus);
+        setBackgroundStatus(status);
       },
     );
     return unsubscribe;
   }, []);
 
   useEffect(() => {
-    cancelScheduledAiPlaceholderNotifications().catch(() => undefined);
-    registerAiNotificationBackgroundTask().catch(() => undefined);
-  }, []);
-
-  const persist = useCallback(async (nextState: AiNotificationState) => {
-    setState(nextState);
-    stateRef.current = nextState;
-    try {
-      const mergedState = await mergeAndWriteAiNotifications(nextState);
-      setState(mergedState);
-      stateRef.current = mergedState;
-      setLocalMode(false);
-      return true;
-    } catch {
-      await writeLocalAiNotifications(nextState);
-      setLocalMode(true);
-      return true;
-    }
+    registerAiNotificationBackgroundTask()
+      .then(setBackgroundStatus)
+      .catch(async () => setBackgroundStatus(await getAiNotificationBackgroundStatus(localMode).catch(() => defaultBackgroundStatus)));
   }, []);
 
   const scheduleNotification = useCallback(async (input: { title: string; prompt: string; scheduledAt: string; repeatEveryHours?: number }) => {
@@ -78,39 +77,65 @@ export function useAiNotificationsSync() {
     setSaving(true);
     setError(null);
     try {
-      const job = createAiNotificationJob({
+      let job = createAiNotificationJob({
         ...input,
         documentId: 'main',
         documentName: 'Main JSON',
       });
+      let nextState: AiNotificationState;
+      let savedRemotely = false;
       try {
-        const nextState = await addAiNotificationJob(job);
-        setState(nextState);
-        stateRef.current = nextState;
-        setLocalMode(false);
-        return true;
+        nextState = await addAiNotificationJob(job);
+        savedRemotely = true;
       } catch {
-        const nextState = { jobs: [job, ...stateRef.current.jobs], version: stateRef.current.version + 1 };
+        nextState = { jobs: [job, ...stateRef.current.jobs], version: stateRef.current.version + 1 };
         await writeLocalAiNotifications(nextState);
-        setState(nextState);
-        stateRef.current = nextState;
-        setLocalMode(true);
-        return true;
       }
+
+      setState(nextState);
+      stateRef.current = nextState;
+      setLocalMode(!savedRemotely);
+      setBackgroundStatus((current) => ({ ...current, localOnly: !savedRemotely }));
+
+      const nativeNotificationId = await scheduleNativeAiNotificationPlaceholder(job).catch(() => undefined);
+      if (nativeNotificationId) {
+        job = { ...job, nativeNotificationId };
+        const stateWithNativeId = {
+          jobs: stateRef.current.jobs.map((item) => item.id === job.id ? job : item),
+          version: stateRef.current.version + 1,
+        };
+        try {
+          const mergedState = await mergeAndWriteAiNotifications(stateWithNativeId);
+          setState(mergedState);
+          stateRef.current = mergedState;
+          setLocalMode(false);
+          setBackgroundStatus((current) => ({ ...current, localOnly: false }));
+        } catch {
+          await writeLocalAiNotifications(stateWithNativeId);
+          setState(stateWithNativeId);
+          stateRef.current = stateWithNativeId;
+          setLocalMode(true);
+          setBackgroundStatus((current) => ({ ...current, localOnly: true }));
+        }
+      }
+
+      return true;
     } finally {
       setSaving(false);
     }
-  }, [persist]);
+  }, []);
 
   const deleteNotification = useCallback(async (jobId: string) => {
     setSaving(true);
     const job = stateRef.current.jobs.find((item) => item.id === jobId);
     await cancelNativeAiNotification(job?.nativeNotificationId);
+    await cancelNativeAiNotificationWorker(job?.id);
     try {
       const nextState = await removeAiNotificationJob(jobId);
       setState(nextState);
       stateRef.current = nextState;
       setLocalMode(false);
+      setBackgroundStatus((current) => ({ ...current, localOnly: false }));
       return true;
     } catch {
       const nextState = { jobs: stateRef.current.jobs.filter((job) => job.id !== jobId), version: stateRef.current.version + 1 };
@@ -118,11 +143,12 @@ export function useAiNotificationsSync() {
       setState(nextState);
       stateRef.current = nextState;
       setLocalMode(true);
+      setBackgroundStatus((current) => ({ ...current, localOnly: true }));
       return true;
     } finally {
       setSaving(false);
     }
-  }, [persist]);
+  }, []);
 
   const refresh = useCallback(async () => {
     if (refreshing) return false;
@@ -134,12 +160,14 @@ export function useAiNotificationsSync() {
       stateRef.current = nextState;
       await writeLocalAiNotifications(nextState);
       setLocalMode(false);
+      setBackgroundStatus(await getAiNotificationBackgroundStatus(false).catch(() => defaultBackgroundStatus));
       return true;
     } catch (refreshError) {
       const localState = await readLocalAiNotifications();
       setState(localState);
       stateRef.current = localState;
       setLocalMode(true);
+      setBackgroundStatus(await getAiNotificationBackgroundStatus(true).catch(() => defaultBackgroundStatus));
       const message = refreshError instanceof Error ? refreshError.message.toLowerCase() : '';
       setError(message.includes('permission') ? null : refreshError instanceof Error ? `Could not reload AI notifications: ${refreshError.message}` : 'Could not reload AI notifications.');
       return false;
@@ -163,9 +191,11 @@ export function useAiNotificationsSync() {
   useEffect(() => {
     if (loading) return;
     runDueJobs();
-    const interval = setInterval(runDueJobs, 30 * 1000);
-    return () => clearInterval(interval);
-  }, [loading, runDueJobs, state.jobs]);
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') runDueJobs();
+    });
+    return () => subscription.remove();
+  }, [loading, runDueJobs]);
 
   return {
     jobs: state.jobs,
@@ -173,6 +203,7 @@ export function useAiNotificationsSync() {
     saving,
     refreshing,
     localMode,
+    backgroundStatus,
     error,
     setError,
     scheduleNotification,

@@ -81,3 +81,14 @@ export type AiNotificationState = {
   jobs: AiNotificationJob[];
   version: number;
 };
+
+export type AiNotificationRuntimeMode = 'native-background' | 'foreground-catchup' | 'unsupported';
+
+export type AiNotificationBackgroundStatus = {
+  mode: AiNotificationRuntimeMode;
+  available: boolean;
+  registered: boolean;
+  permissionGranted: boolean;
+  localOnly: boolean;
+  details: string;
+};

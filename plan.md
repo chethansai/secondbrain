@@ -361,6 +361,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-09: Updated AI notification behavior description. Decision: clarified that while scheduled times are stored in Firestore, the actual AI processing and notifications are triggered only upon app opening, not via a background Android worker; the app checks the queue on launch and processes eligible jobs then.
+
 - 2026-05-08: Simplified AI notification persistence to a single Firestore queue document. Decision: stop trying to mirror each scheduled notification into separate `job_*` Firestore documents and instead store `jobs` as one array inside `reactnativecollection_notifications/ainotifications`, using explicit queue-style fields such as `jobId`, `prompt`, `timeToRun`, `durationMinutes`, and `status`.
 
 - 2026-05-08: Added an AI Notifications entry beside Settings/Search. Decision: create a dedicated AI Notifications section backed by the AI review ledger, route it from the workspace menu and category header, and keep the section read-only with reload/status summaries.

@@ -17,7 +17,7 @@ type Props = {
 export function AiNotificationsPanel({ data }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { jobs, loading, saving, refreshing, error, localMode, setError, scheduleNotification, deleteNotification, refresh } = useAiNotificationsSync();
+  const { jobs, loading, saving, refreshing, error, localMode, backgroundStatus, setError, scheduleNotification, deleteNotification, refresh } = useAiNotificationsSync();
   const [title, setTitle] = useState('AI notification');
   const [scheduledAt, setScheduledAt] = useState(defaultDateTimeInputValue());
   const [prompt, setPrompt] = useState('Summarize what I should pay attention to next from this JSON.');
@@ -97,6 +97,15 @@ export function AiNotificationsPanel({ data }: Props) {
       </View>
 
       <View style={styles.form}>
+        <View style={[styles.runtimeBanner, backgroundStatus.mode === 'native-background' ? styles.runtimeBannerReady : styles.runtimeBannerFallback]}>
+          <View style={styles.runtimeBannerHeader}>
+            <Text style={styles.runtimeBannerTitle}>{runtimeHeadline(backgroundStatus.mode)}</Text>
+            <Text style={styles.runtimeBadge}>{backgroundStatus.registered ? 'Registered' : backgroundStatus.mode === 'unsupported' ? 'Unsupported' : 'Fallback'}</Text>
+          </View>
+          <Text style={styles.runtimeBannerText}>{backgroundStatus.details}</Text>
+          <Text style={styles.runtimeBannerMeta}>Permission: {backgroundStatus.permissionGranted ? 'granted' : 'not granted'} · Storage: {backgroundStatus.localOnly ? 'local only' : 'synced'}</Text>
+        </View>
+
         <View style={styles.contextRow}>
           <Icon name="document-text-outline" size={16} color={colors.primary} />
           <View style={styles.contextTextWrap}>
@@ -149,7 +158,8 @@ export function AiNotificationsPanel({ data }: Props) {
         </View>
         {scheduleHint ? <Text style={styles.microText}>{scheduleHint}</Text> : null}
         {testStatus ? <Text style={styles.microText}>{testStatus}</Text> : null}
-        {Platform.OS === 'web' ? <Text style={styles.microText}>Browser notification permission is requested when the first scheduled result is ready.</Text> : null}
+        {Platform.OS === 'web' ? <Text style={styles.microText}>Web can show browser notifications, but scheduled AI processing stops when the page is closed.</Text> : null}
+        {Platform.OS !== 'web' ? <Text style={styles.microText}>Android and iOS delivery can be delayed by the OS. Overdue jobs still run when the app becomes active again.</Text> : null}
       </View>
 
       {jobs.length ? (
@@ -198,6 +208,12 @@ function statusLabel(job: AiNotificationJob) {
   if (job.status === 'running') return 'Running';
   if (job.status === 'failed') return 'Failed';
   return 'Scheduled';
+}
+
+function runtimeHeadline(mode: 'native-background' | 'foreground-catchup' | 'unsupported') {
+  if (mode === 'native-background') return 'Background worker active';
+  if (mode === 'unsupported') return 'Background worker unavailable';
+  return 'Foreground catch-up only';
 }
 
 function defaultDateTimeInputValue() {
@@ -250,6 +266,14 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     errorText: { ...typography.bodySmMedium, color: colors.semanticError, flex: 1 },
     dismissButton: { width: 32, height: 32, borderRadius: rounded.sm, alignItems: 'center', justifyContent: 'center' },
     form: { gap: spacing.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surfaceSoft, borderRadius: rounded.md, padding: spacing.md },
+    runtimeBanner: { borderRadius: rounded.md, borderWidth: 1, padding: spacing.md, gap: spacing.xs },
+    runtimeBannerReady: { backgroundColor: colors.cardTintMint, borderColor: colors.semanticSuccess },
+    runtimeBannerFallback: { backgroundColor: colors.cardTintYellow, borderColor: colors.brandYellow },
+    runtimeBannerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+    runtimeBannerTitle: { ...typography.bodySmMedium, color: colors.ink },
+    runtimeBadge: { ...typography.micro, color: colors.ink, backgroundColor: colors.canvas, borderRadius: rounded.sm, paddingHorizontal: spacing.xs, paddingVertical: spacing.xxs, overflow: 'hidden' },
+    runtimeBannerText: { ...typography.bodySm, color: colors.charcoal },
+    runtimeBannerMeta: { ...typography.micro, color: colors.slate },
     contextRow: { minHeight: 54, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     contextTextWrap: { flex: 1, minWidth: 0 },
     contextTitle: { ...typography.bodySmMedium, color: colors.ink },
