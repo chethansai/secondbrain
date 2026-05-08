@@ -1,5 +1,6 @@
 package com.notes.nativenotetaking.ainotifications
 
+import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
@@ -19,6 +20,10 @@ import kotlin.math.max
 class AiNotificationWorkerModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
   override fun getName(): String = "AiNotificationWorkerModule"
 
+  private val connectedConstraints = Constraints.Builder()
+    .setRequiredNetworkType(NetworkType.CONNECTED)
+    .build()
+
   @ReactMethod
   fun scheduleJob(jobId: String, scheduledAtMillis: Double, repeatEveryHours: Double, promise: Promise) {
     try {
@@ -33,7 +38,7 @@ class AiNotificationWorkerModule(private val reactContext: ReactApplicationConte
         val request = PeriodicWorkRequestBuilder<AiNotificationWorker>(repeatMinutes, TimeUnit.MINUTES)
           .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
           .setInputData(input)
-          .setRequiredNetworkType(NetworkType.CONNECTED)
+          .setConstraints(connectedConstraints)
           .addTag(AiNotificationWorker.WORK_TAG)
           .addTag(workName)
           .build()
@@ -42,7 +47,7 @@ class AiNotificationWorkerModule(private val reactContext: ReactApplicationConte
         val request = OneTimeWorkRequestBuilder<AiNotificationWorker>()
           .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
           .setInputData(input)
-          .setRequiredNetworkType(NetworkType.CONNECTED)
+          .setConstraints(connectedConstraints)
           .addTag(AiNotificationWorker.WORK_TAG)
           .addTag(workName)
           .build()
@@ -59,7 +64,7 @@ class AiNotificationWorkerModule(private val reactContext: ReactApplicationConte
   fun schedulePolling(promise: Promise) {
     try {
       val request = PeriodicWorkRequestBuilder<AiNotificationWorker>(15, TimeUnit.MINUTES)
-        .setRequiredNetworkType(NetworkType.CONNECTED)
+        .setConstraints(connectedConstraints)
         .addTag(AiNotificationWorker.WORK_TAG)
         .addTag(AiNotificationWorker.POLLING_WORK_NAME)
         .build()
@@ -88,7 +93,7 @@ class AiNotificationWorkerModule(private val reactContext: ReactApplicationConte
   fun triggerNow(promise: Promise) {
     try {
       val request = OneTimeWorkRequestBuilder<AiNotificationWorker>()
-        .setRequiredNetworkType(NetworkType.CONNECTED)
+        .setConstraints(connectedConstraints)
         .addTag(AiNotificationWorker.WORK_TAG)
         .build()
       WorkManager.getInstance(reactContext).enqueue(request)

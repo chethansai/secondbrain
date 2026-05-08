@@ -225,45 +225,65 @@ export async function cancelScheduledAiPlaceholderNotifications() {
 }
 
 export async function processDueAiNotifications() {
+  console.log('[AI BACKGROUND] Headless task started - processing due jobs');
   const state = await readNotificationStateForRunner();
   const now = Date.now();
   const dueJobs = state.jobs.filter((job) => job.status === 'scheduled' && new Date(job.scheduledAt).getTime() <= now && !processingJobIds.has(job.id));
-  if (!dueJobs.length) return { state, processed: 0 };
+  if (!dueJobs.length) {
+    console.log('[AI BACKGROUND] No due jobs found');
+    return { state, processed: 0 };
+  }
 
   const latestState = await readNotificationStateForRunner();
   const refreshedDueJobs = latestState.jobs.filter((job) => job.status === 'scheduled' && new Date(job.scheduledAt).getTime() <= now && !processingJobIds.has(job.id));
   let nextState = latestState;
   let processed = 0;
   for (const job of refreshedDueJobs) {
+    console.log(`[AI BACKGROUND] Processing job ${job.id}`);
     processingJobIds.add(job.id);
     try {
       nextState = await processAiNotificationJob(job, nextState);
       processed += 1;
+      console.log(`[AI BACKGROUND] Job ${job.id} completed successfully`);
+    } catch (error) {
+      console.error(`[AI BACKGROUND] Job ${job.id} failed:`, error);
     } finally {
       processingJobIds.delete(job.id);
     }
   }
+  console.log(`[AI BACKGROUND] Task finished - processed ${processed} jobs`);
   return { state: nextState, processed };
 }
 
 async function processAiNotificationJob(job: AiNotificationJob, state: AiNotificationState) {
+  console.log(`[AI BACKGROUND] Starting AI request for job ${job.id}`);
   let nextState = updateJob(state, job.id, { status: 'running', updatedAt: new Date().toISOString(), error: undefined });
   await writeNotificationStateForRunner(nextState);
+  let result: string | undefined;
+  let errorMsg: string | undefined;
   try {
     const data = await readNotificationDocument(job.documentId);
-    const result = cleanResult(await requestAiText(buildNotificationPrompt(job.prompt, data)));
-    const now = new Date().toISOString();
-    nextState = updateJob(nextState, job.id, createCompletedPatch(job, { result, now, failed: false }));
-    await writeNotificationStateForRunner(nextState);
-    await cancelNativeAiNotification(job.nativeNotificationId);
-    if (!job.notifiedAt) await presentAiResultNotification(job.title, result);
+    console.log(`[AI BACKGROUND] Fetched data for job ${job.id}, calling AI...`);
+    result = cleanResult(await requestAiText(buildNotificationPrompt(job.prompt, data)));
+    console.log(`[AI BACKGROUND] AI response received for job ${job.id}`);
   } catch (runError) {
-    const message = formatAiReviewRequestError(runError);
-    const now = new Date().toISOString();
-    nextState = updateJob(nextState, job.id, createCompletedPatch(job, { error: message, now, failed: true }));
-    await writeNotificationStateForRunner(nextState);
-    await cancelNativeAiNotification(job.nativeNotificationId);
-    if (!job.notifiedAt) await presentAiResultNotification(`${job.title} failed`, message);
+    errorMsg = formatAiReviewRequestError(runError);
+    console.error(`[AI BACKGROUND] AI request failed for job ${job.id}:`, errorMsg);
+  }
+  const now = new Date().toISOString();
+  nextState = updateJob(nextState, job.id, createCompletedPatch(job, { 
+    result, 
+    error: errorMsg, 
+    now, 
+    failed: !!errorMsg 
+  }));
+  await writeNotificationStateForRunner(nextState);
+  await cancelNativeAiNotification(job.nativeNotificationId);
+  const finalTitle = job.title + (errorMsg ? ' failed' : '');
+  const finalBody = errorMsg || result || 'Processing complete.';
+  if (!job.notifiedAt) {
+    console.log(`[AI BACKGROUND] Sending result notification for job ${job.id}`);
+    await presentAiResultNotification(finalTitle, finalBody);
   }
   return nextState;
 }
@@ -306,13 +326,12 @@ function buildNotificationPrompt(prompt: string, data: NotesData) {
 }
 
 function cleanResult(result: string) {
-  const clean = result.replace(/\s+/g, ' ').trim();
-  return clean || 'AI completed the scheduled prompt.';
+  return result.replace(/\s+/g, ' ').trim();
 }
 
 function updateJob(state: AiNotificationState, jobId: string, patch: Partial<AiNotificationJob>): AiNotificationState {
   return {
-    jobs: state.jobs.map((item) => item.id === jobId ? { ...item, ...patch } : item),
+    jobs: state.jobs.map((job) => job.id === jobId ? { ...job, ...patch } : job),
     version: state.version + 1,
   };
 }

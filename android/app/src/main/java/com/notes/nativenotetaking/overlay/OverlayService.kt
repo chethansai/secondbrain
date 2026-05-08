@@ -8,8 +8,10 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import android.os.Handler
 import android.os.Build
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
@@ -27,6 +29,11 @@ import androidx.core.content.ContextCompat
 import com.notes.nativenotetaking.MainActivity
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -233,29 +240,114 @@ class OverlayService : Service() {
       Toast.makeText(this, "Note text cannot be empty.", Toast.LENGTH_SHORT).show()
       return
     }
-    try {
-      appendSeekNote(note)
-      Toast.makeText(this, "Added to SEEK", Toast.LENGTH_SHORT).show()
-      hideInput()
-    } catch (_: Exception) {
-      Toast.makeText(this, "Could not save note.", Toast.LENGTH_LONG).show()
+    editText.isEnabled = false
+    Thread {
+      try {
+        val data = appendSeekNoteToFirestore(note)
+        writeNotesDataToLocalCache(data)
+        Handler(Looper.getMainLooper()).post {
+          Toast.makeText(this, "Added to Firestore SEEK", Toast.LENGTH_SHORT).show()
+          hideInput()
+        }
+      } catch (_: Exception) {
+        Handler(Looper.getMainLooper()).post {
+          editText.isEnabled = true
+          editText.requestFocus()
+          ContextCompat.getSystemService(this, InputMethodManager::class.java)?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
+          Toast.makeText(this, "Could not add to Firestore.", Toast.LENGTH_LONG).show()
+        }
+      }
+    }.start()
+  }
+
+  private fun appendSeekNoteToFirestore(note: String): JSONObject {
+    val document = readFirestoreDocument()
+    val fields = document.optJSONObject("fields") ?: JSONObject().also { document.put("fields", it) }
+    val dataValue = fields.optJSONObject("data") ?: JSONObject().put("mapValue", JSONObject().put("fields", JSONObject())).also { fields.put("data", it) }
+    val dataFields = dataValue.optJSONObject("mapValue")?.optJSONObject("fields") ?: JSONObject()
+    dataValue.put("mapValue", JSONObject().put("fields", dataFields))
+    val seekValue = dataFields.optJSONObject("SEEK") ?: JSONObject().put("arrayValue", JSONObject().put("values", JSONArray())).also { dataFields.put("SEEK", it) }
+    val seekArray = seekValue.optJSONObject("arrayValue") ?: JSONObject().put("values", JSONArray()).also { seekValue.put("arrayValue", it) }
+    val seekValues = seekArray.optJSONArray("values") ?: JSONArray().also { seekArray.put("values", it) }
+    seekValues.put(JSONObject().put("stringValue", note))
+
+    val body = JSONObject().put("fields", JSONObject().put("data", dataValue))
+    val connection = openFirestoreConnection("PATCH")
+    writeJson(connection, body)
+    val responseCode = connection.responseCode
+    if (responseCode !in 200..299) throw IllegalStateException(readResponse(connection))
+    return firestoreDataFieldsToNotesData(dataFields)
+  }
+
+  private fun readFirestoreDocument(): JSONObject {
+    val connection = openFirestoreConnection("GET")
+    val responseCode = connection.responseCode
+    if (responseCode == 404) return JSONObject()
+    if (responseCode !in 200..299) throw IllegalStateException(readResponse(connection))
+    val response = readResponse(connection)
+    return if (response.isBlank()) JSONObject() else JSONObject(response)
+  }
+
+  private fun openFirestoreConnection(method: String): HttpURLConnection {
+    val connection = URL(firestoreDocumentUrl).openConnection() as HttpURLConnection
+    connection.requestMethod = method
+    connection.connectTimeout = 12000
+    connection.readTimeout = 12000
+    connection.setRequestProperty("Content-Type", "application/json")
+    if (method == "PATCH") connection.doOutput = true
+    return connection
+  }
+
+  private fun writeJson(connection: HttpURLConnection, body: JSONObject) {
+    OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
+      writer.write(body.toString())
     }
   }
 
-  private fun appendSeekNote(note: String) {
+  private fun readResponse(connection: HttpURLConnection): String {
+    val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream ?: connection.inputStream
+    return BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { reader -> reader.readText() }
+  }
+
+  private fun firestoreDataFieldsToNotesData(dataFields: JSONObject): JSONObject {
+    val data = JSONObject()
+    val keys = dataFields.keys()
+    while (keys.hasNext()) {
+      val key = keys.next()
+      val arrayValue = dataFields.optJSONObject(key)?.optJSONObject("arrayValue") ?: continue
+      data.put(key, firestoreArrayToNoteItems(arrayValue.optJSONArray("values") ?: JSONArray()))
+    }
+    return data
+  }
+
+  private fun firestoreArrayToNoteItems(values: JSONArray): JSONArray {
+    val items = JSONArray()
+    for (index in 0 until values.length()) {
+      val value = values.optJSONObject(index) ?: continue
+      when {
+        value.has("stringValue") -> items.put(value.optString("stringValue"))
+        value.has("mapValue") -> items.put(firestoreMapToCategoryNode(value.optJSONObject("mapValue")?.optJSONObject("fields") ?: JSONObject()))
+      }
+    }
+    return items
+  }
+
+  private fun firestoreMapToCategoryNode(fields: JSONObject): JSONObject {
+    val node = JSONObject()
+    val keys = fields.keys()
+    while (keys.hasNext()) {
+      val key = keys.next()
+      val arrayValue = fields.optJSONObject(key)?.optJSONObject("arrayValue") ?: continue
+      node.put(key, firestoreArrayToNoteItems(arrayValue.optJSONArray("values") ?: JSONArray()))
+    }
+    return node
+  }
+
+  private fun writeNotesDataToLocalCache(data: JSONObject) {
     val db = AsyncStorageDb(this).writableDatabase
-    val data = readNotesData(db)
-    val seekItems = data.optJSONArray("SEEK") ?: JSONArray().also { data.put("SEEK", it) }
-    seekItems.put(note)
     val serialized = JSONObject().put("data", data).toString()
     writeStorageValue(db, localWorkspaceNotesKey, serialized)
     writeStorageValue(db, legacyLocalNotesKey, serialized)
-  }
-
-  private fun readNotesData(db: SQLiteDatabase): JSONObject {
-    val raw = readStorageValue(db, localWorkspaceNotesKey) ?: readStorageValue(db, legacyLocalNotesKey)
-    if (raw.isNullOrBlank()) return JSONObject()
-    return JSONObject(raw).optJSONObject("data") ?: JSONObject()
   }
 
   private fun readStorageValue(db: SQLiteDatabase, key: String): String? {
@@ -413,6 +505,7 @@ class OverlayService : Service() {
     private const val localWorkspaceNotesKey = "rnnotetaking.notes.workspace.Main"
     private const val legacyLocalNotesKey = "rnnotetaking.notes.main"
     private const val createStorageTableSql = "CREATE TABLE IF NOT EXISTS catalystLocalStorage (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+    private const val firestoreDocumentUrl = "https://firestore.googleapis.com/v1/projects/notes-55c97/databases/(default)/documents/reactnativecollection/main?key=AIzaSyD8t3f8EvherkuyAmLB6iFN5wuiOmALCzU"
   }
 
   private class AsyncStorageDb(context: Context) : SQLiteOpenHelper(context.applicationContext, storageDatabaseName, null, 1) {
