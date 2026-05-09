@@ -10,6 +10,11 @@ Before running the Git commands, update the `## history` section with a dated su
 
 This post-step Git workflow is mandatory and must not be skipped after any implemented change.
 
+## Android ADB Path
+
+ADB executable path:
+`C:\Users\chethan sheshu\AppData\Local\Android\Sdk\platform-tools\adb.exe`
+
 ## Plan: Exhaustive React Native Firebase Notes
 
 Rebuild the notes app as React Native + Firebase only, with no Django dependency. Store notes in Firestore collection `reactnativecollection` using simple nested JSON: root category keys map to arrays containing note strings and nested single-key category objects. The app should preserve core note/category workflows while deliberately excluding instant/full load, Instagram-specific rendering, OCR/Tesseract, Django APIs, and complex mirror propagation.
