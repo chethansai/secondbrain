@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { spacing } from '../../shared/design/tokens';
 import { normalizeNoteText } from '../notes/noteMutations';
 import { Button } from '../../shared/ui/Button';
@@ -29,12 +29,10 @@ export function NoteEditorModal({ visible, title, initialText = '', onClose, onS
 
   return (
     <ModalShell visible={visible} title={title} onClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.content}>
-          <TextInputField value={text} onChangeText={setText} autoCapitalize="sentences" multiline placeholder="Write a note" accessibilityLabel="Note text" />
-          <Button label="Save note" icon="checkmark" onPress={submit} disabled={busy || !text.trim()} />
-        </View>
-      </KeyboardAvoidingView>
+      <View style={styles.content}>
+        <TextInputField value={text} onChangeText={setText} autoCapitalize="sentences" multiline placeholder="Write a note" accessibilityLabel="Note text" />
+        <Button label="Save note" icon="checkmark" onPress={submit} disabled={busy || !text.trim()} />
+      </View>
     </ModalShell>
   );
 }

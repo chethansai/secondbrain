@@ -22,6 +22,7 @@ export function TextPromptModal({ visible, title, label, initialValue = '', subm
   useEffect(() => setValue(initialValue), [initialValue, visible]);
 
   async function submit() {
+    if (busy || !value.trim()) return;
     setBusy(true);
     const ok = await onSubmit(value);
     setBusy(false);
@@ -31,7 +32,15 @@ export function TextPromptModal({ visible, title, label, initialValue = '', subm
   return (
     <ModalShell visible={visible} title={title} onClose={onClose}>
       <View style={styles.content}>
-        <TextInputField label={label} value={value} onChangeText={setValue} autoCapitalize="sentences" />
+        <TextInputField
+          label={label}
+          value={value}
+          onChangeText={setValue}
+          autoCapitalize="sentences"
+          editable={!busy}
+          returnKeyType="done"
+          onSubmitEditing={submit}
+        />
         <Button label={submitLabel} icon="checkmark" onPress={submit} disabled={busy || !value.trim()} />
       </View>
     </ModalShell>

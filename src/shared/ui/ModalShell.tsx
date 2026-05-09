@@ -1,5 +1,5 @@
 import { ReactNode, useMemo } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../design/ThemeProvider';
 import { colors, rounded, spacing, typography, shadows } from '../design/tokens';
 import { Icon } from './Icon';
@@ -16,23 +16,26 @@ export function ModalShell({ visible, title, onClose, children }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <View style={styles.header}>
-            <Text style={styles.title}>{title}</Text>
-            <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={styles.close}>
-              <Icon name="close" size={22} color={colors.ink} />
-            </Pressable>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoider}>
+        <View style={styles.backdrop}>
+          <View style={styles.sheet}>
+            <View style={styles.header}>
+              <Text style={styles.title}>{title}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={styles.close}>
+                <Icon name="close" size={22} color={colors.ink} />
+              </Pressable>
+            </View>
+            {children}
           </View>
-          {children}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 function createStyles(colors: typeof import('../design/tokens').colors) {
   return StyleSheet.create({
+  keyboardAvoider: { flex: 1 },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(7, 15, 36, 0.45)' },
   sheet: {
     maxHeight: '88%',
