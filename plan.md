@@ -367,6 +367,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-09: Implemented floating category selection for add-note saves. Decision: add an optional feature-owned floating category dial to the note editor, sort category buttons alphabetically by full path, save immediately when a category is tapped, and relabel the fallback add-note submit action to `Seek` while leaving edit-mode and AI workspace modal behavior unchanged.
+
 - 2026-05-09: Implemented pinned notes within categories. Decision: keep notes stored as plain strings in the simple nested JSON, persist pin references in the workspace sidecar metadata, sort pinned notes first in category/detail and board views, and update pin references on edit/order/delete/rename while removing pins when notes move categories.
 
 - 2026-05-09: Implemented automatic pinning for newly created subcategories. Decision: after a subcategory create mutation and history write succeed, append the new full category path to the active workspace's pinned category paths so it appears in pinned move/copy destinations immediately.

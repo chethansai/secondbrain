@@ -142,6 +142,28 @@ export function deleteCategory(data: NotesData, path: CategoryPath): MutationRes
   return { ok: true, data: next };
 }
 
+export function setCategoryPriority(data: NotesData, path: CategoryPath, priority: number): MutationResult {
+  const name = path[path.length - 1];
+  if (!name) return failure('path_not_found', 'Choose a category to order.');
+  const next = cloneData(data);
+  const items = path.length === 1 ? getRootCategoryItems(next) : getCategoryItems(next, path.slice(0, -1));
+  if (!items) return failure('path_not_found', 'The selected category no longer exists.');
+  const index = items.findIndex((item) => isCategoryNode(item) && Object.prototype.hasOwnProperty.call(item, name));
+  if (index === -1) return failure('path_not_found', 'The selected category no longer exists.');
+
+  const visibleItems = [...items].reverse();
+  const currentVisibleIndex = visibleItems.findIndex((_, visibleIndex) => items.length - 1 - visibleIndex === index);
+  if (currentVisibleIndex === -1) return failure('path_not_found', 'The selected category no longer exists.');
+
+  const targetVisibleIndex = Math.max(0, Math.min(priority - 1, visibleItems.length - 1));
+  const [selectedCategory] = visibleItems.splice(currentVisibleIndex, 1);
+  visibleItems.splice(targetVisibleIndex, 0, selectedCategory);
+  items.splice(0, items.length, ...visibleItems.reverse());
+
+  syncStandaloneCategory(next, path.length === 1 ? path : path.slice(0, -1));
+  return { ok: true, data: next };
+}
+
 export function syncStandaloneCategory(data: NotesData, path: CategoryPath): NotesData {
   const name = path[path.length - 1];
   if (!name) return data;
@@ -308,4 +330,8 @@ function deleteItemsNamed(items: NoteItem[], name: string) {
 
 function failure(code: string, message: string): MutationResult {
   return { ok: false, code, message };
+}
+
+function getRootCategoryItems(data: NotesData): NoteItem[] {
+  return Object.entries(data).map(([name, items]) => ({ [name]: items }));
 }

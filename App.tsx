@@ -583,6 +583,8 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         visible={editorMode !== null}
         title={editorMode === 'edit' ? 'Edit note' : 'Add note'}
         initialText={editorMode === 'edit' ? selectedNote?.note ?? '' : ''}
+        categoryData={editorMode === 'add' ? data : undefined}
+        selectedPath={editorMode === 'add' ? path : null}
         onClose={() => { setEditorMode(null); setSelectedNote(null); }}
         onSubmit={async (text) => {
           if (editorMode !== 'edit' || !selectedNote) return addWorkspaceNote(path, text);
@@ -590,6 +592,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           if (ok) await updatePinnedNotes(replacePinnedNote(selectedNote, { ...selectedNote, note: text.trim() }, pinnedNotes));
           return ok;
         }}
+        onSubmitToCategory={editorMode === 'add' ? addWorkspaceNote : undefined}
       />
       <MoveCopyModal
         visible={moveVisible}

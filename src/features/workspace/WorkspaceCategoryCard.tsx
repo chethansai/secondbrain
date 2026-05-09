@@ -87,6 +87,11 @@ export function WorkspaceCategoryCard({
     }
   }
 
+  function openAddNote() {
+    setActionsOpen(false);
+    setAdding(true);
+  }
+
   function toggleCategory(path: CategoryPath) {
     const key = pathKey(path);
     setExpandedCategoryKeys((current) => {
@@ -116,7 +121,7 @@ export function WorkspaceCategoryCard({
           </Pressable>
         </View>
         <View style={styles.headerMeta}>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Add note to ${category.name}`} onPress={(event) => { event.stopPropagation(); setActionsOpen(false); setAdding(true); }} style={styles.iconButtonSmall}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Add note to ${category.name}`} onPress={(event) => { event.stopPropagation(); openAddNote(); }} style={styles.iconButtonSmall}>
             <Icon name="add" size={12} color={colors.primary} />
           </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${category.name}`} onPress={(event) => { event.stopPropagation(); setActionsOpen((current) => !current); }} style={styles.iconButtonSmall}>
@@ -140,6 +145,15 @@ export function WorkspaceCategoryCard({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={notes.length > 4}
       >
+        {priority === 1 && !adding ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={`Add note to ${category.name}`} onPress={(event) => { event.stopPropagation(); openAddNote(); }} style={styles.previewAddButton}>
+            <View style={styles.previewAddIcon}>
+              <Icon name="add" size={12} color={colors.primary} />
+            </View>
+            <Text style={styles.previewAddText} numberOfLines={1}>Add note</Text>
+          </Pressable>
+        ) : null}
+
         {adding ? (
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.inlineAdd}>
             <TextInput
@@ -353,7 +367,11 @@ function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinne
           <Text style={styles.previewHistoryPrimary} numberOfLines={3}>{historyNote.primary}</Text>
           <Text style={styles.previewHistoryMeta} numberOfLines={2}>{[historyNote.event ? formatHistoryEvent(historyNote.event) : null, ...historyNote.metadata].filter(Boolean).join(' · ')}</Text>
         </View>
-      ) : <Text style={styles.previewText} numberOfLines={4}>{note.note}</Text>}
+      ) : (
+        <ScrollView style={styles.previewTextScroller} nestedScrollEnabled showsVerticalScrollIndicator>
+          <Text style={styles.previewText}>{note.note}</Text>
+        </ScrollView>
+      )}
       <Pressable accessibilityRole="button" accessibilityLabel="Note actions" onPress={() => setOpen((current) => !current)} style={styles.previewMenuButton}>
         <Icon name="settings-outline" size={11} color={colors.steel} />
       </Pressable>
@@ -477,9 +495,13 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   subcategoryInlineAdd: { marginTop: scale(1), marginBottom: scale(1) },
   inlineInput: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.charcoal, flex: 1, minWidth: 0, paddingVertical: 0 },
   inlineIconButton: { width: scale(22), height: scale(22), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center' },
+  previewAddButton: { minHeight: scale(29), flexDirection: 'row', alignItems: 'center', gap: scale(5), borderWidth: 1, borderStyle: 'dashed', borderColor: colors.hairlineStrong, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.50)' : 'rgba(255,255,255,0.56)', paddingHorizontal: scale(5), paddingVertical: scale(3) },
+  previewAddIcon: { width: scale(20), height: scale(20), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'rgba(10,11,14,0.72)' : colors.surface, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, flexShrink: 0 },
+  previewAddText: { fontSize: scale(11), fontWeight: '700', lineHeight: scale(14), color: colors.primary, flex: 1, minWidth: 0 },
   previewNote: { position: 'relative', flexDirection: 'row', alignItems: 'flex-start', gap: scale(4), borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.54)' : 'rgba(255,255,255,0.66)', paddingHorizontal: scale(4), paddingVertical: scale(3), marginTop: 0 },
   previewNoteMenuOpen: { elevation: 16 },
-  previewText: { fontSize: scale(11), fontWeight: '500', lineHeight: scale(13), color: colors.charcoal, flex: 1, minWidth: 0, paddingRight: scale(24) },
+  previewTextScroller: { flex: 1, minWidth: 0, maxHeight: scale(52), paddingRight: scale(24) },
+  previewText: { fontSize: scale(11), fontWeight: '500', lineHeight: scale(13), color: colors.charcoal },
   previewHistoryBlock: { flex: 1, minWidth: 0, gap: scale(1), paddingRight: scale(24) },
   previewHistoryPrimary: { fontSize: scale(11), fontWeight: '700', lineHeight: scale(13), color: colors.charcoal },
   previewHistoryMeta: { fontSize: scale(8), fontWeight: '500', lineHeight: scale(10), color: colors.steel },
