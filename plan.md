@@ -367,6 +367,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-09: Implemented pinned notes within categories. Decision: keep notes stored as plain strings in the simple nested JSON, persist pin references in the workspace sidecar metadata, sort pinned notes first in category/detail and board views, and update pin references on edit/order/delete/rename while removing pins when notes move categories.
+
 - 2026-05-09: Implemented automatic pinning for newly created subcategories. Decision: after a subcategory create mutation and history write succeed, append the new full category path to the active workspace's pinned category paths so it appears in pinned move/copy destinations immediately.
 
 - 2026-05-09: Strengthened architecture guidance in the implementation plan. Decision: each feature must have its own feature-owned component or component set, and the 600-line source-file limit is a hard maximum that must be followed before adding more behavior.

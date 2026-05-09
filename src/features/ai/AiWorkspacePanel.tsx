@@ -128,7 +128,14 @@ export function AiWorkspacePanel() {
   }
 
   async function setNoteOrderPriority(note: FlatNote, priority: number) {
-    return commit(setNotePriority(data, note.path, note.note, priority, note.index));
+    const result = setNotePriority(data, note.path, note.note, priority, note.index);
+    const ok = await commit(result);
+    if (ok && result.ok) {
+      const reorderedNotes = listNotesAtPath(result.data, note.path);
+      const nextNote = reorderedNotes[Math.max(0, Math.min(priority - 1, reorderedNotes.length - 1))];
+      if (nextNote?.note === note.note) updatePinnedNotes(replacePinnedNote(note, nextNote, pinnedNotes));
+    }
+    return ok;
   }
 
   async function submitNoteEdit(text: string) {
@@ -376,7 +383,12 @@ export function AiWorkspacePanel() {
         onClose={() => { setMoveVisible(false); setSelectedNote(null); }}
         onTogglePin={togglePinnedMoveCopyCategory}
         onResetPins={() => updatePinnedCategoryPaths([])}
-        onMove={(destination) => selectedNote ? commitWithHistory(moveNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index), `${selectedNote.note} moved - ${formatHistoryPath(destination)} - ${formatHistoryTime()} - Event: NOTE_MOVED - From: ${formatHistoryPath(selectedNote.path)}`) : false}
+        onMove={async (destination) => {
+          if (!selectedNote) return false;
+          const ok = await commitWithHistory(moveNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index), `${selectedNote.note} moved - ${formatHistoryPath(destination)} - ${formatHistoryTime()} - Event: NOTE_MOVED - From: ${formatHistoryPath(selectedNote.path)}`);
+          if (ok) updatePinnedNotes(removePinnedNote(selectedNote, pinnedNotes));
+          return ok;
+        }}
         onCopy={(destination) => selectedNote ? commitWithHistory(copyNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index), `${selectedNote.note} copied - ${formatHistoryPath(destination)} - ${formatHistoryTime()} - Event: NOTE_COPIED - From: ${formatHistoryPath(selectedNote.path)}`) : false}
       />
       <ConfirmModal
