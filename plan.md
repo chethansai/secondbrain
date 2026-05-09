@@ -33,17 +33,18 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 **Architecture Rules**
 1. Use strict feature-based architecture. Organize code by feature domains such as `notes`, `folders`/`categories`, `search`, `editor`, `settings`, `sync`, and `auth` instead of building giant shared files.
-2. Each feature should own its relevant components, hooks, types, services, and helpers. Shared UI is only for truly reusable primitives such as `Button`, `Input`, `Modal`, `ListItem`, and `EmptyState`.
-3. No source file should exceed 600 lines. Prefer 300-450 lines. If a file approaches 450-500 lines, split it immediately.
-4. Do not create monolithic components, screens, services, or utility files. Prefer smaller files with clear names over catch-all files.
-5. Keep each component focused on one responsibility. Screens should mostly compose feature components rather than contain all UI, state, and data access logic directly.
-6. Keep business logic out of UI components whenever possible. Put data fetching, persistence, sync, validation, and mutation behavior in feature services or hooks.
-7. Use the simplest state management that fits the app. Keep local UI state local, lift state only when necessary, and extract duplicated stateful logic into hooks.
-8. Prefer TypeScript types/interfaces for app data structures, including notes data, category paths, mutation results, repository payloads, and import/export results.
-9. Prefer composition over inheritance and keep props clean, minimal, and flow-specific.
-10. Avoid unnecessary abstractions, but split early when a component or helper is taking on multiple responsibilities.
-11. Remove dead code quickly during implementation so the new RN app stays small and easy to reason about.
-12. Before adding new code, identify the feature boundary first. Extend an existing feature file only if it remains clean and below size limits; otherwise create a new feature component, hook, service, helper, or type file.
+2. Every feature must have its own clearly named component or component set in the appropriate feature folder. Do not place feature-specific UI inside broad shared files or unrelated screens.
+3. Each feature should own its relevant components, hooks, types, services, and helpers. Shared UI is only for truly reusable primitives such as `Button`, `Input`, `Modal`, `ListItem`, and `EmptyState`.
+4. No source file may exceed 600 lines under any circumstance. Prefer 300-450 lines. If a file approaches 450-500 lines, split it immediately before adding more behavior.
+5. Do not create monolithic components, screens, services, or utility files. Prefer smaller files with clear names over catch-all files.
+6. Keep each component focused on one responsibility. Screens should mostly compose feature components rather than contain all UI, state, and data access logic directly.
+7. Keep business logic out of UI components whenever possible. Put data fetching, persistence, sync, validation, and mutation behavior in feature services or hooks.
+8. Use the simplest state management that fits the app. Keep local UI state local, lift state only when necessary, and extract duplicated stateful logic into hooks.
+9. Prefer TypeScript types/interfaces for app data structures, including notes data, category paths, mutation results, repository payloads, and import/export results.
+10. Prefer composition over inheritance and keep props clean, minimal, and flow-specific.
+11. Avoid unnecessary abstractions, but split early when a component or helper is taking on multiple responsibilities.
+12. Remove dead code quickly during implementation so the new RN app stays small and easy to reason about.
+13. Before adding new code, identify the feature boundary first. Extend an existing feature file only if it remains clean and below size limits; otherwise create a new feature component, hook, service, helper, or type file.
 
 **Suggested Feature Layout**
 1. `src/features/auth/` - local password setup/unlock, session hook, SecureStore/AsyncStorage service, auth UI components.
@@ -365,6 +366,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 5.  The Conundrum onversation export requests such as `exportocnversation.txt` / `exportconversation.txt` are separate transcript utility tasks, not part of the React Native notes app implementation plan.
 
 ## history
+
+- 2026-05-09: Strengthened architecture guidance in the implementation plan. Decision: each feature must have its own feature-owned component or component set, and the 600-line source-file limit is a hard maximum that must be followed before adding more behavior.
 
 - 2026-05-09: Troubleshot Android development build installation on USB device. Decision: ADB can see the attached Samsung device, the build failure was caused by Gradle/Kotlin parsing Java 25.0.3, so Gradle is pinned to Android Studio's bundled Java 21 runtime for local native builds.
 
