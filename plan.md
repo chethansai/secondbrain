@@ -366,6 +366,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-09: Troubleshot Android development build installation on USB device. Decision: ADB can see the attached Samsung device, the build failure was caused by Gradle/Kotlin parsing Java 25.0.3, so Gradle is pinned to Android Studio's bundled Java 21 runtime for local native builds.
+
 - 2026-05-09: Implemented true background AI notification processing. Decision: updated placeholder messaging and status details to reflect that Android WorkManager schedules headless JS tasks to process AI jobs at the exact scheduled time without requiring app launch; results are notified directly, with possible OS delays.
 
 - 2026-05-08: Simplified AI notification persistence to a single Firestore queue document. Decision: stop trying to mirror each scheduled notification into separate `job_*` Firestore documents and instead store `jobs` as one array inside `reactnativecollection_notifications/ainotifications`, using explicit queue-style fields such as `jobId`, `prompt`, `timeToRun`, `durationMinutes`, and `status`.
