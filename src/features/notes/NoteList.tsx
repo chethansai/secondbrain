@@ -12,13 +12,14 @@ type Props = {
   onEdit: (note: FlatNote) => void;
   onMove: (note: FlatNote) => void;
   onCopy: (note: FlatNote) => void;
+  onCopyText: (note: FlatNote) => void;
   onSetPriority: (note: FlatNote, priority: number) => void;
   onTogglePin: (note: FlatNote) => void;
   onDelete: (note: FlatNote) => void;
   pinnedNotes: import('../../shared/types/notes').PinnedNoteRef[];
 };
 
-export function NoteList({ notes, onEdit, onMove, onCopy, onSetPriority, onTogglePin, onDelete, pinnedNotes }: Props) {
+export function NoteList({ notes, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete, pinnedNotes }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -26,7 +27,7 @@ export function NoteList({ notes, onEdit, onMove, onCopy, onSetPriority, onToggl
       {notes.map((note, index) => (
         <View key={`${note.path.join('/')}-${note.index}-${index}`} style={[styles.card, { zIndex: notes.length - index }]}>
           <NoteText note={note} styles={styles} />
-          <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={index + 1} pinned={isPinnedNote(note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onCopy={onCopy} onSetPriority={onSetPriority} onTogglePin={onTogglePin} onDelete={onDelete} />
+          <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={index + 1} pinned={isPinnedNote(note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onCopy={onCopy} onCopyText={onCopyText} onSetPriority={onSetPriority} onTogglePin={onTogglePin} onDelete={onDelete} />
         </View>
       ))}
     </View>
@@ -35,20 +36,20 @@ export function NoteList({ notes, onEdit, onMove, onCopy, onSetPriority, onToggl
 
 function NoteText({ note, styles }: { note: FlatNote; styles: ReturnType<typeof createStyles> }) {
   const historyNote = isHistoryPath(note.path) ? parseHistoryNote(note.note) : null;
-  if (!historyNote) return <Text style={styles.text}>{note.note}</Text>;
+  if (!historyNote) return <Text selectable style={styles.text}>{note.note}</Text>;
 
   return (
     <View style={styles.historyTextBlock}>
-      <Text style={styles.historyPrimary}>{historyNote.primary}</Text>
+      <Text selectable style={styles.historyPrimary}>{historyNote.primary}</Text>
       <View style={styles.historyMetaRow}>
-        {historyNote.event ? <Text style={styles.historyEvent}>{formatHistoryEvent(historyNote.event)}</Text> : null}
-        <Text style={styles.historyMeta}>{historyNote.metadata.join(' · ')}</Text>
+        {historyNote.event ? <Text selectable style={styles.historyEvent}>{formatHistoryEvent(historyNote.event)}</Text> : null}
+        <Text selectable style={styles.historyMeta}>{historyNote.metadata.join(' · ')}</Text>
       </View>
     </View>
   );
 }
 
-function NoteActionsDropdown({ note, noteCount, currentOrder, pinned, colors, styles, onEdit, onMove, onCopy, onSetPriority, onTogglePin, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; pinned: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onTogglePin: (note: FlatNote) => void; onDelete: (note: FlatNote) => void }) {
+function NoteActionsDropdown({ note, noteCount, currentOrder, pinned, colors, styles, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; pinned: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onCopyText: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onTogglePin: (note: FlatNote) => void; onDelete: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
@@ -87,6 +88,10 @@ function NoteActionsDropdown({ note, noteCount, currentOrder, pinned, colors, st
             <Icon name="git-branch-outline" size={15} color={colors.ink} />
             <Text style={styles.dropdownItemText}>Move</Text>
           </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Copy note text" onPress={() => { close(); onCopyText(note); }} style={styles.dropdownItem}>
+            <Icon name="copy-outline" size={15} color={colors.ink} />
+            <Text style={styles.dropdownItemText}>Copy text</Text>
+          </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Change note order" onPress={() => setPriorityOpen((current) => !current)} style={styles.dropdownItem}>
             <Icon name="albums-outline" size={15} color={colors.ink} />
             <Text style={styles.dropdownItemText}>Order</Text>
@@ -113,7 +118,7 @@ function NoteActionsDropdown({ note, noteCount, currentOrder, pinned, colors, st
           </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Copy note" onPress={() => { close(); onCopy(note); }} style={styles.dropdownItem}>
             <Icon name="copy-outline" size={15} color={colors.ink} />
-            <Text style={styles.dropdownItemText}>Copy</Text>
+            <Text style={styles.dropdownItemText}>Copy to category</Text>
           </Pressable>
         </View>
       ) : null}

@@ -9,7 +9,7 @@ import { AiNotificationsPanel } from './src/features/ai/AiNotificationsPanel';
 import { AiReviewPanel } from './src/features/ai/AiReviewPanel';
 import { AiWorkspacePanel } from './src/features/ai/AiWorkspacePanel';
 import { CategoryList } from './src/features/categories/CategoryList';
-import { countCategoryContents, createRootCategory, createSubcategory, deleteCategory, formatPath, getCategoryItems, listChildCategories, renameCategory, setCategoryPriority } from './src/features/categories/categoryTree';
+import { copyCategory, countCategoryContents, createRootCategory, createSubcategory, deleteCategory, formatPath, getCategoryItems, listChildCategories, renameCategory, setCategoryPriority } from './src/features/categories/categoryTree';
 import { TextPromptModal } from './src/features/editor/TextPromptModal';
 import { NoteEditorModal } from './src/features/editor/NoteEditorModal';
 import { MoveCopyModal } from './src/features/notes/MoveCopyModal';
@@ -17,6 +17,7 @@ import { NoteList } from './src/features/notes/NoteList';
 import { addNote, appendHistoryNote, copyNote, deleteNote, editNote, formatAddedNoteHistory, formatHistoryPath, formatHistoryTime, HISTORY_CATEGORY, listNotesAtPath, moveNote, setNotePriority } from './src/features/notes/noteMutations';
 import { removePinnedNote, removePinnedNotesInPath, replacePinnedNote, replacePinnedNotesInPath, sortPinnedNotesFirst, togglePinnedNote } from './src/features/notes/pinnedNotes';
 import { SearchPanel } from './src/features/search/SearchPanel';
+import { copyText } from './src/features/settings/clipboard';
 import { SettingsPanel } from './src/features/settings/SettingsPanel';
 import { useNotesSync } from './src/features/sync/useNotesSync';
 import { WorkspaceBoard } from './src/features/workspace/WorkspaceBoard';
@@ -30,6 +31,7 @@ import { Icon } from './src/shared/ui/Icon';
 
 type ModalMode = 'root' | 'subcategory' | 'rename' | 'workspace' | 'renameWorkspace' | null;
 type MoveCopyAction = 'move' | 'copy';
+type MoveCopyTarget = { type: 'note'; note: FlatNote } | { type: 'category'; path: CategoryPath } | null;
 type Tab = 'workspace' | 'search' | 'settings' | 'aiChat' | 'ai' | 'aiWorkspace' | 'aiNotifications';
 type DeleteTarget = { type: 'category'; path: CategoryPath } | { type: 'note'; note: FlatNote } | null;
 
@@ -148,6 +150,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [moveVisible, setMoveVisible] = useState(false);
   const [moveCopyAction, setMoveCopyAction] = useState<MoveCopyAction>('move');
+  const [moveCopyTarget, setMoveCopyTarget] = useState<MoveCopyTarget>(null);
   const [boardTopActionsVisible, setBoardTopActionsVisible] = useState(true);
   const runningAutomationKey = useRef<string | null>(null);
   const fileAutomationRunKey = useRef<string | null>(null);
@@ -258,7 +261,14 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
 
   function openMoveCopy(note: FlatNote, action: MoveCopyAction) {
     setSelectedNote(note);
+    setMoveCopyTarget({ type: 'note', note });
     setMoveCopyAction(action);
+    setMoveVisible(true);
+  }
+
+  function openCategoryCopy(categoryPath: CategoryPath) {
+    setMoveCopyTarget({ type: 'category', path: categoryPath });
+    setMoveCopyAction('copy');
     setMoveVisible(true);
   }
 
@@ -371,6 +381,11 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     return updatePinnedNotes(togglePinnedNote(note, pinnedNotes));
   }
 
+  async function copyNoteText(note: FlatNote) {
+    const copied = await copyText(note.note);
+    if (!copied) setError('Clipboard copy is not available on this device.');
+  }
+
   async function toggleWorkspaceCategory(categoryPath: CategoryPath) {
     const selected = activeWorkspace?.selectedCategoryPaths ?? [];
     const key = categoryPath.join('\u001f');
@@ -379,8 +394,8 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     return updateSelectedCategoryPaths(nextSelected);
   }
 
-  async function setWorkspaceCategoryPriority(categoryPath: CategoryPath, priority: number) {
-    const selected = activeWorkspace?.selectedCategoryPaths ?? [];
+  async function setWorkspaceCategoryPriority(categoryPath: CategoryPath, priority: number, visibleCategoryPaths?: CategoryPath[]) {
+    const selected = visibleCategoryPaths?.length ? visibleCategoryPaths : activeWorkspace?.selectedCategoryPaths ?? [];
     const key = categoryPath.join('\u001f');
     const withoutCategory = selected.filter((item) => item.join('\u001f') !== key);
     const insertionIndex = Math.max(0, Math.min(priority - 1, withoutCategory.length));
@@ -487,11 +502,13 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onSetSubcategoryPriority={setSubcategoryOrderPriority}
                   onAddNote={addBoardNote}
                   onCreateSubcategory={(categoryPath) => { setPromptPath(categoryPath); setPromptMode('subcategory'); }}
+                  onCopyCategory={openCategoryCopy}
                   onRenameCategory={(categoryPath) => { setPath(categoryPath); setPromptMode('rename'); }}
                   onDeleteCategory={(categoryPath) => setDeleteTarget({ type: 'category', path: categoryPath })}
                   onEditNote={(note) => { setSelectedNote(note); setEditorMode('edit'); }}
                   onMoveNote={(note) => openMoveCopy(note, 'move')}
                   onCopyNote={(note) => openMoveCopy(note, 'copy')}
+                  onCopyNoteText={(note) => { copyNoteText(note).catch(() => setError('Clipboard copy failed.')); }}
                   onSetNotePriority={setNoteOrderPriority}
                   onToggleNotePin={toggleNotePin}
                   onDeleteNote={confirmDeleteNote}
@@ -518,6 +535,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     onSubcategory={() => { setPromptPath(path); setPromptMode('subcategory'); }}
                     onRename={() => setPromptMode('rename')}
                     onDelete={confirmDeleteCategory}
+                    onCopy={() => openCategoryCopy(path)}
                   />
                   {childCategories.length ? <CategoryList categories={childCategories} onSelect={setPath} /> : null}
                   {notes.length ? (
@@ -526,6 +544,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                       onEdit={(note) => { setSelectedNote(note); setEditorMode('edit'); }}
                       onMove={(note) => openMoveCopy(note, 'move')}
                       onCopy={(note) => openMoveCopy(note, 'copy')}
+                      onCopyText={(note) => { copyNoteText(note).catch(() => setError('Clipboard copy failed.')); }}
                       onSetPriority={setNoteOrderPriority}
                       onTogglePin={toggleNotePin}
                       onDelete={confirmDeleteNote}
@@ -602,18 +621,32 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
       <MoveCopyModal
         visible={moveVisible}
         action={moveCopyAction}
+        itemType={moveCopyTarget?.type ?? 'note'}
         data={data}
         pinnedPaths={activeWorkspace?.pinnedCategoryPaths ?? []}
-        onClose={() => { setMoveVisible(false); setSelectedNote(null); }}
+        onClose={() => { setMoveVisible(false); setSelectedNote(null); setMoveCopyTarget(null); }}
         onTogglePin={togglePinnedMoveCopyCategory}
         onResetPins={() => updatePinnedCategoryPaths([])}
         onMove={async (destination) => {
-          if (!selectedNote) return false;
+          if (moveCopyTarget?.type !== 'note') return false;
+          const selectedNote = moveCopyTarget.note;
           const ok = await commitWithHistory(moveNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index), `${selectedNote.note} moved - ${formatHistoryPath(destination)} - ${formatHistoryTime()} - Event: NOTE_MOVED - From: ${formatHistoryPath(selectedNote.path)}`);
           if (ok) await updatePinnedNotes(removePinnedNote(selectedNote, pinnedNotes));
           return ok;
         }}
-        onCopy={(destination) => selectedNote ? commitWithHistory(copyNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index), `${selectedNote.note} copied - ${formatHistoryPath(destination)} - ${formatHistoryTime()} - Event: NOTE_COPIED - From: ${formatHistoryPath(selectedNote.path)}`) : false}
+        onCopy={(destination) => {
+          if (moveCopyTarget?.type === 'note') {
+            const selectedNote = moveCopyTarget.note;
+            return commitWithHistory(copyNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index), `${selectedNote.note} copied - ${formatHistoryPath(destination)} - ${formatHistoryTime()} - Event: NOTE_COPIED - From: ${formatHistoryPath(selectedNote.path)}`);
+          }
+          if (moveCopyTarget?.type === 'category') {
+            const sourcePath = moveCopyTarget.path;
+            const result = copyCategory(data, sourcePath, destination);
+            const copiedPath = result.ok ? result.path : destination;
+            return commitWithHistory(result, `${formatHistoryPath(sourcePath)} category copied - ${formatHistoryPath(copiedPath)} - ${formatHistoryTime()} - Event: CATEGORY_COPIED - From: ${formatHistoryPath(sourcePath)}`);
+          }
+          return false;
+        }}
       />
       <ConfirmModal
         visible={deleteTarget !== null}
@@ -685,11 +718,12 @@ function PanelHeader({ title, colors, styles, onBack }: { title: string; colors:
   );
 }
 
-function ActionGrid({ styles, onAddNote, onSubcategory, onRename, onDelete }: { styles: ReturnType<typeof createStyles>; onAddNote: () => void; onSubcategory: () => void; onRename: () => void; onDelete: () => void }) {
+function ActionGrid({ styles, onAddNote, onSubcategory, onCopy, onRename, onDelete }: { styles: ReturnType<typeof createStyles>; onAddNote: () => void; onSubcategory: () => void; onCopy: () => void; onRename: () => void; onDelete: () => void }) {
   return (
     <View style={styles.actionGrid}>
       <Button label="Note" icon="add" onPress={onAddNote} style={styles.gridButton} />
       <Button label="Folder" icon="folder-outline" variant="secondary" onPress={onSubcategory} style={styles.gridButton} />
+      <Button label="Copy" icon="copy-outline" variant="secondary" onPress={onCopy} style={styles.gridButton} />
       <Button label="Rename" icon="create-outline" variant="secondary" onPress={onRename} style={styles.gridButton} />
       <Button label="Delete" icon="trash-outline" variant="danger" onPress={onDelete} style={styles.gridButton} />
     </View>

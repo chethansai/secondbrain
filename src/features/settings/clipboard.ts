@@ -8,3 +8,11 @@ export async function copyText(text: string) {
 
 	return false;
 }
+
+export async function readText() {
+	if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+		return navigator.clipboard.readText();
+	}
+
+	return '';
+}

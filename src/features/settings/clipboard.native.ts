@@ -1,4 +1,10 @@
+import * as Clipboard from 'expo-clipboard';
+
 export async function copyText(text: string) {
-  void text;
-  return false;
+  await Clipboard.setStringAsync(text);
+  return true;
+}
+
+export async function readText() {
+  return Clipboard.getStringAsync();
 }

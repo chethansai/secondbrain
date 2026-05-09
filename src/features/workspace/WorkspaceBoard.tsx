@@ -36,15 +36,17 @@ type Props = {
   onOpenCategory: (path: CategoryPath) => void;
   onCreateRootCategory: () => void;
   onToggleCategory: (path: CategoryPath) => void;
-  onSetCategoryPriority: (path: CategoryPath, priority: number) => void;
+  onSetCategoryPriority: (path: CategoryPath, priority: number, visibleCategoryPaths?: CategoryPath[]) => void;
   onSetSubcategoryPriority: (path: CategoryPath, priority: number) => void;
   onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean;
   onCreateSubcategory: (path: CategoryPath) => void;
+  onCopyCategory: (path: CategoryPath) => void;
   onRenameCategory: (path: CategoryPath) => void;
   onDeleteCategory: (path: CategoryPath) => void;
   onEditNote: (note: FlatNote) => void;
   onMoveNote: (note: FlatNote) => void;
   onCopyNote: (note: FlatNote) => void;
+  onCopyNoteText: (note: FlatNote) => void;
   onSetNotePriority: (note: FlatNote, priority: number) => void;
   onToggleNotePin: (note: FlatNote) => void;
   onDeleteNote: (note: FlatNote) => void;
@@ -80,11 +82,13 @@ export function WorkspaceBoard({
   onSetSubcategoryPriority,
   onAddNote,
   onCreateSubcategory,
+  onCopyCategory,
   onRenameCategory,
   onDeleteCategory,
   onEditNote,
   onMoveNote,
   onCopyNote,
+  onCopyNoteText,
   onSetNotePriority,
   onToggleNotePin,
   onDeleteNote,
@@ -119,7 +123,7 @@ export function WorkspaceBoard({
       if (!categorySearchText) return true;
       return category.name.toLowerCase().includes(categorySearchText) || formatPath(category.path).toLowerCase().includes(categorySearchText);
     })
-    .map((category, index) => ({ category, index, selectedIndex: findSelectedCategoryIndex(selectedPaths, rawCategoriesByKey, category) }))
+    .map((category, index) => ({ category, index, selectedIndex: findVisibleCategoryIndex(boardCategories, category) }))
     .sort((left, right) => {
       const leftSelected = left.selectedIndex >= 0;
       const rightSelected = right.selectedIndex >= 0;
@@ -131,7 +135,7 @@ export function WorkspaceBoard({
 
   function setCategoryPriority(path: CategoryPath, priority: number) {
     setPriorityMenuKey(null);
-    onSetCategoryPriority(path, priority);
+    onSetCategoryPriority(path, priority, boardCategories.map((category) => category.path));
   }
 
   function closeHeaderMenus() {
@@ -364,7 +368,7 @@ export function WorkspaceBoard({
                 const selected = selectedIndex >= 0;
                 const priority = selected ? selectedIndex + 1 : prioritizedCategories.length + 1;
                 const menuOpen = priorityMenuKey === key;
-                const priorityOptions = Array.from({ length: Math.max(selectedPaths.length, 1) + (selected ? 0 : 1) }, (_, index) => index + 1);
+                const priorityOptions = Array.from({ length: Math.max(prioritizedCategories.length, 1) + (selected ? 0 : 1) }, (_, index) => index + 1);
                 return (
                   <View key={key} style={[styles.paneCategoryRow, selected && styles.paneCategoryRowSelected, menuOpen && styles.paneCategoryRowMenuOpen]}>
                     <Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${formatPath(category.path)}`} onPress={() => { setPriorityMenuKey(null); onToggleCategory(category.path); }} style={styles.paneCategoryMain}>
@@ -422,12 +426,14 @@ export function WorkspaceBoard({
                   onOpenCategory={onOpenCategory}
                   onAddNote={onAddNote}
                   onCreateSubcategory={onCreateSubcategory}
+                  onCopyCategory={onCopyCategory}
                   onSetSubcategoryPriority={onSetSubcategoryPriority}
                   onRenameCategory={onRenameCategory}
                   onDeleteCategory={onDeleteCategory}
                   onEditNote={onEditNote}
                   onMoveNote={onMoveNote}
                   onCopyNote={onCopyNote}
+                  onCopyNoteText={onCopyNoteText}
                   onSetNotePriority={onSetNotePriority}
                   onToggleNotePin={onToggleNotePin}
                   onDeleteNote={onDeleteNote}
@@ -522,12 +528,8 @@ function removeDescendantCategories(categories: CategorySummary[]) {
   return categories.filter((category) => !categories.some((candidate) => isAncestorPath(candidate.path, category.path)));
 }
 
-function findSelectedCategoryIndex(selectedPaths: CategoryPath[], categoriesByKey: Map<string, CategorySummary>, category: CategorySummary) {
-  return selectedPaths.findIndex((path) => {
-    if (pathKey(path) === pathKey(category.path)) return true;
-    const selectedCategory = categoriesByKey.get(pathKey(path));
-    return selectedCategory?.name === category.name;
-  });
+function findVisibleCategoryIndex(categories: CategorySummary[], category: CategorySummary) {
+  return categories.findIndex((item) => pathKey(item.path) === pathKey(category.path) || item.name === category.name);
 }
 
 function compareCategoriesAlphabetically(left: CategorySummary, right: CategorySummary) {

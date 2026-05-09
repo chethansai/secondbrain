@@ -17,6 +17,7 @@ import { EmptyState } from '../../shared/ui/EmptyState';
 import { Icon } from '../../shared/ui/Icon';
 import { CategoryList } from '../categories/CategoryList';
 import { NoteList } from '../notes/NoteList';
+import { copyText } from '../settings/clipboard';
 
 type ModalMode = 'root' | 'subcategory' | 'rename' | null;
 type MoveCopyAction = 'move' | 'copy';
@@ -181,9 +182,10 @@ export function AiWorkspacePanel() {
     updateSelectedCategoryPaths(exists ? selectedCategoryPaths.filter((item) => pathKey(item) !== key) : [...selectedCategoryPaths, categoryPath]);
   }
 
-  function setWorkspaceCategoryPriority(categoryPath: CategoryPath, priority: number) {
+  function setWorkspaceCategoryPriority(categoryPath: CategoryPath, priority: number, visibleCategoryPaths?: CategoryPath[]) {
     const key = pathKey(categoryPath);
-    const withoutCategory = selectedCategoryPaths.filter((item) => pathKey(item) !== key);
+    const selected = visibleCategoryPaths?.length ? visibleCategoryPaths : selectedCategoryPaths;
+    const withoutCategory = selected.filter((item) => pathKey(item) !== key);
     const insertionIndex = Math.max(0, Math.min(priority - 1, withoutCategory.length));
     updateSelectedCategoryPaths([...withoutCategory.slice(0, insertionIndex), categoryPath, ...withoutCategory.slice(insertionIndex)]);
   }
@@ -213,6 +215,11 @@ export function AiWorkspacePanel() {
 
   function toggleNotePin(note: FlatNote) {
     updatePinnedNotes(togglePinnedNote(note, pinnedNotes));
+  }
+
+  async function copyNoteText(note: FlatNote) {
+    const copied = await copyText(note.note);
+    if (!copied) setError('Clipboard copy is not available on this device.');
   }
 
   function replaceWorkspacePinnedCategoryPath(oldPath: CategoryPath, newPath: CategoryPath) {
@@ -314,11 +321,13 @@ export function AiWorkspacePanel() {
           onSetSubcategoryPriority={setSubcategoryOrderPriority}
           onAddNote={addWorkspaceNote}
           onCreateSubcategory={(categoryPath) => { setPromptPath(categoryPath); setPromptMode('subcategory'); }}
+          onCopyCategory={() => undefined}
           onRenameCategory={(categoryPath) => { setPath(categoryPath); setPromptMode('rename'); }}
           onDeleteCategory={(categoryPath) => setDeleteTarget({ type: 'category', path: categoryPath })}
           onEditNote={(note) => { setSelectedNote(note); setEditorMode('edit'); }}
           onMoveNote={(note) => openMoveCopy(note, 'move')}
           onCopyNote={(note) => openMoveCopy(note, 'copy')}
+          onCopyNoteText={(note) => { copyNoteText(note).catch(() => setError('Clipboard copy failed.')); }}
           onSetNotePriority={setNoteOrderPriority}
           onToggleNotePin={toggleNotePin}
           onDeleteNote={(note) => setDeleteTarget({ type: 'note', note })}
@@ -349,6 +358,7 @@ export function AiWorkspacePanel() {
               onEdit={(note) => { setSelectedNote(note); setEditorMode('edit'); }}
               onMove={(note) => openMoveCopy(note, 'move')}
               onCopy={(note) => openMoveCopy(note, 'copy')}
+              onCopyText={(note) => { copyNoteText(note).catch(() => setError('Clipboard copy failed.')); }}
               onSetPriority={setNoteOrderPriority}
               onTogglePin={toggleNotePin}
               onDelete={(note) => setDeleteTarget({ type: 'note', note })}

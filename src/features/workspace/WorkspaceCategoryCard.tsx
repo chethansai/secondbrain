@@ -22,12 +22,14 @@ type Props = {
   onOpenCategory: (path: CategoryPath) => void;
   onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean;
   onCreateSubcategory: (path: CategoryPath) => void;
+  onCopyCategory: (path: CategoryPath) => void;
   onSetSubcategoryPriority: (path: CategoryPath, priority: number) => void;
   onRenameCategory: (path: CategoryPath) => void;
   onDeleteCategory: (path: CategoryPath) => void;
   onEditNote: (note: FlatNote) => void;
   onMoveNote: (note: FlatNote) => void;
   onCopyNote: (note: FlatNote) => void;
+  onCopyNoteText: (note: FlatNote) => void;
   onSetNotePriority: (note: FlatNote, priority: number) => void;
   onToggleNotePin: (note: FlatNote) => void;
   onDeleteNote: (note: FlatNote) => void;
@@ -51,12 +53,14 @@ export function WorkspaceCategoryCard({
   onOpenCategory,
   onAddNote,
   onCreateSubcategory,
+  onCopyCategory,
   onSetSubcategoryPriority,
   onRenameCategory,
   onDeleteCategory,
   onEditNote,
   onMoveNote,
   onCopyNote,
+  onCopyNoteText,
   onSetNotePriority,
   onToggleNotePin,
   onDeleteNote,
@@ -136,6 +140,7 @@ export function WorkspaceCategoryCard({
         <View style={styles.actionsPanel}>
           <Button label="Rename" icon="create-outline" variant="secondary" onPress={() => { setActionsOpen(false); onRenameCategory(category.path); }} style={styles.panelButton} />
           <Button label="Folder" icon="folder-outline" variant="secondary" onPress={() => { setActionsOpen(false); onCreateSubcategory(category.path); }} style={styles.panelButton} />
+          <Button label="Copy" icon="copy-outline" variant="secondary" onPress={() => { setActionsOpen(false); onCopyCategory(category.path); }} style={styles.panelButton} />
           <Button label="Delete" icon="trash-outline" variant="danger" onPress={() => { setActionsOpen(false); onDeleteCategory(category.path); }} style={styles.panelButton} />
         </View>
       ) : null}
@@ -198,12 +203,14 @@ export function WorkspaceCategoryCard({
                   onOpenCategory={onOpenCategory}
                   onAddNote={onAddNote}
                   onCreateSubcategory={onCreateSubcategory}
+                  onCopyCategory={onCopyCategory}
                   onSetSubcategoryPriority={onSetSubcategoryPriority}
                   onRenameCategory={onRenameCategory}
                   onDeleteCategory={onDeleteCategory}
                   onEditNote={onEditNote}
                   onMoveNote={onMoveNote}
                   onCopyNote={onCopyNote}
+                  onCopyNoteText={onCopyNoteText}
                   onSetNotePriority={onSetNotePriority}
                   onToggleNotePin={onToggleNotePin}
                   onDeleteNote={onDeleteNote}
@@ -213,7 +220,7 @@ export function WorkspaceCategoryCard({
           }
 
           return (
-            <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={previewItems.length} currentOrder={index + 1} stackOrder={stackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} />
+            <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={previewItems.length} currentOrder={index + 1} stackOrder={stackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onCopyText={onCopyNoteText} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} />
           );
         }) : !adding ? (
           <View style={styles.emptyPreview}><Text style={styles.emptyPreviewText}>No notes yet.</Text></View>
@@ -223,7 +230,7 @@ export function WorkspaceCategoryCard({
   );
 }
 
-function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, pinnedNotes, colors, styles, onToggleCategory, onOpenCategory, onAddNote, onCreateSubcategory, onSetSubcategoryPriority, onRenameCategory, onDeleteCategory, onEditNote, onMoveNote, onCopyNote, onSetNotePriority, onToggleNotePin, onDeleteNote }: { category: CategorySummary; depth: number; itemCount: number; currentOrder: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; pinnedNotes: PinnedNoteRef[]; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean; onCreateSubcategory: (path: CategoryPath) => void; onSetSubcategoryPriority: (path: CategoryPath, priority: number) => void; onRenameCategory: (path: CategoryPath) => void; onDeleteCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onToggleNotePin: (note: FlatNote) => void; onDeleteNote: (note: FlatNote) => void }) {
+function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, pinnedNotes, colors, styles, onToggleCategory, onOpenCategory, onAddNote, onCreateSubcategory, onCopyCategory, onSetSubcategoryPriority, onRenameCategory, onDeleteCategory, onEditNote, onMoveNote, onCopyNote, onCopyNoteText, onSetNotePriority, onToggleNotePin, onDeleteNote }: { category: CategorySummary; depth: number; itemCount: number; currentOrder: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; pinnedNotes: PinnedNoteRef[]; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean; onCreateSubcategory: (path: CategoryPath) => void; onCopyCategory: (path: CategoryPath) => void; onSetSubcategoryPriority: (path: CategoryPath, priority: number) => void; onRenameCategory: (path: CategoryPath) => void; onDeleteCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onCopyNoteText: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onToggleNotePin: (note: FlatNote) => void; onDeleteNote: (note: FlatNote) => void }) {
   const [adding, setAdding] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -294,6 +301,7 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
         <View style={[styles.subcategoryActionsPanel, { marginLeft: indent + styles.subcategoryIndent.width }]}> 
           <Button label="Rename" icon="create-outline" variant="secondary" onPress={() => { setActionsOpen(false); onRenameCategory(category.path); }} style={styles.subcategoryPanelButton} />
           <Button label="Folder" icon="folder-outline" variant="secondary" onPress={() => { setActionsOpen(false); onCreateSubcategory(category.path); }} style={styles.subcategoryPanelButton} />
+          <Button label="Copy" icon="copy-outline" variant="secondary" onPress={() => { setActionsOpen(false); onCopyCategory(category.path); }} style={styles.subcategoryPanelButton} />
           <Button label="Order" icon="albums-outline" variant="secondary" onPress={() => setPriorityOpen((current) => !current)} style={styles.subcategoryPanelButton} />
           <Button label="Delete" icon="trash-outline" variant="danger" onPress={() => { setActionsOpen(false); onDeleteCategory(category.path); }} style={styles.subcategoryPanelButton} />
         </View>
@@ -356,12 +364,14 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
                   onOpenCategory={onOpenCategory}
                   onAddNote={onAddNote}
                   onCreateSubcategory={onCreateSubcategory}
+                  onCopyCategory={onCopyCategory}
                   onSetSubcategoryPriority={onSetSubcategoryPriority}
                   onRenameCategory={onRenameCategory}
                   onDeleteCategory={onDeleteCategory}
                   onEditNote={onEditNote}
                   onMoveNote={onMoveNote}
                   onCopyNote={onCopyNote}
+                  onCopyNoteText={onCopyNoteText}
                   onSetNotePriority={onSetNotePriority}
                   onToggleNotePin={onToggleNotePin}
                   onDeleteNote={onDeleteNote}
@@ -370,7 +380,7 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
             }
 
             return (
-              <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={childItems.length} currentOrder={index + 1} stackOrder={childStackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} />
+              <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={childItems.length} currentOrder={index + 1} stackOrder={childStackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onCopyText={onCopyNoteText} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} />
             );
           })}
         </View>
@@ -379,7 +389,7 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
   );
 }
 
-function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinned, colors, styles, onEdit, onMove, onCopy, onSetPriority, onTogglePin, onDelete }: { note: FlatNote; itemCount: number; currentOrder: number; stackOrder: number; pinned: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onTogglePin: (note: FlatNote) => void; onDelete: (note: FlatNote) => void }) {
+function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinned, colors, styles, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete }: { note: FlatNote; itemCount: number; currentOrder: number; stackOrder: number; pinned: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onCopyText: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onTogglePin: (note: FlatNote) => void; onDelete: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
@@ -399,12 +409,12 @@ function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinne
     <View style={[styles.previewNote, open && styles.previewNoteMenuOpen, { zIndex: open ? 1000 : stackOrder }]}>
       {historyNote ? (
         <View style={styles.previewHistoryBlock}>
-          <Text style={styles.previewHistoryPrimary} numberOfLines={3}>{historyNote.primary}</Text>
-          <Text style={styles.previewHistoryMeta} numberOfLines={2}>{[historyNote.event ? formatHistoryEvent(historyNote.event) : null, ...historyNote.metadata].filter(Boolean).join(' · ')}</Text>
+          <Text selectable style={styles.previewHistoryPrimary} numberOfLines={3}>{historyNote.primary}</Text>
+          <Text selectable style={styles.previewHistoryMeta} numberOfLines={2}>{[historyNote.event ? formatHistoryEvent(historyNote.event) : null, ...historyNote.metadata].filter(Boolean).join(' · ')}</Text>
         </View>
       ) : (
         <ScrollView style={styles.previewTextScroller} nestedScrollEnabled showsVerticalScrollIndicator>
-          <Text style={styles.previewText}>{note.note}</Text>
+          <Text selectable style={styles.previewText}>{note.note}</Text>
         </ScrollView>
       )}
       <Pressable accessibilityRole="button" accessibilityLabel={pinned ? 'Pinned note actions' : 'Note actions'} onPress={() => setOpen((current) => !current)} style={[styles.previewMenuButton, pinned && styles.previewMenuButtonPinned]}>
@@ -415,6 +425,7 @@ function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinne
           <Pressable onPress={() => { setOpen(false); onTogglePin(note); }} style={[styles.previewAction, pinned && styles.previewActionPinnedRow]}><Text style={[styles.previewActionText, pinned && styles.previewActionPinnedText]}>{pinned ? 'Unpin' : 'Pin'}</Text></Pressable>
           <Pressable onPress={() => { setOpen(false); onEdit(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Edit</Text></Pressable>
           <Pressable onPress={() => { setOpen(false); onMove(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Move</Text></Pressable>
+          <Pressable onPress={() => { setOpen(false); onCopyText(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Copy text</Text></Pressable>
           <Pressable onPress={() => setPriorityOpen((current) => !current)} style={styles.previewAction}><Text style={styles.previewActionText}>Order</Text></Pressable>
           {priorityOpen ? (
             <View style={styles.previewPriorityPicker}>
@@ -432,7 +443,7 @@ function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinne
             </View>
           ) : null}
           <Pressable onPress={() => { setOpen(false); onDelete(note); }} style={styles.previewAction}><Text style={styles.previewActionDanger}>Delete</Text></Pressable>
-          <Pressable onPress={() => { setOpen(false); onCopy(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Copy</Text></Pressable>
+          <Pressable onPress={() => { setOpen(false); onCopy(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Copy to category</Text></Pressable>
         </View>
       ) : null}
     </View>

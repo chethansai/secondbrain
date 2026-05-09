@@ -6,6 +6,7 @@ import { CategoryPicker } from '../categories/CategoryPicker';
 type Props = {
   visible: boolean;
   action: 'move' | 'copy';
+  itemType?: 'note' | 'category';
   data: NotesData;
   pinnedPaths: CategoryPath[];
   onClose: () => void;
@@ -15,7 +16,7 @@ type Props = {
   onCopy: (path: CategoryPath) => Promise<boolean> | boolean;
 };
 
-export function MoveCopyModal({ visible, action, data, pinnedPaths, onClose, onTogglePin, onResetPins, onMove, onCopy }: Props) {
+export function MoveCopyModal({ visible, action, itemType = 'note', data, pinnedPaths, onClose, onTogglePin, onResetPins, onMove, onCopy }: Props) {
   const [selectedPath, setSelectedPath] = useState<CategoryPath | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -36,8 +37,13 @@ export function MoveCopyModal({ visible, action, data, pinnedPaths, onClose, onT
   }
 
   return (
-    <ModalShell visible={visible} title={action === 'move' ? 'Move to category' : 'Copy to category'} onClose={onClose}>
+    <ModalShell visible={visible} title={createTitle(action, itemType)} onClose={onClose}>
       <CategoryPicker data={data} selectedPath={selectedPath} onSelect={run} disabled={busy} pinnedPaths={pinnedPaths} onTogglePin={onTogglePin} onResetPins={onResetPins} />
     </ModalShell>
   );
+}
+
+function createTitle(action: 'move' | 'copy', itemType: 'note' | 'category') {
+  const verb = action === 'move' ? 'Move' : 'Copy';
+  return `${verb} ${itemType} to category`;
 }

@@ -367,6 +367,14 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-09: Stabilized workspace card scrolling handoff with active local board changes. Decision: wire note text copy callbacks through AI workspace detail notes, ignore generated Expo local device state, and keep the broader in-progress category copy/order work typecheck-clean before the required commit and push.
+
+- 2026-05-09: Fixed workspace priority numbering redraw. Decision: make the shown-categories priority picker derive its current numbers from the same rendered board category list, pass that visible order into the priority handler, and persist root card priority changes against that visible list so selected numbers redraw to the expected card positions in both main and AI workspace boards.
+
+- 2026-05-09: Implemented subcategory order controls in workspace cards. Decision: add an `Order` action to subcategory star/options menus, reuse the note-style numeric picker, and persist nested category ordering with a focused category mutation while keeping root card order managed by workspace selection priority.
+
+- 2026-05-09: Implemented note pinning within the star action control. Decision: keep the existing pinned-note metadata and sorting behavior, but make the note action star show pinned state and place the pin/unpin toggle as the first action inside that star menu in both category detail notes and workspace preview notes.
+
 - 2026-05-09: Implemented scrollable long notes inside workspace category cards. Decision: keep each note preview visually capped at four text lines while replacing clipped preview text with a nested scroll area so longer note content can be read fully in place.
 
 - 2026-05-09: Cleaned up workspace category-card ordering wiring after the floating category save commit. Decision: preserve the in-progress subcategory order UI already present in the workspace card, pass the existing subcategory priority callback through the board, use an existing icon token, and keep `npm run typecheck` clean before the follow-up push.

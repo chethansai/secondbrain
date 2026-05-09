@@ -1,5 +1,9 @@
 import { CategoryPath, CategorySummary, MutationResult, NoteItem, NotesData } from '../../shared/types/notes';
 
+type CategoryCopyResult =
+  | { ok: true; data: NotesData; path: CategoryPath }
+  | { ok: false; code: string; message: string };
+
 export function cloneData(data: NotesData): NotesData {
   return JSON.parse(JSON.stringify(data)) as NotesData;
 }
@@ -140,6 +144,28 @@ export function deleteCategory(data: NotesData, path: CategoryPath): MutationRes
   parent.splice(index, 1);
   if (!hasNestedCategoryNamed(next, name)) delete next[name];
   return { ok: true, data: next };
+}
+
+export function copyCategory(data: NotesData, sourcePath: CategoryPath, destinationPath: CategoryPath): CategoryCopyResult {
+  const sourceName = sourcePath[sourcePath.length - 1];
+  if (!sourceName) return copyFailure('path_not_found', 'Choose a category to copy.');
+  const next = cloneData(data);
+  const sourceItems = getCategoryItems(next, sourcePath);
+  const destination = getCategoryItems(next, destinationPath);
+  if (!sourceItems || !destination) return copyFailure('path_not_found', 'Source or destination category no longer exists.');
+  if (startsWithPath(destinationPath, sourcePath)) return copyFailure('invalid_destination', 'Choose a category outside the copied category.');
+
+  const usedNames = collectCategoryNames(next);
+  const destinationChildNames = new Set(destination.flatMap((item) => isCategoryNode(item) ? [Object.keys(item)[0]] : []));
+  const copyName = createUniqueCopyName(sourceName, new Set([...usedNames, ...destinationChildNames]));
+  usedNames.add(copyName);
+  const copiedItems = copyItemsWithUniqueCategoryNames(sourceItems, usedNames);
+  destination.push({ [copyName]: copiedItems });
+  next[copyName] = cloneItems(copiedItems);
+  addStandaloneCopiedCategories(next, copiedItems);
+  syncStandaloneCategory(next, destinationPath);
+  syncStandaloneCategory(next, [...destinationPath, copyName]);
+  return { ok: true, data: next, path: [...destinationPath, copyName] };
 }
 
 export function setCategoryPriority(data: NotesData, path: CategoryPath, priority: number): MutationResult {
@@ -329,6 +355,57 @@ function deleteItemsNamed(items: NoteItem[], name: string) {
   }
 }
 
+function copyItemsWithUniqueCategoryNames(items: NoteItem[], usedNames: Set<string>): NoteItem[] {
+  return items.map((item) => {
+    if (typeof item === 'string') return item;
+    if (!isCategoryNode(item)) return item;
+    const [name, childItems] = Object.entries(item)[0];
+    const copyName = createUniqueCopyName(name, usedNames);
+    usedNames.add(copyName);
+    return { [copyName]: copyItemsWithUniqueCategoryNames(childItems, usedNames) };
+  });
+}
+
+function addStandaloneCopiedCategories(data: NotesData, items: NoteItem[]) {
+  items.forEach((item) => {
+    if (!isCategoryNode(item)) return;
+    const [name, childItems] = Object.entries(item)[0];
+    data[name] = cloneItems(childItems);
+    addStandaloneCopiedCategories(data, childItems);
+  });
+}
+
+function collectCategoryNames(data: NotesData) {
+  const names = new Set(Object.keys(data));
+  Object.values(data).forEach((items) => collectCategoryNamesInItems(items, names));
+  return names;
+}
+
+function collectCategoryNamesInItems(items: NoteItem[], names: Set<string>) {
+  items.forEach((item) => {
+    if (!isCategoryNode(item)) return;
+    const [name, childItems] = Object.entries(item)[0];
+    names.add(name);
+    collectCategoryNamesInItems(childItems, names);
+  });
+}
+
+function createUniqueCopyName(name: string, usedNames: Set<string>) {
+  const baseName = `${name} copy`;
+  if (!usedNames.has(baseName)) return baseName;
+  let suffix = 2;
+  while (usedNames.has(`${baseName} ${suffix}`)) suffix += 1;
+  return `${baseName} ${suffix}`;
+}
+
+function startsWithPath(path: CategoryPath, prefix: CategoryPath) {
+  return prefix.every((segment, index) => path[index] === segment);
+}
+
 function failure(code: string, message: string): MutationResult {
+  return { ok: false, code, message };
+}
+
+function copyFailure(code: string, message: string): CategoryCopyResult {
   return { ok: false, code, message };
 }
