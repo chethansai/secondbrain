@@ -1,13 +1,9 @@
 package com.notes.nativenotetaking.overlay
 
 import android.app.Service
-import android.content.ContentValues
-import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
-import android.database.sqlite.SQLiteDatabase
-import android.database.sqlite.SQLiteOpenHelper
 import android.os.Handler
 import android.os.Build
 import android.os.IBinder
@@ -23,26 +19,18 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.notes.nativenotetaking.MainActivity
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
 class OverlayService : Service() {
   private lateinit var windowManager: WindowManager
+  private val notesStore by lazy { OverlayNotesStore(this) }
   private var buttonView: View? = null
   private var inputView: View? = null
   private var buttonParams: WindowManager.LayoutParams? = null
@@ -172,7 +160,7 @@ class OverlayService : Service() {
   private fun showInput() {
     removeView(inputView)
     val editText = EditText(this).apply {
-      hint = "Add to SEEK"
+      hint = "Add note"
       minLines = 1
       maxLines = 3
       textSize = 16f
@@ -181,18 +169,31 @@ class OverlayService : Service() {
       setSingleLine(false)
       imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
     }
-    val saveButton = Button(this).apply {
-      text = "Save"
-      setOnClickListener { submitInput(editText) }
+    val seekButton = Button(this).apply {
+      text = "SEEK"
+      setOnClickListener { submitInput(editText, listOf(OverlayNotesStore.seekCategoryName)) }
     }
     val closeButton = Button(this).apply {
-      text = "Close"
+      text = "Cancel"
       setOnClickListener { hideInput() }
     }
     val controls = LinearLayout(this).apply {
       orientation = LinearLayout.HORIZONTAL
-      addView(saveButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+      addView(seekButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
       addView(closeButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+    }
+    val chipWrap = LinearLayout(this).apply {
+      orientation = LinearLayout.VERTICAL
+      setPadding(0, dp(8), 0, 0)
+      addView(TextView(this@OverlayService).apply {
+        text = "Loading categories..."
+        textSize = 12f
+        setTextColor(0xff787671.toInt())
+      })
+    }
+    val chipScroll = ScrollView(this).apply {
+      isFillViewport = false
+      addView(chipWrap)
     }
     val container = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
@@ -201,6 +202,7 @@ class OverlayService : Service() {
       elevation = dp(10).toFloat()
       addView(editText, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(controls, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+      addView(chipScroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(172)))
     }
     val frame = FrameLayout(this).apply { addView(container) }
     val width = min(displayBounds().width() - dp(32), dp(340))
@@ -215,14 +217,14 @@ class OverlayService : Service() {
       val source = buttonParams
       x = source?.x ?: dp(16)
       y = max(dp(24), (source?.y ?: dp(120)) - dp(72))
-      clampParams(this, width, dp(150))
+      clampParams(this, width, dp(330))
       softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
     }
 
     editText.setOnEditorActionListener { _, actionId, event ->
       val enterPressed = event?.keyCode == android.view.KeyEvent.KEYCODE_ENTER && event.action == android.view.KeyEvent.ACTION_UP
       if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE || enterPressed) {
-        submitInput(editText)
+        submitInput(editText, listOf(OverlayNotesStore.seekCategoryName))
         true
       } else {
         false
@@ -231,13 +233,89 @@ class OverlayService : Service() {
 
     windowManager.addView(frame, params)
     inputView = frame
+    loadCategoryChips(chipWrap, editText)
     editText.postDelayed({
       editText.requestFocus()
       ContextCompat.getSystemService(this, InputMethodManager::class.java)?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
     }, 120)
   }
 
-  private fun submitInput(editText: EditText) {
+  private fun loadCategoryChips(chipWrap: LinearLayout, editText: EditText) {
+    Thread {
+      try {
+        val categories = notesStore.readCategoryPaths()
+          .filter { it.path != listOf(OverlayNotesStore.seekCategoryName) }
+          .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.label })
+        Handler(Looper.getMainLooper()).post { renderCategoryChips(chipWrap, editText, categories) }
+      } catch (_: Exception) {
+        Handler(Looper.getMainLooper()).post {
+          chipWrap.removeAllViews()
+          chipWrap.addView(TextView(this).apply {
+            text = "Could not load categories."
+            textSize = 12f
+            setTextColor(0xff787671.toInt())
+          })
+        }
+      }
+    }.start()
+  }
+
+  private fun renderCategoryChips(chipWrap: LinearLayout, editText: EditText, categories: List<OverlayNotesStore.CategoryPath>) {
+    chipWrap.removeAllViews()
+    if (categories.isEmpty()) {
+      chipWrap.addView(TextView(this).apply {
+        text = "No other categories."
+        textSize = 12f
+        setTextColor(0xff787671.toInt())
+      })
+      return
+    }
+    categories.chunked(2).forEach { rowCategories ->
+      val row = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(0, 0, 0, dp(6))
+      }
+      rowCategories.forEach { category ->
+        row.addView(createCategoryChip(category, editText), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) })
+      }
+      if (rowCategories.size == 1) row.addView(FrameLayout(this), LinearLayout.LayoutParams(0, 1, 1f))
+      chipWrap.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    }
+  }
+
+  private fun createCategoryChip(category: OverlayNotesStore.CategoryPath, editText: EditText): View {
+    val chip = LinearLayout(this).apply {
+      orientation = LinearLayout.HORIZONTAL
+      gravity = Gravity.CENTER_VERTICAL
+      background = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = dp(18).toFloat()
+        setColor(0xfffafaf9.toInt())
+        setStroke(dp(1), 0xffc8c4be.toInt())
+      }
+    }
+    val label = TextView(this).apply {
+      text = category.label
+      textSize = 12f
+      setTextColor(0xff37352f.toInt())
+      maxLines = 1
+      setPadding(dp(10), dp(8), dp(6), dp(8))
+      setOnClickListener { submitInput(editText, category.path) }
+    }
+    val overflow = TextView(this).apply {
+      text = "⋮"
+      textSize = 18f
+      gravity = Gravity.CENTER
+      setTextColor(0xff787671.toInt())
+      setPadding(dp(6), dp(4), dp(10), dp(4))
+      setOnClickListener { submitInput(editText, category.path) }
+    }
+    chip.addView(label, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+    chip.addView(overflow, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT))
+    return chip
+  }
+
+  private fun submitInput(editText: EditText, path: List<String>) {
     val note = editText.text?.toString()?.trim().orEmpty()
     if (note.isBlank()) {
       Toast.makeText(this, "Note text cannot be empty.", Toast.LENGTH_SHORT).show()
@@ -246,10 +324,9 @@ class OverlayService : Service() {
     editText.isEnabled = false
     Thread {
       try {
-        val data = appendSeekNoteToFirestore(note)
-        writeNotesDataToLocalCache(data)
+        notesStore.appendNote(path, note)
         Handler(Looper.getMainLooper()).post {
-            Toast.makeText(this, "Added to SEEK", Toast.LENGTH_SHORT).show()
+          Toast.makeText(this, "Added to ${path.joinToString(" > ")}", Toast.LENGTH_SHORT).show()
           hideInput()
         }
       } catch (_: Exception) {
@@ -261,124 +338,6 @@ class OverlayService : Service() {
         }
       }
     }.start()
-  }
-
-  private fun appendSeekNoteToFirestore(note: String): JSONObject {
-    val document = readFirestoreDocument()
-    val fields = document.optJSONObject("fields") ?: JSONObject().also { document.put("fields", it) }
-    val dataValue = fields.optJSONObject("data") ?: JSONObject().put("mapValue", JSONObject().put("fields", JSONObject())).also { fields.put("data", it) }
-    val dataFields = dataValue.optJSONObject("mapValue")?.optJSONObject("fields") ?: JSONObject()
-    dataValue.put("mapValue", JSONObject().put("fields", dataFields))
-    appendRootCategoryString(dataFields, seekCategoryName, note)
-    appendRootCategoryString(dataFields, historyCategoryName, formatAddedNoteHistory(note))
-
-    val body = JSONObject().put("fields", JSONObject().put("data", dataValue))
-    val connection = openFirestoreConnection("PATCH")
-    writeJson(connection, body)
-    val responseCode = connection.responseCode
-    if (responseCode !in 200..299) throw IllegalStateException(readResponse(connection))
-    return firestoreDataFieldsToNotesData(dataFields)
-  }
-
-  private fun readFirestoreDocument(): JSONObject {
-    val connection = openFirestoreConnection("GET")
-    val responseCode = connection.responseCode
-    if (responseCode == 404) return JSONObject()
-    if (responseCode !in 200..299) throw IllegalStateException(readResponse(connection))
-    val response = readResponse(connection)
-    return if (response.isBlank()) JSONObject() else JSONObject(response)
-  }
-
-  private fun openFirestoreConnection(method: String): HttpURLConnection {
-    val connection = URL(firestoreDocumentUrl).openConnection() as HttpURLConnection
-    connection.requestMethod = method
-    connection.connectTimeout = 12000
-    connection.readTimeout = 12000
-    connection.setRequestProperty("Content-Type", "application/json")
-    if (method == "PATCH") connection.doOutput = true
-    return connection
-  }
-
-  private fun writeJson(connection: HttpURLConnection, body: JSONObject) {
-    OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
-      writer.write(body.toString())
-    }
-  }
-
-  private fun readResponse(connection: HttpURLConnection): String {
-    val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream ?: connection.inputStream
-    return BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { reader -> reader.readText() }
-  }
-
-  private fun firestoreDataFieldsToNotesData(dataFields: JSONObject): JSONObject {
-    val data = JSONObject()
-    val keys = dataFields.keys()
-    while (keys.hasNext()) {
-      val key = keys.next()
-      val arrayValue = dataFields.optJSONObject(key)?.optJSONObject("arrayValue") ?: continue
-      data.put(key, firestoreArrayToNoteItems(arrayValue.optJSONArray("values") ?: JSONArray()))
-    }
-    return data
-  }
-
-  private fun firestoreArrayToNoteItems(values: JSONArray): JSONArray {
-    val items = JSONArray()
-    for (index in 0 until values.length()) {
-      val value = values.optJSONObject(index) ?: continue
-      when {
-        value.has("stringValue") -> items.put(value.optString("stringValue"))
-        value.has("mapValue") -> items.put(firestoreMapToCategoryNode(value.optJSONObject("mapValue")?.optJSONObject("fields") ?: JSONObject()))
-      }
-    }
-    return items
-  }
-
-  private fun firestoreMapToCategoryNode(fields: JSONObject): JSONObject {
-    val node = JSONObject()
-    val keys = fields.keys()
-    while (keys.hasNext()) {
-      val key = keys.next()
-      val arrayValue = fields.optJSONObject(key)?.optJSONObject("arrayValue") ?: continue
-      node.put(key, firestoreArrayToNoteItems(arrayValue.optJSONArray("values") ?: JSONArray()))
-    }
-    return node
-  }
-
-  private fun appendRootCategoryString(dataFields: JSONObject, categoryName: String, text: String) {
-    val categoryValue = dataFields.optJSONObject(categoryName)
-      ?: JSONObject().put("arrayValue", JSONObject().put("values", JSONArray())).also { dataFields.put(categoryName, it) }
-    val categoryArray = categoryValue.optJSONObject("arrayValue")
-      ?: JSONObject().put("values", JSONArray()).also { categoryValue.put("arrayValue", it) }
-    val categoryValues = categoryArray.optJSONArray("values") ?: JSONArray().also { categoryArray.put("values", it) }
-    categoryValues.put(JSONObject().put("stringValue", text))
-  }
-
-  private fun formatAddedNoteHistory(note: String): String {
-    return "$note - $seekCategoryName - ${formatHistoryTime()}"
-  }
-
-  private fun formatHistoryTime(): String {
-    return historyDateFormat.get().format(Date())
-  }
-
-  private fun writeNotesDataToLocalCache(data: JSONObject) {
-    val db = AsyncStorageDb(this).writableDatabase
-    val serialized = JSONObject().put("data", data).toString()
-    writeStorageValue(db, localWorkspaceNotesKey, serialized)
-    writeStorageValue(db, legacyLocalNotesKey, serialized)
-  }
-
-  private fun readStorageValue(db: SQLiteDatabase, key: String): String? {
-    val cursor = db.query(storageTableName, arrayOf(storageValueColumn), "$storageKeyColumn=?", arrayOf(key), null, null, null)
-    return cursor.use { if (it.moveToFirst()) it.getString(0) else null }
-  }
-
-  private fun writeStorageValue(db: SQLiteDatabase, key: String, value: String) {
-    val contentValues = ContentValues().apply {
-      put(storageKeyColumn, key)
-      put(storageValueColumn, value)
-    }
-    db.insertWithOnConflict(storageTableName, null, contentValues, SQLiteDatabase.CONFLICT_REPLACE)
   }
 
   private fun hideInput() {
@@ -516,26 +475,5 @@ class OverlayService : Service() {
     const val ACTION_STOP = "com.notes.nativenotetaking.overlay.STOP"
     const val ACTION_UPDATE = "com.notes.nativenotetaking.overlay.UPDATE"
     const val ACTION_RESET_POSITION = "com.notes.nativenotetaking.overlay.RESET_POSITION"
-    private const val storageDatabaseName = "RKStorage"
-    private const val storageTableName = "catalystLocalStorage"
-    private const val storageKeyColumn = "key"
-    private const val storageValueColumn = "value"
-    private const val localWorkspaceNotesKey = "rnnotetaking.notes.workspace.Main"
-    private const val legacyLocalNotesKey = "rnnotetaking.notes.main"
-    private const val seekCategoryName = "SEEK"
-    private const val historyCategoryName = "HISTORY"
-    private const val createStorageTableSql = "CREATE TABLE IF NOT EXISTS catalystLocalStorage (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
-    private const val firestoreDocumentUrl = "https://firestore.googleapis.com/v1/projects/notes-55c97/databases/(default)/documents/reactnativecollection/main?key=AIzaSyD8t3f8EvherkuyAmLB6iFN5wuiOmALCzU"
-    private val historyDateFormat = ThreadLocal.withInitial { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
-  }
-
-  private class AsyncStorageDb(context: Context) : SQLiteOpenHelper(context.applicationContext, storageDatabaseName, null, 1) {
-    override fun onCreate(db: SQLiteDatabase) {
-      db.execSQL(createStorageTableSql)
-    }
-
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-      db.execSQL(createStorageTableSql)
-    }
   }
 }
