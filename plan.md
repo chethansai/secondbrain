@@ -369,6 +369,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 - 2026-05-09: Implemented scrollable long notes inside workspace category cards. Decision: keep each note preview visually capped at four text lines while replacing clipped preview text with a nested scroll area so longer note content can be read fully in place.
 
+- 2026-05-09: Cleaned up workspace category-card ordering wiring after the floating category save commit. Decision: preserve the in-progress subcategory order UI already present in the workspace card, pass the existing subcategory priority callback through the board, use an existing icon token, and keep `npm run typecheck` clean before the follow-up push.
+
 - 2026-05-09: Implemented floating category selection for add-note saves. Decision: add an optional feature-owned floating category dial to the note editor, sort category buttons alphabetically by full path, save immediately when a category is tapped, and relabel the fallback add-note submit action to `Seek` while leaving edit-mode and AI workspace modal behavior unchanged.
 
 - 2026-05-09: Implemented pinned notes within categories. Decision: keep notes stored as plain strings in the simple nested JSON, persist pin references in the workspace sidecar metadata, sort pinned notes first in category/detail and board views, and update pin references on edit/order/delete/rename while removing pins when notes move categories.

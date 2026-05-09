@@ -422,7 +422,6 @@ export function WorkspaceBoard({
                   onOpenCategory={onOpenCategory}
                   onAddNote={onAddNote}
                   onCreateSubcategory={onCreateSubcategory}
-                  onSetSubcategoryPriority={onSetCategoryPriority}
                   onSetSubcategoryPriority={onSetSubcategoryPriority}
                   onRenameCategory={onRenameCategory}
                   onDeleteCategory={onDeleteCategory}

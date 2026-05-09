@@ -332,7 +332,3 @@ function deleteItemsNamed(items: NoteItem[], name: string) {
 function failure(code: string, message: string): MutationResult {
   return { ok: false, code, message };
 }
-
-function getRootCategoryItems(data: NotesData): NoteItem[] {
-  return Object.entries(data).map(([name, items]) => ({ [name]: items }));
-}

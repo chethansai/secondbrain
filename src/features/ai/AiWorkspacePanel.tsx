@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { countCategoryContents, createRootCategory, createSubcategory, formatPath, getCategoryItems, listChildCategories, renameCategory, deleteCategory } from '../categories/categoryTree';
+import { countCategoryContents, createRootCategory, createSubcategory, formatPath, getCategoryItems, listChildCategories, renameCategory, deleteCategory, setCategoryPriority } from '../categories/categoryTree';
 import { NoteEditorModal } from '../editor/NoteEditorModal';
 import { TextPromptModal } from '../editor/TextPromptModal';
 import { MoveCopyModal } from '../notes/MoveCopyModal';
@@ -188,6 +188,10 @@ export function AiWorkspacePanel() {
     updateSelectedCategoryPaths([...withoutCategory.slice(0, insertionIndex), categoryPath, ...withoutCategory.slice(insertionIndex)]);
   }
 
+  function setSubcategoryOrderPriority(categoryPath: CategoryPath, priority: number) {
+    return commit(setCategoryPriority(data, categoryPath, priority));
+  }
+
   function includeWorkspaceCategory(categoryName: string) {
     if (!categoryName || selectedCategoryPaths.some((item) => item[0] === categoryName)) return;
     updateSelectedCategoryPaths([...selectedCategoryPaths, [categoryName]]);
@@ -307,6 +311,7 @@ export function AiWorkspacePanel() {
           onCreateRootCategory={() => setPromptMode('root')}
           onToggleCategory={toggleWorkspaceCategory}
           onSetCategoryPriority={setWorkspaceCategoryPriority}
+          onSetSubcategoryPriority={setSubcategoryOrderPriority}
           onAddNote={addWorkspaceNote}
           onCreateSubcategory={(categoryPath) => { setPromptPath(categoryPath); setPromptMode('subcategory'); }}
           onRenameCategory={(categoryPath) => { setPath(categoryPath); setPromptMode('rename'); }}
