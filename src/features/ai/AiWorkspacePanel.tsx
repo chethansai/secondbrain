@@ -5,11 +5,12 @@ import { NoteEditorModal } from '../editor/NoteEditorModal';
 import { TextPromptModal } from '../editor/TextPromptModal';
 import { MoveCopyModal } from '../notes/MoveCopyModal';
 import { addNote, appendHistoryNote, copyNote, deleteNote, editNote, formatAddedNoteHistory, formatHistoryPath, formatHistoryTime, HISTORY_CATEGORY, listNotesAtPath, moveNote, setNotePriority } from '../notes/noteMutations';
+import { removePinnedNote, removePinnedNotesInPath, replacePinnedNote, replacePinnedNotesInPath, sortPinnedNotesFirst, togglePinnedNote } from '../notes/pinnedNotes';
 import { useAiWorkspaceSync } from '../sync/useAiWorkspaceSync';
 import { WorkspaceBoard } from '../workspace/WorkspaceBoard';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { rounded, spacing, typography } from '../../shared/design/tokens';
-import { CategoryPath, FlatNote, MutationResult, NotesData, WorkspaceMeta } from '../../shared/types/notes';
+import { CategoryPath, FlatNote, MutationResult, NotesData, PinnedNoteRef, WorkspaceMeta } from '../../shared/types/notes';
 import { Button } from '../../shared/ui/Button';
 import { ConfirmModal } from '../../shared/ui/ConfirmModal';
 import { EmptyState } from '../../shared/ui/EmptyState';
@@ -21,6 +22,7 @@ type ModalMode = 'root' | 'subcategory' | 'rename' | null;
 type MoveCopyAction = 'move' | 'copy';
 type DeleteTarget = { type: 'category'; path: CategoryPath } | { type: 'note'; note: FlatNote } | null;
 type PathStateByDocument = Record<string, CategoryPath[]>;
+type PinnedNoteStateByDocument = Record<string, PinnedNoteRef[]>;
 
 export function AiWorkspacePanel() {
   const { colors } = useTheme();
@@ -31,6 +33,7 @@ export function AiWorkspacePanel() {
   const [path, setPath] = useState<CategoryPath>([]);
   const [selectedPathsByDocument, setSelectedPathsByDocument] = useState<PathStateByDocument>({});
   const [pinnedPathsByDocument, setPinnedPathsByDocument] = useState<PathStateByDocument>({});
+  const [pinnedNotesByDocument, setPinnedNotesByDocument] = useState<PinnedNoteStateByDocument>({});
   const [promptMode, setPromptMode] = useState<ModalMode>(null);
   const [promptPath, setPromptPath] = useState<CategoryPath | null>(null);
   const [editorMode, setEditorMode] = useState<'add' | 'edit' | null>(null);
@@ -42,15 +45,17 @@ export function AiWorkspacePanel() {
   const activeSelectionKey = activeDocumentId ?? 'none';
   const selectedCategoryPaths = selectedPathsByDocument[activeSelectionKey] ?? [];
   const pinnedCategoryPaths = pinnedPathsByDocument[activeSelectionKey] ?? [];
+  const pinnedNotes = pinnedNotesByDocument[activeSelectionKey] ?? [];
   const workspace = useMemo<WorkspaceMeta | null>(() => activeDocument ? {
     id: activeDocument.documentId,
     name: activeDocument.name,
     selectedCategoryPaths,
     pinnedCategoryPaths,
-  } : null, [activeDocument, pinnedCategoryPaths, selectedCategoryPaths]);
+    pinnedNotes,
+  } : null, [activeDocument, pinnedCategoryPaths, pinnedNotes, selectedCategoryPaths]);
   const currentItems = path.length ? getCategoryItems(data, path) : null;
   const childCategories = useMemo(() => (currentItems ? listChildCategories(currentItems, path) : []), [currentItems, path]);
-  const notes = useMemo(() => (path.length ? listNotesAtPath(data, path) : []), [data, path]);
+  const notes = useMemo(() => (path.length ? sortPinnedNotesFirst(listNotesAtPath(data, path), pinnedNotes) : []), [data, path, pinnedNotes]);
   const activeTitle = path.length ? path[path.length - 1] : activeDocument?.name ?? 'AI WORKSPACE';
 
   async function generateDocument() {
@@ -76,6 +81,7 @@ export function AiWorkspacePanel() {
       setDocumentMenuOpen(false);
       setSelectedPathsByDocument((current) => removeDocumentPathState(current, deleteDocumentId));
       setPinnedPathsByDocument((current) => removeDocumentPathState(current, deleteDocumentId));
+      setPinnedNotesByDocument((current) => removeDocumentPinnedNoteState(current, deleteDocumentId));
     }
     return ok;
   }
@@ -110,6 +116,7 @@ export function AiWorkspacePanel() {
         setPath(newPath);
         replaceWorkspaceCategoryPath(oldPath, newPath);
         replaceWorkspacePinnedCategoryPath(oldPath, newPath);
+        updatePinnedNotes(replacePinnedNotesInPath(oldPath, newPath, pinnedNotes));
       }
       return ok;
     }
@@ -124,16 +131,26 @@ export function AiWorkspacePanel() {
     return commit(setNotePriority(data, note.path, note.note, priority, note.index));
   }
 
+  async function submitNoteEdit(text: string) {
+    if (!selectedNote) return addWorkspaceNote(path, text);
+    const ok = await commitWithHistory(editNote(data, selectedNote.path, selectedNote.note, text, selectedNote.index), `${selectedNote.note} edited to ${text.trim()} - ${formatHistoryPath(selectedNote.path)} - ${formatHistoryTime()} - Event: NOTE_EDITED`);
+    if (ok) updatePinnedNotes(replacePinnedNote(selectedNote, { ...selectedNote, note: text.trim() }, pinnedNotes));
+    return ok;
+  }
+
   async function runDelete() {
     if (!deleteTarget) return false;
     if (deleteTarget.type === 'note') {
-      return commitWithHistory(deleteNote(data, deleteTarget.note.path, deleteTarget.note.note, deleteTarget.note.index), `${deleteTarget.note.note} deleted - ${formatHistoryPath(deleteTarget.note.path)} - ${formatHistoryTime()} - Event: NOTE_DELETED`);
+      const ok = await commitWithHistory(deleteNote(data, deleteTarget.note.path, deleteTarget.note.note, deleteTarget.note.index), `${deleteTarget.note.note} deleted - ${formatHistoryPath(deleteTarget.note.path)} - ${formatHistoryTime()} - Event: NOTE_DELETED`);
+      if (ok) updatePinnedNotes(removePinnedNote(deleteTarget.note, pinnedNotes));
+      return ok;
     }
     const parent = deleteTarget.path.slice(0, -1);
     const ok = await commitWithHistory(deleteCategory(data, deleteTarget.path), `${formatHistoryPath(deleteTarget.path)} category deleted - ${formatHistoryPath(deleteTarget.path)} - ${formatHistoryTime()} - Event: CATEGORY_DELETED`);
     if (ok) {
       removeWorkspaceCategoryPath(deleteTarget.path);
       removeWorkspacePinnedCategoryPath(deleteTarget.path);
+      updatePinnedNotes(removePinnedNotesInPath(deleteTarget.path, pinnedNotes));
       if (startsWithPath(path, deleteTarget.path)) setPath(parent);
     }
     return ok;
@@ -145,6 +162,10 @@ export function AiWorkspacePanel() {
 
   function updatePinnedCategoryPaths(paths: CategoryPath[]) {
     setPinnedPathsByDocument((current) => ({ ...current, [activeSelectionKey]: dedupePaths(paths) }));
+  }
+
+  function updatePinnedNotes(notes: PinnedNoteRef[]) {
+    setPinnedNotesByDocument((current) => ({ ...current, [activeSelectionKey]: dedupePinnedNotes(notes) }));
   }
 
   function toggleWorkspaceCategory(categoryPath: CategoryPath) {
@@ -177,6 +198,10 @@ export function AiWorkspacePanel() {
     const key = pathKey(categoryPath);
     const exists = pinnedCategoryPaths.some((item) => pathKey(item) === key);
     updatePinnedCategoryPaths(exists ? pinnedCategoryPaths.filter((item) => pathKey(item) !== key) : [...pinnedCategoryPaths, categoryPath]);
+  }
+
+  function toggleNotePin(note: FlatNote) {
+    updatePinnedNotes(togglePinnedNote(note, pinnedNotes));
   }
 
   function replaceWorkspacePinnedCategoryPath(oldPath: CategoryPath, newPath: CategoryPath) {
@@ -283,6 +308,7 @@ export function AiWorkspacePanel() {
           onMoveNote={(note) => openMoveCopy(note, 'move')}
           onCopyNote={(note) => openMoveCopy(note, 'copy')}
           onSetNotePriority={setNoteOrderPriority}
+          onToggleNotePin={toggleNotePin}
           onDeleteNote={(note) => setDeleteTarget({ type: 'note', note })}
         />
       ) : null}
@@ -312,7 +338,9 @@ export function AiWorkspacePanel() {
               onMove={(note) => openMoveCopy(note, 'move')}
               onCopy={(note) => openMoveCopy(note, 'copy')}
               onSetPriority={setNoteOrderPriority}
+              onTogglePin={toggleNotePin}
               onDelete={(note) => setDeleteTarget({ type: 'note', note })}
+              pinnedNotes={pinnedNotes}
             />
           ) : <EmptyState title="No notes here" message="This AI category is ready for notes or subcategories." actionLabel="Add note" onAction={() => setEditorMode('add')} />}
         </View>
@@ -338,7 +366,7 @@ export function AiWorkspacePanel() {
         title={editorMode === 'edit' ? 'Edit note' : 'Add note'}
         initialText={editorMode === 'edit' ? selectedNote?.note ?? '' : ''}
         onClose={() => { setEditorMode(null); setSelectedNote(null); }}
-        onSubmit={(text) => editorMode === 'edit' && selectedNote ? commitWithHistory(editNote(data, selectedNote.path, selectedNote.note, text, selectedNote.index), `${selectedNote.note} edited to ${text.trim()} - ${formatHistoryPath(selectedNote.path)} - ${formatHistoryTime()} - Event: NOTE_EDITED`) : addWorkspaceNote(path, text)}
+        onSubmit={(text) => editorMode === 'edit' ? submitNoteEdit(text) : addWorkspaceNote(path, text)}
       />
       <MoveCopyModal
         visible={moveVisible}
@@ -386,7 +414,16 @@ function dedupePaths(paths: CategoryPath[]) {
   return Array.from(new Map(paths.filter((path) => path.length > 0).map((path) => [pathKey(path), path])).values());
 }
 
+function dedupePinnedNotes(notes: PinnedNoteRef[]) {
+  return Array.from(new Map(notes.filter((note) => note.path.length > 0 && note.note.length > 0 && note.index >= 0).map((note) => [`${pathKey(note.path)}\u001f${note.index}\u001f${note.note}`, note])).values());
+}
+
 function removeDocumentPathState(state: PathStateByDocument, documentId: string) {
+  const { [documentId]: _removed, ...nextState } = state;
+  return nextState;
+}
+
+function removeDocumentPinnedNoteState(state: PinnedNoteStateByDocument, documentId: string) {
   const { [documentId]: _removed, ...nextState } = state;
   return nextState;
 }

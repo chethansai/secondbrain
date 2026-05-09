@@ -75,6 +75,7 @@ function parseLegacyWorkspaceIndex(parsed: Partial<WorkspaceIndex>): WorkspaceIn
       name,
       selectedCategoryPaths: Array.isArray(workspace.selectedCategoryPaths) ? workspace.selectedCategoryPaths : [],
       pinnedCategoryPaths: Array.isArray(workspace.pinnedCategoryPaths) ? workspace.pinnedCategoryPaths : [],
+      pinnedNotes: Array.isArray(workspace.pinnedNotes) ? workspace.pinnedNotes : [],
     }];
   }) : [];
   const activeWorkspace = workspaces.find((workspace) => workspace.id === parsed.activeWorkspaceId || workspace.name === parsed.activeWorkspaceId) ?? workspaces[0];

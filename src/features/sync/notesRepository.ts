@@ -1,5 +1,5 @@
 import { doc, getDoc, getDocFromServer, onSnapshot, setDoc, Unsubscribe } from 'firebase/firestore';
-import { CategoryPath, NotesData, WorkspaceIndex, WorkspaceListDocument, WorkspaceMeta } from '../../shared/types/notes';
+import { CategoryPath, NotesData, PinnedNoteRef, WorkspaceIndex, WorkspaceListDocument, WorkspaceMeta } from '../../shared/types/notes';
 import { firestore } from './firebase';
 import { validateNotesData } from './validation';
 
@@ -121,12 +121,13 @@ export async function writeWorkspaceIndex(index: WorkspaceIndex): Promise<void> 
   await setDoc(workspaceListRef, serializeWorkspaceIndex(index), { merge: false });
 }
 
-export function createWorkspaceMeta(id: string, name: string, selectedCategoryNames: string[] = [], pinnedCategoryNames: string[] = []): WorkspaceMeta {
+export function createWorkspaceMeta(id: string, name: string, selectedCategoryNames: string[] = [], pinnedCategoryNames: string[] = [], pinnedNotes: PinnedNoteRef[] = []): WorkspaceMeta {
   return {
     id,
     name,
     selectedCategoryPaths: selectedCategoryNames.map((categoryName) => parseCategoryPath(categoryName)),
     pinnedCategoryPaths: pinnedCategoryNames.map((categoryName) => parseCategoryPath(categoryName)),
+    pinnedNotes,
   };
 }
 
@@ -144,11 +145,13 @@ export function parseWorkspaceIndex(raw: Record<string, unknown>): WorkspaceInde
     : [defaultWorkspaceName, ...workspaceNames];
   const uniqueWorkspaceNames = [...new Set(normalizedWorkspaceNames)];
   const pinnedCategoryNamesByWorkspace = parsePinnedCategoryNamesByWorkspace(raw.pinnedcategories);
+  const pinnedNotesByWorkspace = parsePinnedNotesByWorkspace(raw.pinnednotes);
   const workspaces = uniqueWorkspaceNames.map((workspaceName) => createWorkspaceMeta(
     workspaceName,
     workspaceName,
     parseSelectedCategoryNames(raw[workspaceName]),
     pinnedCategoryNamesByWorkspace.get(workspaceName) ?? [],
+    pinnedNotesByWorkspace.get(workspaceName) ?? [],
   ));
 
   return {
@@ -163,12 +166,15 @@ export function serializeWorkspaceIndex(index: WorkspaceIndex): WorkspaceListDoc
   const defaultWorkspace = index.workspaces.find((workspace) => workspace.id === index.defaultWorkspaceId) ?? index.workspaces.find((workspace) => workspace.id === index.activeWorkspaceId) ?? index.workspaces[0] ?? createWorkspaceMeta(defaultWorkspaceId, defaultWorkspaceId);
   const document: WorkspaceListDocument = { defaultworkspace: defaultWorkspace.id };
   const pinnedCategories: Record<string, string[]> = {};
+  const pinnedNotes: Record<string, unknown[]> = {};
   for (const workspace of index.workspaces) {
     document[workspace.id] = selectedCategoryNamesFromPaths(workspace.selectedCategoryPaths);
     const pinnedNames = selectedCategoryNamesFromPaths(workspace.pinnedCategoryPaths);
     if (pinnedNames.length) pinnedCategories[workspace.id] = pinnedNames;
+    if (workspace.pinnedNotes.length) pinnedNotes[workspace.id] = workspace.pinnedNotes.map(serializePinnedNoteRef);
   }
   if (Object.keys(pinnedCategories).length) document.pinnedcategories = pinnedCategories;
+  if (Object.keys(pinnedNotes).length) document.pinnednotes = pinnedNotes;
   if (!Array.isArray(document[defaultWorkspace.id])) {
     document[defaultWorkspace.id] = [];
   }
@@ -192,6 +198,28 @@ function parseSelectedCategoryNames(value: unknown): string[] {
 function parsePinnedCategoryNamesByWorkspace(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return new Map<string, string[]>();
   return new Map(Object.entries(value).map(([workspaceName, categoryNames]) => [workspaceName, parseSelectedCategoryNames(categoryNames)]));
+}
+
+function parsePinnedNotesByWorkspace(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return new Map<string, PinnedNoteRef[]>();
+  return new Map(Object.entries(value).map(([workspaceName, notes]) => [workspaceName, parsePinnedNoteRefs(notes)]));
+}
+
+function parsePinnedNoteRefs(value: unknown): PinnedNoteRef[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): PinnedNoteRef[] => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const raw = item as Record<string, unknown>;
+    const path = Array.isArray(raw.path) ? raw.path.filter((segment): segment is string => typeof segment === 'string' && segment.trim().length > 0).map((segment) => segment.trim()) : [];
+    const note = typeof raw.note === 'string' ? raw.note : '';
+    const index = typeof raw.index === 'number' && Number.isInteger(raw.index) && raw.index >= 0 ? raw.index : -1;
+    if (!path.length || !note || index < 0) return [];
+    return [{ path, note, index }];
+  });
+}
+
+function serializePinnedNoteRef(ref: PinnedNoteRef) {
+  return { path: ref.path, note: ref.note, index: ref.index };
 }
 
 function selectedCategoryNamesFromPaths(paths: CategoryPath[]) {

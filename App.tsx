@@ -15,6 +15,7 @@ import { NoteEditorModal } from './src/features/editor/NoteEditorModal';
 import { MoveCopyModal } from './src/features/notes/MoveCopyModal';
 import { NoteList } from './src/features/notes/NoteList';
 import { addNote, appendHistoryNote, copyNote, deleteNote, editNote, formatAddedNoteHistory, formatHistoryPath, formatHistoryTime, HISTORY_CATEGORY, listNotesAtPath, moveNote, setNotePriority } from './src/features/notes/noteMutations';
+import { removePinnedNote, removePinnedNotesInPath, replacePinnedNote, replacePinnedNotesInPath, sortPinnedNotesFirst, togglePinnedNote } from './src/features/notes/pinnedNotes';
 import { SearchPanel } from './src/features/search/SearchPanel';
 import { SettingsPanel } from './src/features/settings/SettingsPanel';
 import { useNotesSync } from './src/features/sync/useNotesSync';
@@ -137,7 +138,7 @@ const authLoadingStyles = StyleSheet.create({
 function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHours, onAuthTimeoutChange, onLogout }: { automationCommand: AutomationCommand | null; onAutomationComplete: (commandKey: string) => void; authTimeoutHours: number; onAuthTimeoutChange: (hours: number) => Promise<void>; onLogout: () => void }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { data, workspaces, activeWorkspace, activeWorkspaceId, defaultWorkspaceId, loading, saving, refreshing, error, setError, commit, createWorkspace, selectWorkspace, setDefaultWorkspace, renameWorkspace, updateSelectedCategoryPaths, updatePinnedCategoryPaths, refresh } = useNotesSync();
+  const { data, workspaces, activeWorkspace, activeWorkspaceId, defaultWorkspaceId, loading, saving, refreshing, error, setError, commit, createWorkspace, selectWorkspace, setDefaultWorkspace, renameWorkspace, updateSelectedCategoryPaths, updatePinnedCategoryPaths, updatePinnedNotes, refresh } = useNotesSync();
   const [tab, setTab] = useState<Tab>('workspace');
   const [path, setPath] = useState<CategoryPath>([]);
   const [promptMode, setPromptMode] = useState<ModalMode>(null);
@@ -153,7 +154,8 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
 
   const currentItems = path.length ? getCategoryItems(data, path) : null;
   const childCategories = useMemo(() => (currentItems ? listChildCategories(currentItems, path) : []), [currentItems, path]);
-  const notes = useMemo(() => (path.length ? listNotesAtPath(data, path) : []), [data, path]);
+  const pinnedNotes = activeWorkspace?.pinnedNotes ?? [];
+  const notes = useMemo(() => (path.length ? sortPinnedNotesFirst(listNotesAtPath(data, path), pinnedNotes) : []), [data, path, pinnedNotes]);
   const activeTitle = path.length ? path[path.length - 1] : activeWorkspace?.name ?? 'Workspace';
   const showingRootBoard = !loading && tab === 'workspace' && path.length === 0;
 
@@ -219,7 +221,10 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
       const parentPath = promptPath ?? path;
       const cleanName = value.trim();
       const nextPath = [...parentPath, cleanName];
-      return commitWithHistory(createSubcategory(data, parentPath, value), `${formatHistoryPath(nextPath)} category created - ${formatHistoryPath(nextPath)} - ${formatHistoryTime()} - Event: SUBCATEGORY_CREATED - Parent: ${formatHistoryPath(parentPath)}`);
+      const result = createSubcategory(data, parentPath, value);
+      const ok = await commitWithHistory(result, `${formatHistoryPath(nextPath)} category created - ${formatHistoryPath(nextPath)} - ${formatHistoryTime()} - Event: SUBCATEGORY_CREATED - Parent: ${formatHistoryPath(parentPath)}`);
+      if (ok && result.ok) await includeWorkspacePinnedCategory(nextPath);
+      return ok;
     }
     if (promptMode === 'workspace') {
       const ok = await createWorkspace(value);
@@ -236,6 +241,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         setPath(newPath);
         await replaceWorkspaceCategoryPath(oldPath, newPath);
         await replaceWorkspacePinnedCategoryPath(oldPath, newPath);
+        await updatePinnedNotes(replacePinnedNotesInPath(oldPath, newPath, pinnedNotes));
       }
       return ok;
     }
@@ -259,7 +265,9 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   async function runDelete() {
     if (!deleteTarget) return false;
     if (deleteTarget.type === 'note') {
-      return commitWithHistory(deleteNote(data, deleteTarget.note.path, deleteTarget.note.note, deleteTarget.note.index), `${deleteTarget.note.note} deleted - ${formatHistoryPath(deleteTarget.note.path)} - ${formatHistoryTime()} - Event: NOTE_DELETED`);
+      const ok = await commitWithHistory(deleteNote(data, deleteTarget.note.path, deleteTarget.note.note, deleteTarget.note.index), `${deleteTarget.note.note} deleted - ${formatHistoryPath(deleteTarget.note.path)} - ${formatHistoryTime()} - Event: NOTE_DELETED`);
+      if (ok) await updatePinnedNotes(removePinnedNote(deleteTarget.note, pinnedNotes));
+      return ok;
     }
 
     const parent = deleteTarget.path.slice(0, -1);
@@ -267,6 +275,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     if (ok) {
       await removeWorkspaceCategoryPath(deleteTarget.path);
       await removeWorkspacePinnedCategoryPath(deleteTarget.path);
+      await updatePinnedNotes(removePinnedNotesInPath(deleteTarget.path, pinnedNotes));
       if (startsWithPath(path, deleteTarget.path)) setPath(parent);
     }
     return ok;
@@ -348,7 +357,18 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   }
 
   async function setNoteOrderPriority(note: FlatNote, priority: number) {
-    return commit(setNotePriority(data, note.path, note.note, priority, note.index));
+    const result = setNotePriority(data, note.path, note.note, priority, note.index);
+    const ok = await commit(result);
+    if (ok && result.ok) {
+      const reorderedNotes = listNotesAtPath(result.data, note.path);
+      const nextNote = reorderedNotes[Math.max(0, Math.min(priority - 1, reorderedNotes.length - 1))];
+      if (nextNote?.note === note.note) await updatePinnedNotes(replacePinnedNote(note, nextNote, pinnedNotes));
+    }
+    return ok;
+  }
+
+  async function toggleNotePin(note: FlatNote) {
+    return updatePinnedNotes(togglePinnedNote(note, pinnedNotes));
   }
 
   async function toggleWorkspaceCategory(categoryPath: CategoryPath) {
@@ -394,6 +414,14 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     const exists = pinned.some((item) => item.join('\u001f') === key);
     const nextPinned = exists ? pinned.filter((item) => item.join('\u001f') !== key) : [...pinned, categoryPath];
     return updatePinnedCategoryPaths(nextPinned);
+  }
+
+  async function includeWorkspacePinnedCategory(categoryPath: CategoryPath) {
+    if (!categoryPath.length) return false;
+    const pinned = activeWorkspace?.pinnedCategoryPaths ?? [];
+    const key = categoryPath.join('\u001f');
+    if (pinned.some((item) => item.join('\u001f') === key)) return true;
+    return updatePinnedCategoryPaths([...pinned, categoryPath]);
   }
 
   async function replaceWorkspacePinnedCategoryPath(oldPath: CategoryPath, newPath: CategoryPath) {
@@ -460,6 +488,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onMoveNote={(note) => openMoveCopy(note, 'move')}
                   onCopyNote={(note) => openMoveCopy(note, 'copy')}
                   onSetNotePriority={setNoteOrderPriority}
+                  onToggleNotePin={toggleNotePin}
                   onDeleteNote={confirmDeleteNote}
                 />
               ) : (
@@ -493,7 +522,9 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                       onMove={(note) => openMoveCopy(note, 'move')}
                       onCopy={(note) => openMoveCopy(note, 'copy')}
                       onSetPriority={setNoteOrderPriority}
+                      onTogglePin={toggleNotePin}
                       onDelete={confirmDeleteNote}
+                      pinnedNotes={pinnedNotes}
                     />
                   ) : <EmptyState title="No notes here" message="This category is ready for notes or subcategories." actionLabel="Add note" onAction={() => setEditorMode('add')} />}
                 </View>
@@ -553,7 +584,12 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         title={editorMode === 'edit' ? 'Edit note' : 'Add note'}
         initialText={editorMode === 'edit' ? selectedNote?.note ?? '' : ''}
         onClose={() => { setEditorMode(null); setSelectedNote(null); }}
-        onSubmit={(text) => editorMode === 'edit' && selectedNote ? commitWithHistory(editNote(data, selectedNote.path, selectedNote.note, text, selectedNote.index), `${selectedNote.note} edited to ${text.trim()} - ${formatHistoryPath(selectedNote.path)} - ${formatHistoryTime()} - Event: NOTE_EDITED`) : addWorkspaceNote(path, text)}
+        onSubmit={async (text) => {
+          if (editorMode !== 'edit' || !selectedNote) return addWorkspaceNote(path, text);
+          const ok = await commitWithHistory(editNote(data, selectedNote.path, selectedNote.note, text, selectedNote.index), `${selectedNote.note} edited to ${text.trim()} - ${formatHistoryPath(selectedNote.path)} - ${formatHistoryTime()} - Event: NOTE_EDITED`);
+          if (ok) await updatePinnedNotes(replacePinnedNote(selectedNote, { ...selectedNote, note: text.trim() }, pinnedNotes));
+          return ok;
+        }}
       />
       <MoveCopyModal
         visible={moveVisible}
@@ -563,7 +599,12 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         onClose={() => { setMoveVisible(false); setSelectedNote(null); }}
         onTogglePin={togglePinnedMoveCopyCategory}
         onResetPins={() => updatePinnedCategoryPaths([])}
-        onMove={(destination) => selectedNote ? commitWithHistory(moveNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index), `${selectedNote.note} moved - ${formatHistoryPath(destination)} - ${formatHistoryTime()} - Event: NOTE_MOVED - From: ${formatHistoryPath(selectedNote.path)}`) : false}
+        onMove={async (destination) => {
+          if (!selectedNote) return false;
+          const ok = await commitWithHistory(moveNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index), `${selectedNote.note} moved - ${formatHistoryPath(destination)} - ${formatHistoryTime()} - Event: NOTE_MOVED - From: ${formatHistoryPath(selectedNote.path)}`);
+          if (ok) await updatePinnedNotes(removePinnedNote(selectedNote, pinnedNotes));
+          return ok;
+        }}
         onCopy={(destination) => selectedNote ? commitWithHistory(copyNote(data, selectedNote.path, destination, selectedNote.note, selectedNote.index), `${selectedNote.note} copied - ${formatHistoryPath(destination)} - ${formatHistoryTime()} - Event: NOTE_COPIED - From: ${formatHistoryPath(selectedNote.path)}`) : false}
       />
       <ConfirmModal

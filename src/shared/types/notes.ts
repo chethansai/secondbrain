@@ -13,6 +13,12 @@ export type FlatNote = {
   index: number;
 };
 
+export type PinnedNoteRef = {
+  path: CategoryPath;
+  note: string;
+  index: number;
+};
+
 export type CategorySummary = {
   name: string;
   path: CategoryPath;
@@ -26,6 +32,7 @@ export type WorkspaceMeta = {
   name: string;
   selectedCategoryPaths: CategoryPath[];
   pinnedCategoryPaths: CategoryPath[];
+  pinnedNotes: PinnedNoteRef[];
 };
 
 export type WorkspaceIndex = {
@@ -38,6 +45,7 @@ export type WorkspaceIndex = {
 export type WorkspaceListDocument = Record<string, string[] | string | unknown> & {
   defaultworkspace?: string;
   pinnedcategories?: Record<string, string[]>;
+  pinnednotes?: Record<string, unknown[]>;
 };
 
 export type AiWorkspaceDocumentMeta = {

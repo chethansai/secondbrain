@@ -2,16 +2,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { rounded, shadows, spacing, typography } from '../../shared/design/tokens';
-import { CategoryPath, CategorySummary, FlatNote } from '../../shared/types/notes';
+import { CategoryPath, CategorySummary, FlatNote, PinnedNoteRef } from '../../shared/types/notes';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { isHistoryPath, normalizeNoteText, parseHistoryNote } from '../notes/noteMutations';
+import { isPinnedNote } from '../notes/pinnedNotes';
 
 type Props = {
   category: CategorySummary;
   allCategories: CategorySummary[];
   notesByCategoryKey: Map<string, FlatNote[]>;
   notes: FlatNote[];
+  pinnedNotes: PinnedNoteRef[];
   priority: number;
   workspaceName: string;
   showWorkspaceIntro: boolean;
@@ -26,6 +28,7 @@ type Props = {
   onMoveNote: (note: FlatNote) => void;
   onCopyNote: (note: FlatNote) => void;
   onSetNotePriority: (note: FlatNote, priority: number) => void;
+  onToggleNotePin: (note: FlatNote) => void;
   onDeleteNote: (note: FlatNote) => void;
 };
 
@@ -38,6 +41,7 @@ export function WorkspaceCategoryCard({
   allCategories,
   notesByCategoryKey,
   notes,
+  pinnedNotes,
   priority,
   workspaceName,
   showWorkspaceIntro,
@@ -52,6 +56,7 @@ export function WorkspaceCategoryCard({
   onMoveNote,
   onCopyNote,
   onSetNotePriority,
+  onToggleNotePin,
   onDeleteNote,
 }: Props) {
   const { colors, isDark } = useTheme();
@@ -168,6 +173,7 @@ export function WorkspaceCategoryCard({
                   expandedCategoryKeys={expandedCategoryKeys}
                   childCategoriesByParentKey={childCategoriesByParentKey}
                   notesByCategoryKey={notesByCategoryKey}
+                  pinnedNotes={pinnedNotes}
                   colors={colors}
                   styles={styles}
                   onToggleCategory={toggleCategory}
@@ -180,6 +186,7 @@ export function WorkspaceCategoryCard({
                   onMoveNote={onMoveNote}
                   onCopyNote={onCopyNote}
                   onSetNotePriority={onSetNotePriority}
+                  onToggleNotePin={onToggleNotePin}
                   onDeleteNote={onDeleteNote}
                 />
               </View>
@@ -187,7 +194,7 @@ export function WorkspaceCategoryCard({
           }
 
           return (
-            <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={previewItems.length} currentOrder={index + 1} stackOrder={stackOrder} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onSetPriority={onSetNotePriority} onDelete={onDeleteNote} />
+            <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={previewItems.length} currentOrder={index + 1} stackOrder={stackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} />
           );
         }) : !adding ? (
           <View style={styles.emptyPreview}><Text style={styles.emptyPreviewText}>No notes yet.</Text></View>
@@ -197,7 +204,7 @@ export function WorkspaceCategoryCard({
   );
 }
 
-function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, colors, styles, onToggleCategory, onOpenCategory, onAddNote, onCreateSubcategory, onRenameCategory, onDeleteCategory, onEditNote, onMoveNote, onCopyNote, onSetNotePriority, onDeleteNote }: { category: CategorySummary; depth: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean; onCreateSubcategory: (path: CategoryPath) => void; onRenameCategory: (path: CategoryPath) => void; onDeleteCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onDeleteNote: (note: FlatNote) => void }) {
+function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, pinnedNotes, colors, styles, onToggleCategory, onOpenCategory, onAddNote, onCreateSubcategory, onRenameCategory, onDeleteCategory, onEditNote, onMoveNote, onCopyNote, onSetNotePriority, onToggleNotePin, onDeleteNote }: { category: CategorySummary; depth: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; pinnedNotes: PinnedNoteRef[]; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean; onCreateSubcategory: (path: CategoryPath) => void; onRenameCategory: (path: CategoryPath) => void; onDeleteCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onToggleNotePin: (note: FlatNote) => void; onDeleteNote: (note: FlatNote) => void }) {
   const [adding, setAdding] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -294,6 +301,7 @@ function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategory
                   expandedCategoryKeys={expandedCategoryKeys}
                   childCategoriesByParentKey={childCategoriesByParentKey}
                   notesByCategoryKey={notesByCategoryKey}
+                  pinnedNotes={pinnedNotes}
                   colors={colors}
                   styles={styles}
                   onToggleCategory={onToggleCategory}
@@ -306,13 +314,14 @@ function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategory
                   onMoveNote={onMoveNote}
                   onCopyNote={onCopyNote}
                   onSetNotePriority={onSetNotePriority}
+                  onToggleNotePin={onToggleNotePin}
                   onDeleteNote={onDeleteNote}
                 />
               );
             }
 
             return (
-              <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={childItems.length} currentOrder={index + 1} stackOrder={childStackOrder} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onSetPriority={onSetNotePriority} onDelete={onDeleteNote} />
+              <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={childItems.length} currentOrder={index + 1} stackOrder={childStackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} />
             );
           })}
         </View>
@@ -321,7 +330,7 @@ function WorkspaceSubcategoryRow({ category, depth, stackOrder, expandedCategory
   );
 }
 
-function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, colors, styles, onEdit, onMove, onCopy, onSetPriority, onDelete }: { note: FlatNote; itemCount: number; currentOrder: number; stackOrder: number; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onDelete: (note: FlatNote) => void }) {
+function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinned, colors, styles, onEdit, onMove, onCopy, onSetPriority, onTogglePin, onDelete }: { note: FlatNote; itemCount: number; currentOrder: number; stackOrder: number; pinned: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onTogglePin: (note: FlatNote) => void; onDelete: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
@@ -368,6 +377,7 @@ function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, color
               </ScrollView>
             </View>
           ) : null}
+          <Pressable onPress={() => { setOpen(false); onTogglePin(note); }} style={styles.previewAction}><Text style={[styles.previewActionText, pinned && styles.previewActionPinned]}>{pinned ? 'Unpin' : 'Pin'}</Text></Pressable>
           <Pressable onPress={() => { setOpen(false); onDelete(note); }} style={styles.previewAction}><Text style={styles.previewActionDanger}>Delete</Text></Pressable>
           <Pressable onPress={() => { setOpen(false); onCopy(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Copy</Text></Pressable>
         </View>
@@ -478,6 +488,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   previewActionsAbove: { top: undefined, bottom: scale(22) },
   previewAction: { minHeight: scale(22), justifyContent: 'center', paddingHorizontal: scale(6) },
   previewActionText: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.charcoal },
+  previewActionPinned: { color: colors.primary, fontWeight: '700' },
   previewActionDanger: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.semanticError },
   previewPriorityPicker: { gap: scale(3), borderTopWidth: 1, borderTopColor: colors.hairlineSoft, borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft, paddingVertical: scale(3), marginVertical: scale(2) },
   previewPrioritySearch: { height: scale(26), borderRadius: rounded.xs, borderWidth: 1, borderColor: colors.hairlineStrong, color: colors.ink, backgroundColor: colors.surfaceSoft, paddingHorizontal: scale(6), paddingVertical: 0, fontSize: scale(11), lineHeight: scale(14) },

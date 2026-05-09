@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CategoryPath, NotesData, MutationResult, WorkspaceIndex } from '../../shared/types/notes';
+import { CategoryPath, NotesData, MutationResult, PinnedNoteRef, WorkspaceIndex } from '../../shared/types/notes';
 import { readLocalWorkspaceIndex, readLocalWorkspaceNotes, writeLocalWorkspaceIndex, writeLocalWorkspaceNotes } from './localNotesRepository';
 import { createWorkspaceMeta, defaultWorkspaceId, readLatestWorkspaceIndex, readLatestWorkspaceNotes, subscribeToWorkspaceIndex, subscribeToWorkspaceNotes, writeWorkspaceIndex, writeWorkspaceNotes } from './notesRepository';
 
@@ -161,6 +161,13 @@ export function useNotesSync() {
     return persistWorkspaceIndex({ ...workspaceIndex, workspaces: nextWorkspaces, version: workspaceIndex.version + 1 });
   }, [activeWorkspaceId, persistWorkspaceIndex, workspaceIndex]);
 
+  const updatePinnedNotes = useCallback(async (pinnedNotes: PinnedNoteRef[]) => {
+    const validPins = pinnedNotes.filter((pin) => pin.path.length > 0 && pin.path.every((segment) => segment.trim().length > 0) && pin.note.length > 0 && pin.index >= 0);
+    const dedupedPins = Array.from(new Map(validPins.map((pin) => [`${pin.path.join('\u001f')}\u001f${pin.index}\u001f${pin.note}`, pin])).values());
+    const nextWorkspaces = workspaceIndex.workspaces.map((workspace) => workspace.id === activeWorkspaceId ? { ...workspace, pinnedNotes: dedupedPins } : workspace);
+    return persistWorkspaceIndex({ ...workspaceIndex, workspaces: nextWorkspaces, version: workspaceIndex.version + 1 });
+  }, [activeWorkspaceId, persistWorkspaceIndex, workspaceIndex]);
+
   const refresh = useCallback(async () => {
     if (refreshing) return false;
     setRefreshing(true);
@@ -206,6 +213,7 @@ export function useNotesSync() {
     renameWorkspace,
     updateSelectedCategoryPaths,
     updatePinnedCategoryPaths,
+    updatePinnedNotes,
     refresh,
   };
 }

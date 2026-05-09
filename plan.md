@@ -367,6 +367,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-09: Implemented automatic pinning for newly created subcategories. Decision: after a subcategory create mutation and history write succeed, append the new full category path to the active workspace's pinned category paths so it appears in pinned move/copy destinations immediately.
+
 - 2026-05-09: Strengthened architecture guidance in the implementation plan. Decision: each feature must have its own feature-owned component or component set, and the 600-line source-file limit is a hard maximum that must be followed before adding more behavior.
 
 - 2026-05-09: Troubleshot Android development build installation on USB device. Decision: ADB can see the attached Samsung device, the build failure was caused by Gradle/Kotlin parsing Java 25.0.3, so Gradle is pinned to Android Studio's bundled Java 21 runtime for local native builds.

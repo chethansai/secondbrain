@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { GestureResponderEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type DimensionValue } from 'react-native';
 import { collapseExactNameCategories, formatPath, listAllCategories } from '../categories/categoryTree';
 import { listNotesAtPath } from '../notes/noteMutations';
+import { sortPinnedNotesFirst } from '../notes/pinnedNotes';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { colors, rounded, spacing, typography } from '../../shared/design/tokens';
 import { CategoryPath, CategorySummary, FlatNote, NotesData, WorkspaceMeta } from '../../shared/types/notes';
@@ -44,6 +45,7 @@ type Props = {
   onMoveNote: (note: FlatNote) => void;
   onCopyNote: (note: FlatNote) => void;
   onSetNotePriority: (note: FlatNote, priority: number) => void;
+  onToggleNotePin: (note: FlatNote) => void;
   onDeleteNote: (note: FlatNote) => void;
 };
 
@@ -82,6 +84,7 @@ export function WorkspaceBoard({
   onMoveNote,
   onCopyNote,
   onSetNotePriority,
+  onToggleNotePin,
   onDeleteNote,
 }: Props) {
   const { colors, isDark, toggleTheme } = useTheme();
@@ -96,10 +99,11 @@ export function WorkspaceBoard({
   const rawCategories = useMemo(() => listAllCategories(data), [data]);
   const visibleCategories = useMemo(() => collapseExactNameCategories(rawCategories), [rawCategories]);
   const selectedPaths = activeWorkspace?.selectedCategoryPaths ?? [];
+  const pinnedNotes = activeWorkspace?.pinnedNotes ?? [];
   const rawCategoriesByKey = new Map(rawCategories.map((category) => [pathKey(category.path), category]));
   const visibleCategoriesByName = new Map(visibleCategories.map((category) => [category.name, category]));
   const visibleCategoriesByKey = new Map(visibleCategories.map((category) => [pathKey(category.path), category]));
-  const notesByCategoryKey = new Map(rawCategories.map((category) => [pathKey(category.path), listNotesAtPath(data, category.path)]));
+  const notesByCategoryKey = new Map(rawCategories.map((category) => [pathKey(category.path), sortPinnedNotesFirst(listNotesAtPath(data, category.path), pinnedNotes)]));
   const selectedCategoryRows = selectedPaths.flatMap((path) => {
     const rawCategory = rawCategoriesByKey.get(pathKey(path));
     const category = rawCategory ? visibleCategoriesByName.get(rawCategory.name) : visibleCategoriesByKey.get(pathKey(path));
@@ -407,6 +411,7 @@ export function WorkspaceBoard({
                   allCategories={rawCategories}
                   notesByCategoryKey={notesByCategoryKey}
                   notes={notes}
+                  pinnedNotes={pinnedNotes}
                   priority={priority}
                   workspaceName={activeWorkspace?.name ?? 'Workspace'}
                   showWorkspaceIntro={priority === 1}
@@ -421,6 +426,7 @@ export function WorkspaceBoard({
                   onMoveNote={onMoveNote}
                   onCopyNote={onCopyNote}
                   onSetNotePriority={onSetNotePriority}
+                  onToggleNotePin={onToggleNotePin}
                   onDeleteNote={onDeleteNote}
                 />
               )}
