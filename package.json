@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "main": "index.js",
+  "engines": {
+    "node": ">=20.19.4 <24"
+  },
   "scripts": {
+    "prestart": "node -e \"const major=Number(process.versions.node.split('.')[0]); if (major >= 24) { console.error('Node '+process.versions.node+' is not supported by this Expo/Metro stack. Use Node 22 LTS or Node 20.19.4+.'); process.exit(1); }\"",
     "start": "expo start --lan",
     "android": "expo start --lan --android",
     "ios": "expo start --lan --ios",

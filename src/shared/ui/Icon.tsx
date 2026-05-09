@@ -12,6 +12,7 @@ export type IconName =
   | 'copy-outline'
   | 'create-outline'
   | 'document-text-outline'
+  | 'ellipsis-vertical'
   | 'folder-outline'
   | 'git-branch-outline'
   | 'log-out-outline'
@@ -45,6 +46,7 @@ const labels: Record<IconName, string> = {
   'copy-outline': '□',
   'create-outline': '✎',
   'document-text-outline': 'N',
+  'ellipsis-vertical': '⋮',
   'folder-outline': 'F',
   'git-branch-outline': '↗',
   'log-out-outline': 'L',

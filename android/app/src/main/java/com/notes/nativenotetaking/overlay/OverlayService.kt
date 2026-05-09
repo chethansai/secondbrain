@@ -34,6 +34,9 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -246,7 +249,7 @@ class OverlayService : Service() {
         val data = appendSeekNoteToFirestore(note)
         writeNotesDataToLocalCache(data)
         Handler(Looper.getMainLooper()).post {
-          Toast.makeText(this, "Added to Firestore SEEK", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Added to SEEK", Toast.LENGTH_SHORT).show()
           hideInput()
         }
       } catch (_: Exception) {
@@ -266,10 +269,8 @@ class OverlayService : Service() {
     val dataValue = fields.optJSONObject("data") ?: JSONObject().put("mapValue", JSONObject().put("fields", JSONObject())).also { fields.put("data", it) }
     val dataFields = dataValue.optJSONObject("mapValue")?.optJSONObject("fields") ?: JSONObject()
     dataValue.put("mapValue", JSONObject().put("fields", dataFields))
-    val seekValue = dataFields.optJSONObject("SEEK") ?: JSONObject().put("arrayValue", JSONObject().put("values", JSONArray())).also { dataFields.put("SEEK", it) }
-    val seekArray = seekValue.optJSONObject("arrayValue") ?: JSONObject().put("values", JSONArray()).also { seekValue.put("arrayValue", it) }
-    val seekValues = seekArray.optJSONArray("values") ?: JSONArray().also { seekArray.put("values", it) }
-    seekValues.put(JSONObject().put("stringValue", note))
+    appendRootCategoryString(dataFields, seekCategoryName, note)
+    appendRootCategoryString(dataFields, historyCategoryName, formatAddedNoteHistory(note))
 
     val body = JSONObject().put("fields", JSONObject().put("data", dataValue))
     val connection = openFirestoreConnection("PATCH")
@@ -341,6 +342,23 @@ class OverlayService : Service() {
       node.put(key, firestoreArrayToNoteItems(arrayValue.optJSONArray("values") ?: JSONArray()))
     }
     return node
+  }
+
+  private fun appendRootCategoryString(dataFields: JSONObject, categoryName: String, text: String) {
+    val categoryValue = dataFields.optJSONObject(categoryName)
+      ?: JSONObject().put("arrayValue", JSONObject().put("values", JSONArray())).also { dataFields.put(categoryName, it) }
+    val categoryArray = categoryValue.optJSONObject("arrayValue")
+      ?: JSONObject().put("values", JSONArray()).also { categoryValue.put("arrayValue", it) }
+    val categoryValues = categoryArray.optJSONArray("values") ?: JSONArray().also { categoryArray.put("values", it) }
+    categoryValues.put(JSONObject().put("stringValue", text))
+  }
+
+  private fun formatAddedNoteHistory(note: String): String {
+    return "$note - $seekCategoryName - ${formatHistoryTime()}"
+  }
+
+  private fun formatHistoryTime(): String {
+    return historyDateFormat.get().format(Date())
   }
 
   private fun writeNotesDataToLocalCache(data: JSONObject) {
@@ -504,8 +522,11 @@ class OverlayService : Service() {
     private const val storageValueColumn = "value"
     private const val localWorkspaceNotesKey = "rnnotetaking.notes.workspace.Main"
     private const val legacyLocalNotesKey = "rnnotetaking.notes.main"
+    private const val seekCategoryName = "SEEK"
+    private const val historyCategoryName = "HISTORY"
     private const val createStorageTableSql = "CREATE TABLE IF NOT EXISTS catalystLocalStorage (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
     private const val firestoreDocumentUrl = "https://firestore.googleapis.com/v1/projects/notes-55c97/databases/(default)/documents/reactnativecollection/main?key=AIzaSyD8t3f8EvherkuyAmLB6iFN5wuiOmALCzU"
+    private val historyDateFormat = ThreadLocal.withInitial { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
   }
 
   private class AsyncStorageDb(context: Context) : SQLiteOpenHelper(context.applicationContext, storageDatabaseName, null, 1) {

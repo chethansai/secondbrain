@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { NativeSyntheticEvent, StyleSheet, TextInputSelectionChangeEventData, View } from 'react-native';
 import { spacing } from '../../shared/design/tokens';
 import { CategoryPath, NotesData } from '../../shared/types/notes';
-import { FloatingCategoryDial } from '../categories/FloatingCategoryDial';
+import { InlineCategorySavePicker } from '../categories/InlineCategorySavePicker';
 import { normalizeNoteText } from '../notes/noteMutations';
 import { readText } from '../settings/clipboard';
 import { Button } from '../../shared/ui/Button';
 import { ModalShell } from '../../shared/ui/ModalShell';
 import { TextInputField } from '../../shared/ui/TextInputField';
+import { SEEK_CATEGORY } from '../ai/aiReviewTypes';
 
 type Props = {
   visible: boolean;
@@ -24,6 +25,7 @@ export function NoteEditorModal({ visible, title, initialText = '', categoryData
   const [text, setText] = useState(initialText);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [busy, setBusy] = useState(false);
+  const canSubmit = !busy && Boolean(text.trim());
 
   useEffect(() => {
     const nextText = normalizeNoteText(initialText);
@@ -68,12 +70,23 @@ export function NoteEditorModal({ visible, title, initialText = '', categoryData
         <TextInputField value={text} onChangeText={setText} onSelectionChange={updateSelection} selection={selection} autoCapitalize="sentences" multiline placeholder="Write a note" accessibilityLabel="Note text" />
         <Button label="Paste" icon="copy-outline" variant="secondary" onPress={pasteFromClipboard} disabled={busy} />
         {categoryData && onSubmitToCategory ? (
-          <FloatingCategoryDial data={categoryData} selectedPath={selectedPath} disabled={busy || !text.trim()} onSelect={submitToCategory} />
-        ) : null}
-        <Button label={onSubmitToCategory ? 'SEEK' : 'Save note'} icon="checkmark" onPress={submit} disabled={busy || !text.trim()} />
+          <>
+            <View style={styles.mainActions}>
+              <Button label="SEEK" icon="checkmark" onPress={submit} disabled={!canSubmit} style={styles.mainActionButton} />
+              <Button label="Cancel" icon="close" variant="secondary" onPress={onClose} disabled={busy} style={styles.mainActionButton} />
+            </View>
+            <InlineCategorySavePicker data={categoryData} selectedPath={selectedPath} excludedPath={[SEEK_CATEGORY]} disabled={!canSubmit} onSelect={submitToCategory} />
+          </>
+        ) : (
+          <Button label="Save note" icon="checkmark" onPress={submit} disabled={!canSubmit} />
+        )}
       </View>
     </ModalShell>
   );
 }
 
-const styles = StyleSheet.create({ content: { gap: spacing.md } });
+const styles = StyleSheet.create({
+  content: { gap: spacing.md },
+  mainActions: { flexDirection: 'row', gap: spacing.sm },
+  mainActionButton: { flex: 1 },
+});

@@ -6,6 +6,8 @@ import { AuthGate } from './src/features/auth/AuthGate';
 import { AiChatPanel } from './src/features/ai/AiChatPanel';
 import { AiNotificationsPanel } from './src/features/ai/AiNotificationsPanel';
 import { AiReviewPanel } from './src/features/ai/AiReviewPanel';
+import { createDecisionFromSuggestion, formatAiReviewRequestError, nextSimpleReviewId, noteFingerprint, requestAiReview } from './src/features/ai/aiReviewService';
+import { AiReviewLedger, SEEK_CATEGORY } from './src/features/ai/aiReviewTypes';
 import { AiWorkspacePanel } from './src/features/ai/AiWorkspacePanel';
 import { CategoryList } from './src/features/categories/CategoryList';
 import { categoryDeleteMessage, copyCategory, createRootCategory, createSubcategory, deleteCategory, getCategoryItems, listChildCategories, renameCategory, setCategoryPriority, startsWithPath } from './src/features/categories/categoryTree';
@@ -19,6 +21,7 @@ import { SearchPanel } from './src/features/search/SearchPanel';
 import { copyText } from './src/features/settings/clipboard';
 import { SettingsPanel } from './src/features/settings/SettingsPanel';
 import { useNotesSync } from './src/features/sync/useNotesSync';
+import { useAiReviewSync } from './src/features/sync/useAiReviewSync';
 import { WorkspaceBoard } from './src/features/workspace/WorkspaceBoard';
 import { ActionGrid, ErrorBanner, PanelHeader, WorkspaceHeader } from './src/features/workspace/WorkspaceChrome';
 import { ThemeProvider, useTheme } from './src/shared/design/ThemeProvider';
@@ -71,6 +74,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { data, workspaces, activeWorkspace, activeWorkspaceId, defaultWorkspaceId, loading, saving, refreshing, error, setError, commit, createWorkspace, selectWorkspace, setDefaultWorkspace, renameWorkspace, updateSelectedCategoryPaths, updatePinnedCategoryPaths, updatePinnedNotes, refresh } = useNotesSync();
+  const { ledger: aiReviewLedger, loading: aiReviewLoading, setError: setAiReviewError, upsertDecision } = useAiReviewSync();
   const [tab, setTab] = useState<Tab>('workspace');
   const [path, setPath] = useState<CategoryPath>([]);
   const [promptMode, setPromptMode] = useState<ModalMode>(null);
@@ -84,6 +88,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const [boardTopActionsVisible, setBoardTopActionsVisible] = useState(true);
   const runningAutomationKey = useRef<string | null>(null);
   const fileAutomationRunKey = useRef<string | null>(null);
+  const runningAiReviewFingerprints = useRef(new Set<string>());
 
   const currentItems = path.length ? getCategoryItems(data, path) : null;
   const childCategories = useMemo(() => (currentItems ? listChildCategories(currentItems, path) : []), [currentItems, path]);
@@ -93,17 +98,24 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const showingRootBoard = !loading && tab === 'workspace' && path.length === 0;
 
   useEffect(() => {
-    if (!automationCommand || loading || runningAutomationKey.current === automationCommand.key) return;
+    if (!automationCommand || loading || aiReviewLoading || runningAutomationKey.current === automationCommand.key) return;
     runningAutomationKey.current = automationCommand.key;
 
     async function runAutomationCommand(command: AutomationCommand) {
       if (command.type === 'importFile') {
         await drainAutomationFileQueue(command.fileUri);
       } else {
-        const ok = await commitWithHistory(addNote(data, command.categoryPath, command.note), formatAddedNoteHistory(command.note, command.categoryPath));
+        const result = addNote(data, command.categoryPath, command.note);
+        const historyText = formatAddedNoteHistory(command.note, command.categoryPath);
+        const ok = await commitWithHistory(result, historyText);
         if (ok) {
           setTab('workspace');
           setPath(command.categoryPath);
+          if (result.ok) {
+            const reviewData = appendHistoryNote(result.data, historyText);
+            const reviewNote = getInsertedFlatNote(result.data, command.categoryPath, command.note);
+            if (reviewData.ok && reviewNote) await reviewIncomingSeekNotes(reviewData.data, [reviewNote]);
+          }
         }
       }
       onAutomationComplete(command.key);
@@ -115,10 +127,10 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
       onAutomationComplete(automationCommand.key);
       runningAutomationKey.current = null;
     });
-  }, [automationCommand, commit, data, loading, onAutomationComplete, setError]);
+  }, [aiReviewLoading, aiReviewLedger, automationCommand, commit, data, loading, onAutomationComplete, setAiReviewError, setError, upsertDecision]);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || aiReviewLoading) return;
     let cancelled = false;
     ensureDefaultAutomationQueueFile().then((queueUri) => {
       if (cancelled || !queueUri || fileAutomationRunKey.current === queueUri) return;
@@ -128,7 +140,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
       });
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [loading, data]);
+  }, [aiReviewLoading, aiReviewLedger, loading, data, setAiReviewError, setError, upsertDecision]);
 
   function selectWorkspaceAndReset(workspaceId: string) {
     setPath([]);
@@ -230,7 +242,59 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   }
 
   async function addWorkspaceNote(notePath: CategoryPath, text: string) {
-    return commitWithHistory(addNote(data, notePath, text), formatAddedNoteHistory(text, notePath));
+    const result = addNote(data, notePath, text);
+    const historyText = formatAddedNoteHistory(text, notePath);
+    const ok = await commitWithHistory(result, historyText);
+    if (ok && result.ok) {
+      const reviewData = appendHistoryNote(result.data, historyText);
+      const reviewNote = getInsertedFlatNote(result.data, notePath, text);
+      if (reviewData.ok && reviewNote) await reviewIncomingSeekNotes(reviewData.data, [reviewNote]);
+    }
+    return ok;
+  }
+
+  async function addSeekNote(text: string) {
+    const seekResult = getCategoryItems(data, [SEEK_CATEGORY]) ? { ok: true as const, data } : createRootCategory(data, SEEK_CATEGORY);
+    if (!seekResult.ok) return commit(seekResult);
+    const seekData = seekResult.data;
+    const result = addNote(seekData, [SEEK_CATEGORY], text);
+    const historyText = formatAddedNoteHistory(text, [SEEK_CATEGORY]);
+    const ok = await commitWithHistory(result, historyText);
+    if (ok && result.ok) {
+      await includeWorkspaceCategory(SEEK_CATEGORY);
+      setPath([SEEK_CATEGORY]);
+      const reviewData = appendHistoryNote(result.data, historyText);
+      const reviewNote = getInsertedFlatNote(result.data, [SEEK_CATEGORY], text);
+      if (reviewData.ok && reviewNote) await reviewIncomingSeekNotes(reviewData.data, [reviewNote]);
+    }
+    return ok;
+  }
+
+  async function reviewIncomingSeekNotes(reviewData: NotesData, notesToReview: FlatNote[]) {
+    const seekNotes = notesToReview.filter((note) => note.path[0] === SEEK_CATEGORY);
+    if (!seekNotes.length) return;
+
+    let workingLedger: AiReviewLedger = aiReviewLedger;
+    const reviewedFingerprints = new Set(workingLedger.decisions.map((decision) => decision.fingerprint));
+
+    for (const note of seekNotes) {
+      const fingerprint = noteFingerprint(note);
+      if (reviewedFingerprints.has(fingerprint) || runningAiReviewFingerprints.current.has(fingerprint)) continue;
+      runningAiReviewFingerprints.current.add(fingerprint);
+      try {
+        const suggestion = await requestAiReview(reviewData, note);
+        const decision = createDecisionFromSuggestion(note, suggestion, nextSimpleReviewId(workingLedger));
+        await upsertDecision(decision);
+        workingLedger = { ...workingLedger, decisions: [decision, ...workingLedger.decisions] };
+        reviewedFingerprints.add(fingerprint);
+      } catch (reviewError) {
+        const message = formatAiReviewRequestError(reviewError);
+        setAiReviewError(message);
+        setError(message);
+      } finally {
+        runningAiReviewFingerprints.current.delete(fingerprint);
+      }
+    }
   }
 
   async function drainAutomationFileQueue(fileUri?: string) {
@@ -246,6 +310,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
 
     let nextData = data;
     const remaining = [];
+    const importedSeekNotes: FlatNote[] = [];
     let importedCount = 0;
     for (const item of queue.notes) {
       const preparedData = ensureAutomationCategoryPath(nextData, item.categoryPath);
@@ -259,12 +324,14 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         remaining.push(item);
         continue;
       }
+      const insertedSeekNote = getInsertedFlatNote(result.data, item.categoryPath, item.note);
       const historyResult = appendHistoryNote(result.data, formatAddedNoteHistory(item.note, item.categoryPath));
       if (!historyResult.ok) {
         remaining.push(item);
         continue;
       }
       nextData = historyResult.data;
+      if (insertedSeekNote) importedSeekNotes.push(insertedSeekNote);
       importedCount += 1;
     }
 
@@ -279,7 +346,19 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     await includeWorkspaceCategory('SEEK');
     setTab('workspace');
     setPath(['SEEK']);
+    await reviewIncomingSeekNotes(nextData, importedSeekNotes);
     return true;
+  }
+
+  function getInsertedFlatNote(sourceData: NotesData, categoryPath: CategoryPath, noteText: string): FlatNote | null {
+    if (categoryPath[0] !== SEEK_CATEGORY) return null;
+    const cleanNote = noteText.trim();
+    const items = getCategoryItems(sourceData, categoryPath);
+    if (!items) return null;
+    for (let index = items.length - 1; index >= 0; index -= 1) {
+      if (items[index] === cleanNote) return { path: categoryPath, note: cleanNote, index };
+    }
+    return null;
   }
 
   function ensureAutomationCategoryPath(sourceData: NotesData, categoryPath: CategoryPath) {
@@ -538,7 +617,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         selectedPath={editorMode === 'add' ? path : null}
         onClose={() => { setEditorMode(null); setSelectedNote(null); }}
         onSubmit={async (text) => {
-          if (editorMode !== 'edit' || !selectedNote) return addWorkspaceNote(path, text);
+          if (editorMode !== 'edit' || !selectedNote) return addSeekNote(text);
           const ok = await commitWithHistory(editNote(data, selectedNote.path, selectedNote.note, text, selectedNote.index), `${selectedNote.note} edited to ${text.trim()} - ${formatHistoryPath(selectedNote.path)} - ${formatHistoryTime()} - Event: NOTE_EDITED`);
           if (ok) await updatePinnedNotes(replacePinnedNote(selectedNote, { ...selectedNote, note: text.trim() }, pinnedNotes));
           return ok;

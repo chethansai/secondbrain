@@ -367,6 +367,12 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-09: Replaced the add-note floating category dial with an inline category chip picker. Decision: keep `SEEK` and `Cancel` as the main editor action buttons, render all other categories alphabetically in a scrollable flow-wrapped pill chip pane with trailing overflow menus, and preserve immediate silent save behavior when a category chip is selected.
+
+- 2026-05-09: Refined floating add-note category saving. Decision: keep the floating category dial as the immediate save route for any alphabetically sorted category, expand its compact chip layout so paths fit better, and make the fallback add-note submit genuinely save to the `SEEK` category by creating/showing `SEEK` when needed.
+
+- 2026-05-09: Added a temporary all-subcategories view option to workspace category cards. Decision: expose an `All subcats` toggle in the category star/options menu that places every descendant subcategory at the top of that category card preview while leaving the default direct-child view, note storage, and workspace category selection unchanged.
+
 - 2026-05-09: Implemented in-app note text copy and paste. Decision: add Expo Clipboard support, make rendered notes selectable in category detail and workspace cards, distinguish clipboard `Copy text` from existing `Copy to category`, add a Paste action to the note editor that inserts clipboard text at the cursor/selection, and extract auth/workspace chrome/zoom helpers so touched source files stay within the 600-line feature architecture limit.
 
 - 2026-05-09: Implemented copying a category or subcategory into another category. Decision: add a deterministic category-copy mutation that duplicates the branch with globally unique `copy` names so the copied branch stays independent under the app's name-based standalone sync model, reuse the move/copy picker for destination selection, and expose Copy actions in category detail and workspace card menus.

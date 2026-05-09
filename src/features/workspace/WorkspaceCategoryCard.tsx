@@ -72,11 +72,13 @@ export function WorkspaceCategoryCard({
   const [newNote, setNewNote] = useState('');
   const [actionsOpen, setActionsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showAllSubcategories, setShowAllSubcategories] = useState(false);
   const [expandedCategoryKeys, setExpandedCategoryKeys] = useState<Set<string>>(() => new Set());
   const tint = tints[(priority - 1) % tints.length];
   const childCategoriesByParentKey = useMemo(() => groupChildCategories(allCategories, category.path), [allCategories, category.path]);
   const childCategories = childCategoriesByParentKey.get(pathKey(category.path)) ?? [];
-  const previewItems = useMemo(() => createOrderedPreviewItems(childCategories, notes), [childCategories, notes]);
+  const visibleSubcategories = useMemo(() => (showAllSubcategories ? listDescendantCategories(allCategories, category.path) : childCategories), [allCategories, category.path, childCategories, showAllSubcategories]);
+  const previewItems = useMemo(() => createOrderedPreviewItems(visibleSubcategories, notes, showAllSubcategories), [notes, showAllSubcategories, visibleSubcategories]);
 
   async function submitNote() {
     const text = normalizeNoteText(newNote);
@@ -138,6 +140,7 @@ export function WorkspaceCategoryCard({
 
       {actionsOpen ? (
         <View style={styles.actionsPanel}>
+          <Button label={showAllSubcategories ? 'Direct' : 'All subcats'} icon="git-branch-outline" variant="secondary" onPress={() => setShowAllSubcategories((current) => !current)} style={styles.panelButton} />
           <Button label="Rename" icon="create-outline" variant="secondary" onPress={() => { setActionsOpen(false); onRenameCategory(category.path); }} style={styles.panelButton} />
           <Button label="Folder" icon="folder-outline" variant="secondary" onPress={() => { setActionsOpen(false); onCreateSubcategory(category.path); }} style={styles.panelButton} />
           <Button label="Copy" icon="copy-outline" variant="secondary" onPress={() => { setActionsOpen(false); onCopyCategory(category.path); }} style={styles.panelButton} />
@@ -461,11 +464,23 @@ function formatHistoryEvent(event: string) {
   return event.replace(/_/g, ' ').toLowerCase();
 }
 
-function createOrderedPreviewItems(categories: CategorySummary[], notes: FlatNote[]): PreviewItem[] {
-  return [
-    ...categories.map((category) => ({ type: 'category' as const, category, order: category.itemIndex ?? 0 })),
-    ...notes.map((note) => ({ type: 'note' as const, note, order: note.index })),
-  ].sort((left, right) => right.order - left.order);
+function createOrderedPreviewItems(categories: CategorySummary[], notes: FlatNote[], categoriesFirst = false): PreviewItem[] {
+  const categoryItems = categories.map((category) => ({ type: 'category' as const, category, order: category.itemIndex ?? 0 }));
+  const noteItems = notes.map((note) => ({ type: 'note' as const, note, order: note.index }));
+  if (categoriesFirst) {
+    return [...categoryItems.sort(compareCategoryPreviewItems), ...noteItems.sort((left, right) => right.order - left.order)];
+  }
+  return [...categoryItems, ...noteItems].sort((left, right) => right.order - left.order);
+}
+
+function compareCategoryPreviewItems(left: Extract<PreviewItem, { type: 'category' }>, right: Extract<PreviewItem, { type: 'category' }>) {
+  const depth = left.category.path.length - right.category.path.length;
+  if (depth !== 0) return depth;
+  return left.category.path.join('\u001f').localeCompare(right.category.path.join('\u001f'), undefined, { sensitivity: 'base' });
+}
+
+function listDescendantCategories(categories: CategorySummary[], rootPath: CategoryPath) {
+  return categories.filter((category) => isDescendantPath(rootPath, category.path));
 }
 
 function groupChildCategories(categories: CategorySummary[], rootPath: CategoryPath) {

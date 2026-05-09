@@ -33,21 +33,23 @@ export function FloatingCategoryDial({ data, disabled = false, selectedPath = nu
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.triggerRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={open ? 'Close category dial' : 'Open category dial'}
-          disabled={disabled}
-          onPress={() => setOpen((current) => !current)}
-          style={[styles.trigger, open && styles.triggerOpen, disabled && styles.disabled]}
-        >
-          <Icon name="folder-outline" size={16} color={open ? colors.onPrimary : colors.primary} />
-        </Pressable>
-      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={open ? 'Close category dial' : 'Open category dial'}
+        disabled={disabled}
+        onPress={() => setOpen((current) => !current)}
+        style={[styles.trigger, open && styles.triggerOpen, disabled && styles.disabled]}
+      >
+        <View style={styles.triggerIcon}>
+          <Icon name="folder-outline" size={15} color={open ? colors.primary : colors.onPrimary} />
+        </View>
+        <Text style={[styles.triggerText, open && styles.triggerTextOpen]} numberOfLines={1}>Categories</Text>
+        <Text style={[styles.triggerCount, open && styles.triggerCountOpen]}>{categories.length}</Text>
+      </Pressable>
 
       {open ? (
         <View style={styles.dialPanel}>
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.buttonGrid} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.buttonGrid} nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator>
             {categories.map((path) => {
               const active = selectedPath?.join('\u001f') === path.join('\u001f');
               return (
@@ -60,7 +62,7 @@ export function FloatingCategoryDial({ data, disabled = false, selectedPath = nu
                   style={[styles.categoryButton, active && styles.categoryButtonActive, disabled && styles.disabled]}
                 >
                   <Icon name="folder-outline" size={12} color={active ? colors.onDark : colors.primary} />
-                  <Text style={[styles.categoryText, active && styles.categoryTextActive]} numberOfLines={1}>{formatPath(path)}</Text>
+                  <Text style={[styles.categoryText, active && styles.categoryTextActive]} numberOfLines={2}>{formatPath(path)}</Text>
                 </Pressable>
               );
             })}
@@ -74,14 +76,18 @@ export function FloatingCategoryDial({ data, disabled = false, selectedPath = nu
 function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
   return StyleSheet.create({
     wrap: { width: '100%', gap: spacing.xs, zIndex: 20, elevation: 12 },
-    triggerRow: { flexDirection: 'row', alignItems: 'center' },
-    trigger: { width: 42, height: 42, borderRadius: rounded.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairlineStrong },
+    trigger: { minHeight: 42, borderRadius: rounded.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairlineStrong, paddingHorizontal: spacing.sm, flexDirection: 'row', gap: spacing.xs, alignSelf: 'flex-start' },
+    triggerIcon: { width: 24, height: 24, borderRadius: rounded.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+    triggerText: { ...typography.bodySmMedium, color: colors.charcoal, maxWidth: 112 },
+    triggerTextOpen: { color: colors.onPrimary },
+    triggerCount: { ...typography.micro, color: colors.slate, minWidth: 18, textAlign: 'center' },
+    triggerCountOpen: { color: colors.onPrimary },
     triggerOpen: { backgroundColor: colors.primary, borderColor: colors.primary },
     disabled: { opacity: 0.55 },
     dialPanel: { width: '100%', borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.canvas, padding: spacing.xs, zIndex: 30, elevation: 16 },
-    scroll: { maxHeight: 188 },
+    scroll: { maxHeight: 224 },
     buttonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingBottom: spacing.xs },
-    categoryButton: { minHeight: 36, maxWidth: '100%', borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surfaceSoft, paddingHorizontal: spacing.xs, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: spacing.xxs, flexGrow: 1, flexBasis: '30%' },
+    categoryButton: { minHeight: 42, maxWidth: '100%', borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surfaceSoft, paddingHorizontal: spacing.xs, paddingVertical: spacing.xs, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: spacing.xxs, flexGrow: 1, flexBasis: '31%' },
     categoryButtonActive: { backgroundColor: colors.inkDeep, borderColor: colors.inkDeep },
     categoryText: { ...typography.micro, color: colors.charcoal, textAlign: 'center', flexShrink: 1, minWidth: 0 },
     categoryTextActive: { color: colors.onDark },
