@@ -9,7 +9,7 @@ import { AiNotificationsPanel } from './src/features/ai/AiNotificationsPanel';
 import { AiReviewPanel } from './src/features/ai/AiReviewPanel';
 import { AiWorkspacePanel } from './src/features/ai/AiWorkspacePanel';
 import { CategoryList } from './src/features/categories/CategoryList';
-import { countCategoryContents, createRootCategory, createSubcategory, deleteCategory, formatPath, getCategoryItems, listChildCategories, renameCategory } from './src/features/categories/categoryTree';
+import { countCategoryContents, createRootCategory, createSubcategory, deleteCategory, formatPath, getCategoryItems, listChildCategories, renameCategory, setCategoryPriority } from './src/features/categories/categoryTree';
 import { TextPromptModal } from './src/features/editor/TextPromptModal';
 import { NoteEditorModal } from './src/features/editor/NoteEditorModal';
 import { MoveCopyModal } from './src/features/notes/MoveCopyModal';
@@ -388,6 +388,10 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     return updateSelectedCategoryPaths(nextSelected);
   }
 
+  async function setSubcategoryOrderPriority(categoryPath: CategoryPath, priority: number) {
+    return commit(setCategoryPriority(data, categoryPath, priority));
+  }
+
   async function includeWorkspaceCategory(categoryName: string) {
     if (!categoryName) return false;
     const selected = activeWorkspace?.selectedCategoryPaths ?? [];
@@ -480,6 +484,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onCreateRootCategory={() => setPromptMode('root')}
                   onToggleCategory={toggleWorkspaceCategory}
                   onSetCategoryPriority={setWorkspaceCategoryPriority}
+                  onSetSubcategoryPriority={setSubcategoryOrderPriority}
                   onAddNote={addBoardNote}
                   onCreateSubcategory={(categoryPath) => { setPromptPath(categoryPath); setPromptMode('subcategory'); }}
                   onRenameCategory={(categoryPath) => { setPath(categoryPath); setPromptMode('rename'); }}

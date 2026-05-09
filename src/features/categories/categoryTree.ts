@@ -145,8 +145,9 @@ export function deleteCategory(data: NotesData, path: CategoryPath): MutationRes
 export function setCategoryPriority(data: NotesData, path: CategoryPath, priority: number): MutationResult {
   const name = path[path.length - 1];
   if (!name) return failure('path_not_found', 'Choose a category to order.');
+  if (path.length === 1) return failure('root_category_order', 'Root category order is managed by the workspace board.');
   const next = cloneData(data);
-  const items = path.length === 1 ? getRootCategoryItems(next) : getCategoryItems(next, path.slice(0, -1));
+  const items = getCategoryItems(next, path.slice(0, -1));
   if (!items) return failure('path_not_found', 'The selected category no longer exists.');
   const index = items.findIndex((item) => isCategoryNode(item) && Object.prototype.hasOwnProperty.call(item, name));
   if (index === -1) return failure('path_not_found', 'The selected category no longer exists.');
@@ -160,7 +161,7 @@ export function setCategoryPriority(data: NotesData, path: CategoryPath, priorit
   visibleItems.splice(targetVisibleIndex, 0, selectedCategory);
   items.splice(0, items.length, ...visibleItems.reverse());
 
-  syncStandaloneCategory(next, path.length === 1 ? path : path.slice(0, -1));
+  syncStandaloneCategory(next, path.slice(0, -1));
   return { ok: true, data: next };
 }
 

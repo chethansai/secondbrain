@@ -70,11 +70,15 @@ function NoteActionsDropdown({ note, noteCount, currentOrder, pinned, colors, st
 
   return (
     <View style={styles.actions}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Note actions" onPress={() => setOpen((current) => !current)} style={styles.iconButton}>
-        <Icon name="settings-outline" size={18} color={colors.ink} />
+      <Pressable accessibilityRole="button" accessibilityLabel={pinned ? 'Pinned note actions' : 'Note actions'} onPress={() => setOpen((current) => !current)} style={[styles.iconButton, pinned && styles.iconButtonPinned]}>
+        <Icon name="settings-outline" size={18} color={pinned ? colors.onPrimary : colors.ink} />
       </Pressable>
       {open ? (
         <View style={styles.dropdown}>
+          <Pressable accessibilityRole="button" accessibilityLabel={pinned ? 'Unpin note' : 'Pin note'} onPress={() => { close(); onTogglePin(note); }} style={[styles.dropdownItem, pinned && styles.dropdownItemPinned]}>
+            <Icon name="settings-outline" size={15} color={pinned ? colors.onPrimary : colors.primary} />
+            <Text style={[styles.dropdownItemText, pinned && styles.dropdownItemTextPinned]}>{pinned ? 'Unpin' : 'Pin'}</Text>
+          </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Edit note" onPress={() => { close(); onEdit(note); }} style={styles.dropdownItem}>
             <Icon name="create-outline" size={15} color={colors.ink} />
             <Text style={styles.dropdownItemText}>Edit</Text>
@@ -103,10 +107,6 @@ function NoteActionsDropdown({ note, noteCount, currentOrder, pinned, colors, st
               </ScrollView>
             </View>
           ) : null}
-          <Pressable accessibilityRole="button" accessibilityLabel={pinned ? 'Unpin note' : 'Pin note'} onPress={() => { close(); onTogglePin(note); }} style={styles.dropdownItem}>
-            <Icon name="pin-outline" size={15} color={pinned ? colors.primary : colors.ink} />
-            <Text style={styles.dropdownItemText}>{pinned ? 'Unpin' : 'Pin'}</Text>
-          </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Delete note" onPress={() => { close(); onDelete(note); }} style={styles.dropdownItem}>
             <Icon name="trash-outline" size={15} color={colors.semanticError} />
             <Text style={styles.dropdownItemDanger}>Delete</Text>
@@ -144,9 +144,12 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   historyEvent: { ...typography.captionBold, color: colors.steel, textTransform: 'uppercase' },
   actions: { position: 'relative', flexDirection: 'row', gap: spacing.xs, justifyContent: 'flex-end', zIndex: 3 },
   iconButton: { width: 40, height: 40, borderRadius: rounded.md, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  iconButtonPinned: { backgroundColor: colors.primary, borderWidth: 1, borderColor: colors.primaryDeep },
   dropdown: { position: 'absolute', top: 44, right: 0, width: 172, borderRadius: rounded.md, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: spacing.xs, gap: 3, zIndex: 5, elevation: 8 },
   dropdownItem: { minHeight: 36, borderRadius: rounded.sm, paddingHorizontal: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.surfaceSoft },
+  dropdownItemPinned: { backgroundColor: colors.primary },
   dropdownItemText: { ...typography.bodySmMedium, color: colors.charcoal, flex: 1 },
+  dropdownItemTextPinned: { color: colors.onPrimary },
   dropdownItemDanger: { ...typography.bodySmMedium, color: colors.semanticError, flex: 1 },
   priorityPicker: { gap: spacing.xs, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.hairlineSoft, paddingVertical: spacing.xs },
   prioritySearch: { minHeight: 34, borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairlineStrong, color: colors.ink, backgroundColor: colors.surfaceSoft, paddingHorizontal: spacing.xs, paddingVertical: 0, ...typography.bodySm },
