@@ -40,6 +40,7 @@ type Props = {
   onSetCategoryPriority: (path: CategoryPath, priority: number, visibleCategoryPaths?: CategoryPath[]) => void;
   onSetSubcategoryPriority: (path: CategoryPath, priority: number) => void;
   onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean;
+  onOpenAddNote: (path: CategoryPath) => void;
   onCreateSubcategory: (path: CategoryPath) => void;
   onCopyCategory: (path: CategoryPath) => void;
   onRenameCategory: (path: CategoryPath) => void;
@@ -82,6 +83,7 @@ export function WorkspaceBoard({
   onSetCategoryPriority,
   onSetSubcategoryPriority,
   onAddNote,
+  onOpenAddNote,
   onCreateSubcategory,
   onCopyCategory,
   onRenameCategory,
@@ -426,6 +428,7 @@ export function WorkspaceBoard({
                   onOpen={() => onOpenCategory(category.path)}
                   onOpenCategory={onOpenCategory}
                   onAddNote={onAddNote}
+                  onOpenAddNote={onOpenAddNote}
                   onCreateSubcategory={onCreateSubcategory}
                   onCopyCategory={onCopyCategory}
                   onSetSubcategoryPriority={onSetSubcategoryPriority}

@@ -21,6 +21,7 @@ type Props = {
   onOpen: () => void;
   onOpenCategory: (path: CategoryPath) => void;
   onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean;
+  onOpenAddNote: (path: CategoryPath) => void;
   onCreateSubcategory: (path: CategoryPath) => void;
   onCopyCategory: (path: CategoryPath) => void;
   onSetSubcategoryPriority: (path: CategoryPath, priority: number) => void;
@@ -52,6 +53,7 @@ export function WorkspaceCategoryCard({
   onOpen,
   onOpenCategory,
   onAddNote,
+  onOpenAddNote,
   onCreateSubcategory,
   onCopyCategory,
   onSetSubcategoryPriority,
@@ -97,7 +99,7 @@ export function WorkspaceCategoryCard({
 
   function openAddNote() {
     setActionsOpen(false);
-    setAdding(true);
+    onOpenAddNote(category.path);
   }
 
   function toggleCategory(path: CategoryPath) {
@@ -205,6 +207,7 @@ export function WorkspaceCategoryCard({
                   onToggleCategory={toggleCategory}
                   onOpenCategory={onOpenCategory}
                   onAddNote={onAddNote}
+                  onOpenAddNote={onOpenAddNote}
                   onCreateSubcategory={onCreateSubcategory}
                   onCopyCategory={onCopyCategory}
                   onSetSubcategoryPriority={onSetSubcategoryPriority}
@@ -233,7 +236,7 @@ export function WorkspaceCategoryCard({
   );
 }
 
-function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, pinnedNotes, colors, styles, onToggleCategory, onOpenCategory, onAddNote, onCreateSubcategory, onCopyCategory, onSetSubcategoryPriority, onRenameCategory, onDeleteCategory, onEditNote, onMoveNote, onCopyNote, onCopyNoteText, onSetNotePriority, onToggleNotePin, onDeleteNote }: { category: CategorySummary; depth: number; itemCount: number; currentOrder: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; pinnedNotes: PinnedNoteRef[]; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean; onCreateSubcategory: (path: CategoryPath) => void; onCopyCategory: (path: CategoryPath) => void; onSetSubcategoryPriority: (path: CategoryPath, priority: number) => void; onRenameCategory: (path: CategoryPath) => void; onDeleteCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onCopyNoteText: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onToggleNotePin: (note: FlatNote) => void; onDeleteNote: (note: FlatNote) => void }) {
+function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, pinnedNotes, colors, styles, onToggleCategory, onOpenCategory, onAddNote, onOpenAddNote, onCreateSubcategory, onCopyCategory, onSetSubcategoryPriority, onRenameCategory, onDeleteCategory, onEditNote, onMoveNote, onCopyNote, onCopyNoteText, onSetNotePriority, onToggleNotePin, onDeleteNote }: { category: CategorySummary; depth: number; itemCount: number; currentOrder: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; pinnedNotes: PinnedNoteRef[]; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean; onOpenAddNote: (path: CategoryPath) => void; onCreateSubcategory: (path: CategoryPath) => void; onCopyCategory: (path: CategoryPath) => void; onSetSubcategoryPriority: (path: CategoryPath, priority: number) => void; onRenameCategory: (path: CategoryPath) => void; onDeleteCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onCopyNoteText: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onToggleNotePin: (note: FlatNote) => void; onDeleteNote: (note: FlatNote) => void }) {
   const [adding, setAdding] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -293,7 +296,7 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
             {hasChildren ? <Text style={styles.subcategoryCount}>{children.length}</Text> : null}
           </View>
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Add note to ${category.name}`} onPress={(event) => { event.stopPropagation(); setAdding(true); }} style={styles.subcategoryAddButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Add note to ${category.name}`} onPress={(event) => { event.stopPropagation(); onOpenAddNote(category.path); }} style={styles.subcategoryAddButton}>
           <Icon name="add" size={10} color={colors.primary} />
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={`Actions for ${category.name}`} onPress={(event) => { event.stopPropagation(); setActionsOpen((current) => !current); }} style={styles.subcategoryAddButton}>
@@ -366,6 +369,7 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
                   onToggleCategory={onToggleCategory}
                   onOpenCategory={onOpenCategory}
                   onAddNote={onAddNote}
+                  onOpenAddNote={onOpenAddNote}
                   onCreateSubcategory={onCreateSubcategory}
                   onCopyCategory={onCopyCategory}
                   onSetSubcategoryPriority={onSetSubcategoryPriority}

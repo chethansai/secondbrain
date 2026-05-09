@@ -367,6 +367,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-09: Routed workspace card add-note buttons through the full add-note editor. Decision: the release APK already contained the new category chip picker, but category-card `+` buttons still used the older inline mini input, so board/card add-note actions now open the same `SEEK`/`Cancel` modal and chip picker used by category detail add-note flows.
+
 - 2026-05-09: Replaced the add-note floating category dial with an inline category chip picker. Decision: keep `SEEK` and `Cancel` as the main editor action buttons, render all other categories alphabetically in a scrollable flow-wrapped pill chip pane with trailing overflow menus, and preserve immediate silent save behavior when a category chip is selected.
 
 - 2026-05-09: Refined floating add-note category saving. Decision: keep the floating category dial as the immediate save route for any alphabetically sorted category, expand its compact chip layout so paths fit better, and make the fallback add-note submit genuinely save to the `SEEK` category by creating/showing `SEEK` when needed.

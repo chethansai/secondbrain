@@ -320,6 +320,7 @@ export function AiWorkspacePanel() {
           onSetCategoryPriority={setWorkspaceCategoryPriority}
           onSetSubcategoryPriority={setSubcategoryOrderPriority}
           onAddNote={addWorkspaceNote}
+          onOpenAddNote={(categoryPath) => { setPath(categoryPath); setEditorMode('add'); }}
           onCreateSubcategory={(categoryPath) => { setPromptPath(categoryPath); setPromptMode('subcategory'); }}
           onCopyCategory={() => undefined}
           onRenameCategory={(categoryPath) => { setPath(categoryPath); setPromptMode('rename'); }}
