@@ -250,6 +250,11 @@ function countItems(items: NoteItem[]): { notes: number; categories: number } {
   );
 }
 
+  export function categoryDeleteMessage(data: NotesData, path: CategoryPath) {
+    const counts = countCategoryContents(data, path);
+    return `${counts.notes} notes and ${counts.categories} subcategories will be deleted.`;
+  }
+
 function hasNestedCategoryNamed(data: NotesData, name: string) {
   return Object.values(data).some((items) => containsCategoryNamed(items, name));
 }
@@ -398,7 +403,7 @@ function createUniqueCopyName(name: string, usedNames: Set<string>) {
   return `${baseName} ${suffix}`;
 }
 
-function startsWithPath(path: CategoryPath, prefix: CategoryPath) {
+export function startsWithPath(path: CategoryPath, prefix: CategoryPath) {
   return prefix.every((segment, index) => path[index] === segment);
 }
 

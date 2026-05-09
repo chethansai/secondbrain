@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, NativeScrollEvent, NativeSyntheticEvent, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AutomationCommand, parseAutomationDeepLink } from './src/features/automation/deepLinks';
 import { clearAutomationFileQueue, ensureDefaultAutomationQueueFile, getDefaultAutomationQueueUri, readAutomationFileQueue, rewriteAutomationFileQueue } from './src/features/automation/fileQueue';
-import { clearSavedUnlock, defaultAuthTimeoutHours, markUnlocked, readAuthTimeoutHours, readShouldStartUnlocked, writeAuthTimeoutHours } from './src/features/auth/authSession';
-import { LockScreen } from './src/features/auth/LockScreen';
+import { AuthGate } from './src/features/auth/AuthGate';
 import { AiChatPanel } from './src/features/ai/AiChatPanel';
 import { AiNotificationsPanel } from './src/features/ai/AiNotificationsPanel';
 import { AiReviewPanel } from './src/features/ai/AiReviewPanel';
 import { AiWorkspacePanel } from './src/features/ai/AiWorkspacePanel';
 import { CategoryList } from './src/features/categories/CategoryList';
-import { copyCategory, countCategoryContents, createRootCategory, createSubcategory, deleteCategory, formatPath, getCategoryItems, listChildCategories, renameCategory, setCategoryPriority } from './src/features/categories/categoryTree';
+import { categoryDeleteMessage, copyCategory, createRootCategory, createSubcategory, deleteCategory, getCategoryItems, listChildCategories, renameCategory, setCategoryPriority, startsWithPath } from './src/features/categories/categoryTree';
 import { TextPromptModal } from './src/features/editor/TextPromptModal';
 import { NoteEditorModal } from './src/features/editor/NoteEditorModal';
 import { MoveCopyModal } from './src/features/notes/MoveCopyModal';
@@ -21,13 +20,12 @@ import { copyText } from './src/features/settings/clipboard';
 import { SettingsPanel } from './src/features/settings/SettingsPanel';
 import { useNotesSync } from './src/features/sync/useNotesSync';
 import { WorkspaceBoard } from './src/features/workspace/WorkspaceBoard';
+import { ActionGrid, ErrorBanner, PanelHeader, WorkspaceHeader } from './src/features/workspace/WorkspaceChrome';
 import { ThemeProvider, useTheme } from './src/shared/design/ThemeProvider';
 import { rounded, spacing, typography } from './src/shared/design/tokens';
 import { CategoryPath, FlatNote, NotesData } from './src/shared/types/notes';
-import { Button } from './src/shared/ui/Button';
 import { ConfirmModal } from './src/shared/ui/ConfirmModal';
 import { EmptyState } from './src/shared/ui/EmptyState';
-import { Icon } from './src/shared/ui/Icon';
 
 type ModalMode = 'root' | 'subcategory' | 'rename' | 'workspace' | 'renameWorkspace' | null;
 type MoveCopyAction = 'move' | 'copy';
@@ -38,51 +36,9 @@ type DeleteTarget = { type: 'category'; path: CategoryPath } | { type: 'note'; n
 export default function App() {
   return <ThemeProvider><AppContent /></ThemeProvider>;
 }
-
 function AppContent() {
-  const [unlocked, setUnlocked] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [authTimeoutHours, setAuthTimeoutHours] = useState(defaultAuthTimeoutHours);
   const [pendingAutomationCommand, setPendingAutomationCommand] = useState<AutomationCommand | null>(null);
   const processedAutomationLinks = useRef(new Set<string>());
-
-  useEffect(() => {
-    let mounted = true;
-    async function loadAuthSession() {
-      try {
-        const [timeoutHours, shouldStartUnlocked] = await Promise.all([
-          readAuthTimeoutHours(),
-          readShouldStartUnlocked(),
-        ]);
-        if (!mounted) return;
-        setAuthTimeoutHours(timeoutHours);
-        setUnlocked(shouldStartUnlocked);
-      } finally {
-        if (mounted) setAuthLoading(false);
-      }
-    }
-
-    loadAuthSession();
-    return () => { mounted = false; };
-  }, []);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', async (state) => {
-      if (state !== 'active') return;
-      const shouldStayUnlocked = await readShouldStartUnlocked();
-      setUnlocked(shouldStayUnlocked);
-    });
-    return () => subscription.remove();
-  }, []);
-
-  useEffect(() => {
-    if (!unlocked) return;
-    const interval = setInterval(async () => {
-      const shouldStayUnlocked = await readShouldStartUnlocked();
-      setUnlocked(shouldStayUnlocked);
-    }, 60 * 1000);
-    return () => clearInterval(interval);
-  }, [unlocked]);
 
   useEffect(() => {
     function queueAutomationUrl(url: string | null) {
@@ -102,40 +58,14 @@ function AppContent() {
     setPendingAutomationCommand((current) => (current?.key === commandKey ? null : current));
   }
 
-  async function unlock() {
-    await markUnlocked();
-    setUnlocked(true);
-  }
-
-  async function updateAuthTimeout(hours: number) {
-    const nextHours = await writeAuthTimeoutHours(hours);
-    setAuthTimeoutHours(nextHours);
-    const shouldStayUnlocked = await readShouldStartUnlocked();
-    setUnlocked(shouldStayUnlocked);
-  }
-
-  async function logout() {
-    await clearSavedUnlock();
-    setUnlocked(false);
-  }
-
-  if (authLoading) return <AuthLoadingScreen />;
-  if (!unlocked) return <LockScreen onUnlock={unlock} />;
-  return <NotesWorkspace automationCommand={pendingAutomationCommand} onAutomationComplete={completeAutomationCommand} authTimeoutHours={authTimeoutHours} onAuthTimeoutChange={updateAuthTimeout} onLogout={logout} />;
-}
-
-function AuthLoadingScreen() {
-  const { colors } = useTheme();
   return (
-    <View style={[authLoadingStyles.screen, { backgroundColor: colors.brandNavy }]}>
-      <ActivityIndicator color={colors.onPrimary} />
-    </View>
+    <AuthGate>
+      {({ authTimeoutHours, onAuthTimeoutChange, onLogout }) => (
+        <NotesWorkspace automationCommand={pendingAutomationCommand} onAutomationComplete={completeAutomationCommand} authTimeoutHours={authTimeoutHours} onAuthTimeoutChange={onAuthTimeoutChange} onLogout={onLogout} />
+      )}
+    </AuthGate>
   );
 }
-
-const authLoadingStyles = StyleSheet.create({
-  screen: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-});
 
 function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHours, onAuthTimeoutChange, onLogout }: { automationCommand: AutomationCommand | null; onAutomationComplete: (commandKey: string) => void; authTimeoutHours: number; onAuthTimeoutChange: (hours: number) => Promise<void>; onLogout: () => void }) {
   const { colors } = useTheme();
@@ -465,7 +395,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" onScroll={handleScreenScroll} scrollEventThrottle={16}>
         <View style={[styles.workspaceCard, showingRootBoard && styles.workspaceCardBoard]}>
-          {error ? <ErrorBanner message={error} colors={colors} styles={styles} onDismiss={() => setError(null)} /> : null}
+          {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}
           {loading ? (
             <View style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={styles.loadingText}>Loading workspace</Text></View>
           ) : null}
@@ -519,8 +449,6 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     title={activeTitle}
                     path={path}
                     workspaceName={activeWorkspace?.name ?? 'Workspace'}
-                    colors={colors}
-                    styles={styles}
                     onBack={() => setPath(path.slice(0, -1))}
                     onOpenSearch={() => setTab('search')}
                     onOpenSettings={() => setTab('settings')}
@@ -530,7 +458,6 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     onOpenAiWorkspace={() => setTab('aiWorkspace')}
                   />
                   <ActionGrid
-                    styles={styles}
                     onAddNote={() => setEditorMode('add')}
                     onSubcategory={() => { setPromptPath(path); setPromptMode('subcategory'); }}
                     onRename={() => setPromptMode('rename')}
@@ -557,37 +484,37 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           ) : null}
           {!loading && tab === 'search' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="Search" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
+              <PanelHeader title="Search" onBack={() => setTab('workspace')} />
               <SearchPanel data={data} onSelect={(note) => { setPath(note.path); setTab('workspace'); }} />
             </View>
           ) : null}
           {!loading && tab === 'settings' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="Settings" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
+              <PanelHeader title="Settings" onBack={() => setTab('workspace')} />
               <SettingsPanel data={data} authTimeoutHours={authTimeoutHours} onAuthTimeoutChange={onAuthTimeoutChange} onImport={importData} />
             </View>
           ) : null}
           {!loading && tab === 'aiChat' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="AI Chat" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
+              <PanelHeader title="AI Chat" onBack={() => setTab('workspace')} />
               <AiChatPanel data={data} />
             </View>
           ) : null}
           {!loading && tab === 'aiNotifications' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="AI Notifications" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
+              <PanelHeader title="AI Notifications" onBack={() => setTab('workspace')} />
               <AiNotificationsPanel data={data} />
             </View>
           ) : null}
           {!loading && tab === 'ai' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="AI Review" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
+              <PanelHeader title="AI Review" onBack={() => setTab('workspace')} />
               <AiReviewPanel data={data} commit={commit} onIncludeCategory={includeWorkspaceCategory} />
             </View>
           ) : null}
           {!loading && tab === 'aiWorkspace' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="AI WORKSPACE" colors={colors} styles={styles} onBack={() => setTab('workspace')} />
+              <PanelHeader title="AI WORKSPACE" onBack={() => setTab('workspace')} />
               <AiWorkspacePanel />
             </View>
           ) : null}
@@ -659,86 +586,6 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   );
 }
 
-function categoryDeleteMessage(data: NotesData, path: CategoryPath) {
-  const counts = countCategoryContents(data, path);
-  return `${counts.notes} notes and ${counts.categories} subcategories will be deleted.`;
-}
-
-function startsWithPath(path: CategoryPath, prefix: CategoryPath) {
-  return prefix.every((segment, index) => path[index] === segment);
-}
-
-function WorkspaceHeader({ title, path, workspaceName, colors, styles, onBack, onOpenSearch, onOpenSettings, onOpenAiChat, onOpenAiNotifications, onOpenAi, onOpenAiWorkspace }: { title: string; path: CategoryPath; workspaceName: string; colors: typeof import('./src/shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onBack: () => void; onOpenSearch: () => void; onOpenSettings: () => void; onOpenAiChat: () => void; onOpenAiNotifications: () => void; onOpenAi: () => void; onOpenAiWorkspace: () => void }) {
-  return (
-    <View style={styles.header}>
-      {path.length ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={styles.backButton}>
-          <Icon name="arrow-back" size={20} color={colors.ink} />
-        </Pressable>
-      ) : null}
-      <View style={styles.headerText}>
-        <Text style={styles.eyebrow}>{path.length ? `${workspaceName} / ${formatPath(path)}` : workspaceName}</Text>
-        <Text style={styles.heading}>{title}</Text>
-      </View>
-      <View style={styles.headerActions}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open AI Chat" onPress={onOpenAiChat} style={styles.headerIconButton}>
-          <Icon name="sparkles-outline" size={17} color={colors.ink} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open AI Review" onPress={onOpenAi} style={styles.headerIconButton}>
-          <Icon name="sparkles-outline" size={17} color={colors.ink} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open AI workspace" onPress={onOpenAiWorkspace} style={styles.headerIconButton}>
-          <Icon name="albums-outline" size={17} color={colors.ink} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open search" onPress={onOpenSearch} style={styles.headerIconButton}>
-          <Icon name="search-outline" size={17} color={colors.ink} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open AI notifications" onPress={onOpenAiNotifications} style={styles.headerIconButton}>
-          <Icon name="notifications-outline" size={17} color={colors.ink} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={onOpenSettings} style={styles.headerIconButton}>
-          <Icon name="settings-outline" size={17} color={colors.ink} />
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-function PanelHeader({ title, colors, styles, onBack }: { title: string; colors: typeof import('./src/shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onBack: () => void }) {
-  return (
-    <View style={styles.header}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Back to workspace" onPress={onBack} style={styles.backButton}>
-        <Icon name="arrow-back" size={20} color={colors.ink} />
-      </Pressable>
-      <View style={styles.headerText}>
-        <Text style={styles.eyebrow}>Workspace</Text>
-        <Text style={styles.heading}>{title}</Text>
-      </View>
-    </View>
-  );
-}
-
-function ActionGrid({ styles, onAddNote, onSubcategory, onCopy, onRename, onDelete }: { styles: ReturnType<typeof createStyles>; onAddNote: () => void; onSubcategory: () => void; onCopy: () => void; onRename: () => void; onDelete: () => void }) {
-  return (
-    <View style={styles.actionGrid}>
-      <Button label="Note" icon="add" onPress={onAddNote} style={styles.gridButton} />
-      <Button label="Folder" icon="folder-outline" variant="secondary" onPress={onSubcategory} style={styles.gridButton} />
-      <Button label="Copy" icon="copy-outline" variant="secondary" onPress={onCopy} style={styles.gridButton} />
-      <Button label="Rename" icon="create-outline" variant="secondary" onPress={onRename} style={styles.gridButton} />
-      <Button label="Delete" icon="trash-outline" variant="danger" onPress={onDelete} style={styles.gridButton} />
-    </View>
-  );
-}
-
-function ErrorBanner({ message, colors, styles, onDismiss }: { message: string; colors: typeof import('./src/shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onDismiss: () => void }) {
-  return (
-    <View style={styles.errorBanner}>
-      <Text style={styles.errorText}>{message}</Text>
-      <Pressable onPress={onDismiss} style={styles.dismiss}><Icon name="close" size={18} color={colors.semanticError} /></Pressable>
-    </View>
-  );
-}
-
 function createStyles(colors: typeof import('./src/shared/design/tokens').colors) {
   return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.canvas },
@@ -747,20 +594,8 @@ function createStyles(colors: typeof import('./src/shared/design/tokens').colors
   workspaceCard: { width: '100%', backgroundColor: colors.canvas, padding: spacing.lg, gap: spacing.lg },
   workspaceCardBoard: { paddingHorizontal: 0 },
   panel: { gap: spacing.lg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  backButton: { width: 40, height: 40, borderRadius: rounded.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
-  headerText: { flex: 1 },
-  headerActions: { flexDirection: 'row', gap: spacing.xs },
-  headerIconButton: { width: 38, height: 38, borderRadius: rounded.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.hairline },
-  eyebrow: { ...typography.captionBold, color: colors.primary },
-  heading: { ...typography.heading2, color: colors.ink },
   sectionStack: { gap: spacing.md },
-  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  gridButton: { flexGrow: 1, minWidth: 132 },
   loading: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl },
   loadingText: { ...typography.bodySm, color: colors.slate },
-  errorBanner: { backgroundColor: colors.cardTintRose, borderRadius: rounded.md, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  errorText: { ...typography.bodySmMedium, color: colors.semanticError, flex: 1 },
-  dismiss: { width: 32, height: 32, borderRadius: rounded.sm, alignItems: 'center', justifyContent: 'center' },
   });
 }

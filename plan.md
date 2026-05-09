@@ -367,6 +367,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-09: Implemented in-app note text copy and paste. Decision: add Expo Clipboard support, make rendered notes selectable in category detail and workspace cards, distinguish clipboard `Copy text` from existing `Copy to category`, add a Paste action to the note editor that inserts clipboard text at the cursor/selection, and extract auth/workspace chrome/zoom helpers so touched source files stay within the 600-line feature architecture limit.
+
 - 2026-05-09: Implemented copying a category or subcategory into another category. Decision: add a deterministic category-copy mutation that duplicates the branch with globally unique `copy` names so the copied branch stays independent under the app's name-based standalone sync model, reuse the move/copy picker for destination selection, and expose Copy actions in category detail and workspace card menus.
 
 - 2026-05-09: Stabilized workspace card scrolling handoff with active local board changes. Decision: wire note text copy callbacks through AI workspace detail notes, ignore generated Expo local device state, and keep the broader in-progress category copy/order work typecheck-clean before the required commit and push.
