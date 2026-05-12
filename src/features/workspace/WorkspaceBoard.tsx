@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { formatAuthTimeout, neverAuthTimeoutHours } from '../auth/authSession';
 import { collapseExactNameCategories, formatPath, listAllCategories } from '../categories/categoryTree';
 import { listNotesAtPath } from '../notes/noteMutations';
 import { sortPinnedNotesFirst } from '../notes/pinnedNotes';
@@ -99,7 +100,7 @@ export function WorkspaceBoard({
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
-  const [authHoursText, setAuthHoursText] = useState(String(authTimeoutHours));
+  const [authHoursText, setAuthHoursText] = useState(formatAuthTimeoutInput(authTimeoutHours));
   const [authHoursStatus, setAuthHoursStatus] = useState<string | null>(null);
   const [priorityMenuKey, setPriorityMenuKey] = useState<string | null>(null);
   const [categorySearch, setCategorySearch] = useState('');
@@ -154,7 +155,7 @@ export function WorkspaceBoard({
   async function submitAuthHours() {
     const nextHours = Number(authHoursText);
     if (!Number.isFinite(nextHours) || nextHours <= 0) {
-      setAuthHoursText(String(authTimeoutHours));
+      setAuthHoursText(formatAuthTimeoutInput(authTimeoutHours));
       setAuthHoursStatus('Enter hours');
       return;
     }
@@ -165,7 +166,7 @@ export function WorkspaceBoard({
   }
 
   useEffect(() => {
-    setAuthHoursText(String(authTimeoutHours));
+    setAuthHoursText(formatAuthTimeoutInput(authTimeoutHours));
   }, [authTimeoutHours]);
 
   useEffect(() => {
@@ -254,16 +255,18 @@ export function WorkspaceBoard({
                 <View style={styles.authTimeoutRow}>
                   <View style={styles.authTimeoutTextBlock}>
                     <Text style={styles.headerMenuKicker}>Password</Text>
-                    <Text style={styles.authTimeoutText} numberOfLines={1}>{formatHours(authTimeoutHours)}</Text>
+                    <Text style={styles.authTimeoutText} numberOfLines={1}>{formatAuthTimeout(authTimeoutHours)}</Text>
                   </View>
                   <TextInput
                     accessibilityLabel="Password timeout hours"
                     value={authHoursText}
                     onChangeText={(text) => { setAuthHoursStatus(null); setAuthHoursText(text.replace(/[^0-9]/g, '')); }}
                     onSubmitEditing={submitAuthHours}
-                    onBlur={() => setAuthHoursText(authHoursText || String(authTimeoutHours))}
+                    onBlur={() => setAuthHoursText(authHoursText || formatAuthTimeoutInput(authTimeoutHours))}
                     keyboardType="number-pad"
                     returnKeyType="done"
+                    placeholder={authTimeoutHours === neverAuthTimeoutHours ? 'Never' : undefined}
+                    placeholderTextColor={colors.stone}
                     maxLength={2}
                     selectTextOnFocus
                     style={styles.authTimeoutInput}
@@ -468,8 +471,8 @@ function isAncestorPath(candidate: CategoryPath, path: CategoryPath) {
   return candidate.length < path.length && candidate.every((segment, index) => path[index] === segment);
 }
 
-function formatHours(hours: number) {
-  return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+function formatAuthTimeoutInput(hours: number) {
+  return hours === neverAuthTimeoutHours ? '' : String(hours);
 }
 
 const boardCardGutter = 1;

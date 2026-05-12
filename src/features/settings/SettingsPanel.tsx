@@ -6,7 +6,7 @@ import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { TextInputField } from '../../shared/ui/TextInputField';
 import { NotesData, NoteItem } from '../../shared/types/notes';
-import { authTimeoutOptions } from '../auth/authSession';
+import { authTimeoutOptions, formatAuthTimeout } from '../auth/authSession';
 import { cloneItems, isCategoryNode } from '../categories/categoryTree';
 import { validateNotesData } from '../sync/validation';
 import { copyText } from './clipboard';
@@ -139,7 +139,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
       <View style={styles.settingGroup}>
         <Text style={styles.settingLabel}>Ask for password after</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Choose password timeout" onPress={() => setAuthMenuOpen((current) => !current)} style={styles.dropdownButton}>
-          <Text style={styles.dropdownValue}>{formatHours(authTimeoutHours)}</Text>
+          <Text style={styles.dropdownValue}>{formatAuthTimeout(authTimeoutHours)}</Text>
           <Icon name="chevron-down" size={16} color={colors.ink} />
         </Pressable>
         {authMenuOpen ? (
@@ -148,15 +148,15 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
               <Pressable
                 key={hours}
                 accessibilityRole="button"
-                accessibilityLabel={`Set password timeout to ${formatHours(hours)}`}
+                accessibilityLabel={`Set password timeout to ${formatAuthTimeout(hours)}`}
                 onPress={async () => {
                   await onAuthTimeoutChange(hours);
                   setAuthMenuOpen(false);
-                  setStatus(`Password will be asked again after ${formatHours(hours)}.`);
+                  setStatus(hours === 0 ? 'Password will not be asked again automatically.' : `Password will be asked again after ${formatAuthTimeout(hours)}.`);
                 }}
                 style={[styles.dropdownOption, hours === authTimeoutHours && styles.dropdownOptionSelected]}
               >
-                <Text style={[styles.dropdownOptionText, hours === authTimeoutHours && styles.dropdownOptionTextSelected]}>{formatHours(hours)}</Text>
+                <Text style={[styles.dropdownOptionText, hours === authTimeoutHours && styles.dropdownOptionTextSelected]}>{formatAuthTimeout(hours)}</Text>
                 {hours === authTimeoutHours ? <Icon name="checkmark" size={16} color={colors.onPrimary} /> : null}
               </Pressable>
             ))}
@@ -237,10 +237,6 @@ function replaceDuplicateCategoryItems(items: NoteItem[], latestItemsByName: Map
     nextParents.add(name);
     return { [name]: replaceDuplicateCategoryItems(cloneItems(sourceItems), latestItemsByName, nextParents) };
   });
-}
-
-function formatHours(hours: number) {
-  return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
 }
 
 function LineControl({ label, value, min, max, formatter, disabled, colors, styles, onChange }: { label: string; value: number; min: number; max: number; formatter: (value: number) => string; disabled?: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onChange: (value: number) => void | Promise<void> }) {

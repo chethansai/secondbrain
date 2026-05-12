@@ -367,6 +367,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-12: Added a Never option to the password timeout setting. Decision: keep existing hour-based password prompts unchanged, store `Never` as a zero-hour sentinel, and let it keep the app unlocked until explicit logout while showing the option in Settings and the workspace password summary.
+
 - 2026-05-10: Moved category chip saving from workspace card add-note buttons to the native Android overlay popup. Decision: restore category-card `+` buttons to their inline add-note behavior, and make the system overlay floating button's popup show `SEEK` and `Cancel` as main buttons plus a scrollable native category chip list that saves directly to the selected category.
 
 - 2026-05-09: Routed workspace card add-note buttons through the full add-note editor. Decision: the release APK already contained the new category chip picker, but category-card `+` buttons still used the older inline mini input, so board/card add-note actions now open the same `SEEK`/`Cancel` modal and chip picker used by category detail add-note flows.
