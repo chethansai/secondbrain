@@ -192,9 +192,14 @@ class OverlayService : Service() {
       })
     }
     val chipScroll = ScrollView(this).apply {
-      isFillViewport = false
+      isFillViewport = true
+      isVerticalScrollBarEnabled = true
+      overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
       addView(chipWrap)
     }
+    val bounds = displayBounds()
+    val width = min(bounds.width() - dp(32), dp(340))
+    val popupHeight = min(bounds.height() - dp(48), dp(420))
     val container = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
       setPadding(dp(12), dp(10), dp(12), dp(10))
@@ -202,13 +207,14 @@ class OverlayService : Service() {
       elevation = dp(10).toFloat()
       addView(editText, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(controls, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-      addView(chipScroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(172)))
+      addView(chipScroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
     }
-    val frame = FrameLayout(this).apply { addView(container) }
-    val width = min(displayBounds().width() - dp(32), dp(340))
+    val frame = FrameLayout(this).apply {
+      addView(container, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+    }
     val params = WindowManager.LayoutParams(
       width,
-      WindowManager.LayoutParams.WRAP_CONTENT,
+      popupHeight,
       overlayType(),
       WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
       PixelFormat.TRANSLUCENT,
@@ -217,7 +223,7 @@ class OverlayService : Service() {
       val source = buttonParams
       x = source?.x ?: dp(16)
       y = max(dp(24), (source?.y ?: dp(120)) - dp(72))
-      clampParams(this, width, dp(330))
+      clampParams(this, width, popupHeight)
       softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
     }
 

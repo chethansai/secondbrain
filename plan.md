@@ -367,6 +367,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-12: Fixed native floating icon category popup overflow. Decision: target the Android native overlay service instead of the React Native category dial because the floating icon popup is built in Kotlin; constrain the popup to screen-safe height and give category chips the remaining space inside a vertical `ScrollView` so long category lists scroll instead of overflowing.
+
 - 2026-05-12: Added a Never option to the password timeout setting. Decision: keep existing hour-based password prompts unchanged, store `Never` as a zero-hour sentinel, and let it keep the app unlocked until explicit logout while showing the option in Settings and the workspace password summary.
 
 - 2026-05-10: Moved category chip saving from workspace card add-note buttons to the native Android overlay popup. Decision: restore category-card `+` buttons to their inline add-note behavior, and make the system overlay floating button's popup show `SEEK` and `Cancel` as main buttons plus a scrollable native category chip list that saves directly to the selected category.
