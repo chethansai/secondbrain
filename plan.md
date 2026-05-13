@@ -367,6 +367,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-13: Implemented AI Chat notetaking prompt cards. Decision: detect the `notetakingprompts` category case-insensitively, render its notes as tappable quick cards that fill the AI Chat composer, and show the same category-card controls below so prompt notes and subcategories can still be added, edited, copied, moved, ordered, pinned, and deleted through existing deterministic mutations.
+
 - 2026-05-13: Converted workspace category card action options into vertical dropdowns. Decision: replace the compact horizontal category and subcategory action strips with stacked icon rows anchored beside the category action button while preserving rename, folder, copy, order, delete, and all-subcategory behavior.
 
 - 2026-05-12: Fixed native floating icon category popup overflow. Decision: target the Android native overlay service instead of the React Native category dial because the floating icon popup is built in Kotlin; constrain the popup to screen-safe height and give category chips the remaining space inside a vertical `ScrollView` so long category lists scroll instead of overflowing.
