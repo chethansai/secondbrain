@@ -80,6 +80,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const [promptMode, setPromptMode] = useState<ModalMode>(null);
   const [promptPath, setPromptPath] = useState<CategoryPath | null>(null);
   const [editorMode, setEditorMode] = useState<'add' | 'edit' | null>(null);
+  const [editorPath, setEditorPath] = useState<CategoryPath | null>(null);
   const [selectedNote, setSelectedNote] = useState<FlatNote | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [moveVisible, setMoveVisible] = useState(false);
@@ -235,6 +236,11 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
 
   async function importData(nextData: NotesData) {
     return commit({ ok: true, data: nextData });
+  }
+
+  function openAddNoteEditor(notePath: CategoryPath = path) {
+    setEditorPath(notePath);
+    setEditorMode('add');
   }
 
   async function addBoardNote(notePath: CategoryPath, text: string) {
@@ -537,7 +543,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     onOpenAiWorkspace={() => setTab('aiWorkspace')}
                   />
                   <ActionGrid
-                    onAddNote={() => setEditorMode('add')}
+                    onAddNote={() => openAddNoteEditor(path)}
                     onSubcategory={() => { setPromptPath(path); setPromptMode('subcategory'); }}
                     onRename={() => setPromptMode('rename')}
                     onDelete={confirmDeleteCategory}
@@ -556,7 +562,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                       onDelete={confirmDeleteNote}
                       pinnedNotes={pinnedNotes}
                     />
-                  ) : <EmptyState title="No notes here" message="This category is ready for notes or subcategories." actionLabel="Add note" onAction={() => setEditorMode('add')} />}
+                  ) : <EmptyState title="No notes here" message="This category is ready for notes or subcategories." actionLabel="Add note" onAction={() => openAddNoteEditor(path)} />}
                 </View>
               )}
             </View>
@@ -576,7 +582,23 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           {!loading && tab === 'aiChat' ? (
             <View style={styles.sectionStack}>
               <PanelHeader title="AI Chat" onBack={() => setTab('workspace')} />
-              <AiChatPanel data={data} />
+              <AiChatPanel
+                data={data}
+                pinnedNotes={pinnedNotes}
+                onAddNote={addWorkspaceNote}
+                onCreateSubcategory={(categoryPath) => { setPromptPath(categoryPath); setPromptMode('subcategory'); }}
+                onCopyCategory={openCategoryCopy}
+                onSetSubcategoryPriority={setSubcategoryOrderPriority}
+                onRenameCategory={(categoryPath) => { setPath(categoryPath); setPromptMode('rename'); }}
+                onDeleteCategory={(categoryPath) => setDeleteTarget({ type: 'category', path: categoryPath })}
+                onEditNote={(note) => { setSelectedNote(note); setEditorMode('edit'); }}
+                onMoveNote={(note) => openMoveCopy(note, 'move')}
+                onCopyNote={(note) => openMoveCopy(note, 'copy')}
+                onCopyNoteText={(note) => { copyNoteText(note).catch(() => setError('Clipboard copy failed.')); }}
+                onSetNotePriority={setNoteOrderPriority}
+                onToggleNotePin={toggleNotePin}
+                onDeleteNote={confirmDeleteNote}
+              />
             </View>
           ) : null}
           {!loading && tab === 'aiNotifications' ? (
@@ -614,8 +636,8 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         title={editorMode === 'edit' ? 'Edit note' : 'Add note'}
         initialText={editorMode === 'edit' ? selectedNote?.note ?? '' : ''}
         categoryData={editorMode === 'add' ? data : undefined}
-        selectedPath={editorMode === 'add' ? path : null}
-        onClose={() => { setEditorMode(null); setSelectedNote(null); }}
+        selectedPath={editorMode === 'add' ? editorPath ?? path : null}
+        onClose={() => { setEditorMode(null); setEditorPath(null); setSelectedNote(null); }}
         onSubmit={async (text) => {
           if (editorMode !== 'edit' || !selectedNote) return addSeekNote(text);
           const ok = await commitWithHistory(editNote(data, selectedNote.path, selectedNote.note, text, selectedNote.index), `${selectedNote.note} edited to ${text.trim()} - ${formatHistoryPath(selectedNote.path)} - ${formatHistoryTime()} - Event: NOTE_EDITED`);

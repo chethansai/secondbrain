@@ -50,7 +50,7 @@ export async function requestAiText(input: string) {
   });
   if (!response.ok) throw new Error(`AI review failed with ${response.status}.`);
   const text = await response.text();
-  return consumeSseText(text);
+  return consumeAiResponseText(text);
 }
 
 export function createDecisionFromSuggestion(note: FlatNote, suggestion: AiReviewSuggestion, nextId: string): AiReviewDecision {
@@ -172,21 +172,25 @@ function extractJsonObject(text: string) {
   return clean.slice(start, end + 1);
 }
 
-function consumeSseText(text: string) {
+export function consumeAiResponseText(text: string, onToken?: (token: string) => void) {
   let fullText = '';
+  let sawSseData = false;
   for (const line of text.split(/\r?\n/)) {
     const clean = line.trim();
     if (!clean.startsWith('data:')) continue;
+    sawSseData = true;
     const data = clean.replace(/^data:\s*/, '');
     if (!data || data === '[DONE]') continue;
     try {
       const token = extractSseToken(JSON.parse(data) as Record<string, unknown>);
+      if (!token) continue;
       fullText += token;
+      onToken?.(token);
     } catch {
       continue;
     }
   }
-  return fullText || text;
+  return fullText || (sawSseData ? '' : text);
 }
 
 function extractSseToken(parsed: Record<string, unknown>) {

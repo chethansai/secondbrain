@@ -3,8 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { rounded, shadows, spacing, typography } from '../../shared/design/tokens';
 import { CategoryPath, CategorySummary, FlatNote, PinnedNoteRef } from '../../shared/types/notes';
-import { Button } from '../../shared/ui/Button';
-import { Icon } from '../../shared/ui/Icon';
+import { Icon, IconName } from '../../shared/ui/Icon';
 import { isHistoryPath, normalizeNoteText, parseHistoryNote } from '../notes/noteMutations';
 import { isPinnedNote } from '../notes/pinnedNotes';
 
@@ -33,6 +32,7 @@ type Props = {
   onSetNotePriority: (note: FlatNote, priority: number) => void;
   onToggleNotePin: (note: FlatNote) => void;
   onDeleteNote: (note: FlatNote) => void;
+  onPressNote?: (note: FlatNote) => void;
 };
 
 type PreviewItem =
@@ -64,6 +64,7 @@ export function WorkspaceCategoryCard({
   onSetNotePriority,
   onToggleNotePin,
   onDeleteNote,
+  onPressNote,
 }: Props) {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => createStyles(colors, isDark, zoom), [colors, isDark, zoom]);
@@ -140,11 +141,11 @@ export function WorkspaceCategoryCard({
 
       {actionsOpen ? (
         <View style={styles.actionsPanel}>
-          <Button label={showAllSubcategories ? 'Direct' : 'All subcats'} icon="git-branch-outline" variant="secondary" onPress={() => setShowAllSubcategories((current) => !current)} style={styles.panelButton} />
-          <Button label="Rename" icon="create-outline" variant="secondary" onPress={() => { setActionsOpen(false); onRenameCategory(category.path); }} style={styles.panelButton} />
-          <Button label="Folder" icon="folder-outline" variant="secondary" onPress={() => { setActionsOpen(false); onCreateSubcategory(category.path); }} style={styles.panelButton} />
-          <Button label="Copy" icon="copy-outline" variant="secondary" onPress={() => { setActionsOpen(false); onCopyCategory(category.path); }} style={styles.panelButton} />
-          <Button label="Delete" icon="trash-outline" variant="danger" onPress={() => { setActionsOpen(false); onDeleteCategory(category.path); }} style={styles.panelButton} />
+          <CategoryActionItem label={showAllSubcategories ? 'Direct' : 'All subcats'} icon="git-branch-outline" colors={colors} styles={styles} onPress={() => setShowAllSubcategories((current) => !current)} />
+          <CategoryActionItem label="Rename" icon="create-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onRenameCategory(category.path); }} />
+          <CategoryActionItem label="Folder" icon="folder-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onCreateSubcategory(category.path); }} />
+          <CategoryActionItem label="Copy" icon="copy-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onCopyCategory(category.path); }} />
+          <CategoryActionItem label="Delete" icon="trash-outline" danger colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onDeleteCategory(category.path); }} />
         </View>
       ) : null}
 
@@ -217,13 +218,14 @@ export function WorkspaceCategoryCard({
                   onSetNotePriority={onSetNotePriority}
                   onToggleNotePin={onToggleNotePin}
                   onDeleteNote={onDeleteNote}
+                  onPressNote={onPressNote}
                 />
               </View>
             );
           }
 
           return (
-            <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={previewItems.length} currentOrder={index + 1} stackOrder={stackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onCopyText={onCopyNoteText} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} />
+            <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={previewItems.length} currentOrder={index + 1} stackOrder={stackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onCopyText={onCopyNoteText} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} onPressNote={onPressNote} />
           );
         }) : !adding ? (
           <View style={styles.emptyPreview}><Text style={styles.emptyPreviewText}>No notes yet.</Text></View>
@@ -233,7 +235,7 @@ export function WorkspaceCategoryCard({
   );
 }
 
-function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, pinnedNotes, colors, styles, onToggleCategory, onOpenCategory, onAddNote, onCreateSubcategory, onCopyCategory, onSetSubcategoryPriority, onRenameCategory, onDeleteCategory, onEditNote, onMoveNote, onCopyNote, onCopyNoteText, onSetNotePriority, onToggleNotePin, onDeleteNote }: { category: CategorySummary; depth: number; itemCount: number; currentOrder: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; pinnedNotes: PinnedNoteRef[]; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean; onCreateSubcategory: (path: CategoryPath) => void; onCopyCategory: (path: CategoryPath) => void; onSetSubcategoryPriority: (path: CategoryPath, priority: number) => void; onRenameCategory: (path: CategoryPath) => void; onDeleteCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onCopyNoteText: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onToggleNotePin: (note: FlatNote) => void; onDeleteNote: (note: FlatNote) => void }) {
+function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, stackOrder, expandedCategoryKeys, childCategoriesByParentKey, notesByCategoryKey, pinnedNotes, colors, styles, onToggleCategory, onOpenCategory, onAddNote, onCreateSubcategory, onCopyCategory, onSetSubcategoryPriority, onRenameCategory, onDeleteCategory, onEditNote, onMoveNote, onCopyNote, onCopyNoteText, onSetNotePriority, onToggleNotePin, onDeleteNote, onPressNote }: { category: CategorySummary; depth: number; itemCount: number; currentOrder: number; stackOrder: number; expandedCategoryKeys: Set<string>; childCategoriesByParentKey: Map<string, CategorySummary[]>; notesByCategoryKey: Map<string, FlatNote[]>; pinnedNotes: PinnedNoteRef[]; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onToggleCategory: (path: CategoryPath) => void; onOpenCategory: (path: CategoryPath) => void; onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean; onCreateSubcategory: (path: CategoryPath) => void; onCopyCategory: (path: CategoryPath) => void; onSetSubcategoryPriority: (path: CategoryPath, priority: number) => void; onRenameCategory: (path: CategoryPath) => void; onDeleteCategory: (path: CategoryPath) => void; onEditNote: (note: FlatNote) => void; onMoveNote: (note: FlatNote) => void; onCopyNote: (note: FlatNote) => void; onCopyNoteText: (note: FlatNote) => void; onSetNotePriority: (note: FlatNote, priority: number) => void; onToggleNotePin: (note: FlatNote) => void; onDeleteNote: (note: FlatNote) => void; onPressNote?: (note: FlatNote) => void }) {
   const [adding, setAdding] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -302,11 +304,11 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
       </View>
       {actionsOpen ? (
         <View style={[styles.subcategoryActionsPanel, { marginLeft: indent + styles.subcategoryIndent.width }]}> 
-          <Button label="Rename" icon="create-outline" variant="secondary" onPress={() => { setActionsOpen(false); onRenameCategory(category.path); }} style={styles.subcategoryPanelButton} />
-          <Button label="Folder" icon="folder-outline" variant="secondary" onPress={() => { setActionsOpen(false); onCreateSubcategory(category.path); }} style={styles.subcategoryPanelButton} />
-          <Button label="Copy" icon="copy-outline" variant="secondary" onPress={() => { setActionsOpen(false); onCopyCategory(category.path); }} style={styles.subcategoryPanelButton} />
-          <Button label="Order" icon="albums-outline" variant="secondary" onPress={() => setPriorityOpen((current) => !current)} style={styles.subcategoryPanelButton} />
-          <Button label="Delete" icon="trash-outline" variant="danger" onPress={() => { setActionsOpen(false); onDeleteCategory(category.path); }} style={styles.subcategoryPanelButton} />
+          <CategoryActionItem label="Rename" icon="create-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onRenameCategory(category.path); }} />
+          <CategoryActionItem label="Folder" icon="folder-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onCreateSubcategory(category.path); }} />
+          <CategoryActionItem label="Copy" icon="copy-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onCopyCategory(category.path); }} />
+          <CategoryActionItem label="Order" icon="albums-outline" colors={colors} styles={styles} onPress={() => setPriorityOpen((current) => !current)} />
+          <CategoryActionItem label="Delete" icon="trash-outline" danger colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onDeleteCategory(category.path); }} />
         </View>
       ) : null}
       {actionsOpen && priorityOpen ? (
@@ -378,12 +380,13 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
                   onSetNotePriority={onSetNotePriority}
                   onToggleNotePin={onToggleNotePin}
                   onDeleteNote={onDeleteNote}
+                  onPressNote={onPressNote}
                 />
               );
             }
 
             return (
-              <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={childItems.length} currentOrder={index + 1} stackOrder={childStackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onCopyText={onCopyNoteText} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} />
+              <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={childItems.length} currentOrder={index + 1} stackOrder={childStackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onCopyText={onCopyNoteText} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} onPressNote={onPressNote} />
             );
           })}
         </View>
@@ -392,7 +395,7 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
   );
 }
 
-function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinned, colors, styles, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete }: { note: FlatNote; itemCount: number; currentOrder: number; stackOrder: number; pinned: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onCopyText: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onTogglePin: (note: FlatNote) => void; onDelete: (note: FlatNote) => void }) {
+function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinned, colors, styles, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete, onPressNote }: { note: FlatNote; itemCount: number; currentOrder: number; stackOrder: number; pinned: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onCopyText: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onTogglePin: (note: FlatNote) => void; onDelete: (note: FlatNote) => void; onPressNote?: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
@@ -411,14 +414,16 @@ function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinne
   return (
     <View style={[styles.previewNote, open && styles.previewNoteMenuOpen, { zIndex: open ? 1000 : stackOrder }]}>
       {historyNote ? (
-        <View style={styles.previewHistoryBlock}>
+        <Pressable disabled={!onPressNote} onPress={() => onPressNote?.(note)} style={styles.previewHistoryBlock}>
           <Text selectable style={styles.previewHistoryPrimary} numberOfLines={3}>{historyNote.primary}</Text>
           <Text selectable style={styles.previewHistoryMeta} numberOfLines={2}>{[historyNote.event ? formatHistoryEvent(historyNote.event) : null, ...historyNote.metadata].filter(Boolean).join(' · ')}</Text>
-        </View>
+        </Pressable>
       ) : (
-        <ScrollView style={styles.previewTextScroller} nestedScrollEnabled showsVerticalScrollIndicator>
-          <Text selectable style={styles.previewText}>{note.note}</Text>
-        </ScrollView>
+        <Pressable disabled={!onPressNote} onPress={() => onPressNote?.(note)} style={styles.previewTextButton}>
+          <ScrollView style={styles.previewTextScroller} nestedScrollEnabled showsVerticalScrollIndicator>
+            <Text selectable style={styles.previewText}>{note.note}</Text>
+          </ScrollView>
+        </Pressable>
       )}
       <Pressable accessibilityRole="button" accessibilityLabel={pinned ? 'Pinned note actions' : 'Note actions'} onPress={() => setOpen((current) => !current)} style={[styles.previewMenuButton, pinned && styles.previewMenuButtonPinned]}>
         <Icon name="settings-outline" size={11} color={pinned ? colors.onPrimary : colors.steel} />
@@ -450,6 +455,15 @@ function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinne
         </View>
       ) : null}
     </View>
+  );
+}
+
+function CategoryActionItem({ label, icon, danger, colors, styles, onPress }: { label: string; icon: IconName; danger?: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.categoryActionItem, danger && styles.categoryActionItemDanger, pressed && styles.categoryActionItemPressed]}>
+      <Icon name={icon} size={12} color={danger ? colors.semanticError : colors.steel} />
+      <Text style={[styles.categoryActionText, danger && styles.categoryActionTextDanger]} numberOfLines={1}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -523,7 +537,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   const scale = (value: number) => Math.round(value * zoom);
   const scaledRadius = Math.max(rounded.xs, scale(rounded.lg));
   return StyleSheet.create({
-  card: { width: '100%', minWidth: 0, height: scale(264), borderRadius: scaledRadius, borderWidth: 1, borderColor: isDark ? '#353a45' : colors.hairline, paddingHorizontal: scale(5), paddingVertical: scale(7), gap: scale(2), ...shadows.card },
+  card: { position: 'relative', width: '100%', minWidth: 0, height: scale(264), borderRadius: scaledRadius, borderWidth: 1, borderColor: isDark ? '#353a45' : colors.hairline, paddingHorizontal: scale(5), paddingVertical: scale(7), gap: scale(2), ...shadows.card },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: scale(3) },
   titleBlock: { flex: 1, minWidth: 0 },
   workspaceName: { fontSize: scale(7), fontWeight: '500', lineHeight: scale(9), color: colors.steel, textTransform: 'uppercase' },
@@ -534,8 +548,12 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   titleMetaText: { fontSize: scale(7), fontWeight: '700', lineHeight: scale(9), color: colors.steel, textTransform: 'uppercase' },
   headerMeta: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: scale(3), maxWidth: scale(40) },
   iconButtonSmall: { width: scale(18), height: scale(18), borderRadius: rounded.xs, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.12)' : colors.hairline, backgroundColor: isDark ? 'rgba(10,11,14,0.72)' : 'rgba(255,255,255,0.72)', alignItems: 'center', justifyContent: 'center' },
-  actionsPanel: { flexDirection: 'row', gap: scale(4) },
-  panelButton: { flex: 1, minHeight: scale(32), paddingHorizontal: scale(4) },
+  actionsPanel: { position: 'absolute', top: scale(30), right: scale(5), zIndex: 1200, width: scale(118), gap: scale(2), borderRadius: rounded.xs, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.canvas, padding: scale(3), ...shadows.card, elevation: 20 },
+  categoryActionItem: { minHeight: scale(25), borderRadius: rounded.xs, flexDirection: 'row', alignItems: 'center', gap: scale(5), paddingHorizontal: scale(6), backgroundColor: colors.surfaceSoft },
+  categoryActionItemDanger: { backgroundColor: isDark ? 'rgba(224,49,49,0.12)' : 'rgba(224,49,49,0.08)' },
+  categoryActionItemPressed: { opacity: 0.78 },
+  categoryActionText: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.charcoal, flex: 1, minWidth: 0 },
+  categoryActionTextDanger: { color: colors.semanticError },
   previewScroller: { flex: 1, minHeight: 0, marginTop: scale(1) },
   previewList: { gap: scale(1), paddingBottom: scale(2) },
   subcategoryBlock: { position: 'relative', gap: scale(1), borderRadius: rounded.xs, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, backgroundColor: isDark ? 'rgba(10,11,14,0.32)' : 'rgba(255,255,255,0.48)', padding: scale(2), marginBottom: scale(2) },
@@ -547,8 +565,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   subcategoryToggleEmpty: { opacity: 0.45 },
   subcategoryMain: { flex: 1, minWidth: 0, minHeight: scale(22), borderRadius: rounded.xs, flexDirection: 'row', alignItems: 'center', gap: scale(4), paddingHorizontal: scale(4), backgroundColor: isDark ? 'rgba(10,11,14,0.42)' : 'rgba(255,255,255,0.56)' },
   subcategoryAddButton: { width: scale(18), height: scale(20), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'rgba(10,11,14,0.62)' : 'rgba(255,255,255,0.72)', borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, flexShrink: 0 },
-  subcategoryActionsPanel: { flexDirection: 'row', gap: scale(3), paddingVertical: scale(2) },
-  subcategoryPanelButton: { flex: 1, minHeight: scale(27), paddingHorizontal: scale(3), paddingVertical: scale(4), borderRadius: rounded.xs },
+  subcategoryActionsPanel: { width: scale(118), gap: scale(2), borderRadius: rounded.xs, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.canvas, padding: scale(3), marginTop: scale(1), marginBottom: scale(2), ...shadows.card, elevation: 16, zIndex: 1000 },
   subcategoryPriorityPicker: { gap: scale(3), borderRadius: rounded.xs, borderWidth: 1, borderColor: colors.hairlineSoft, backgroundColor: isDark ? 'rgba(10,11,14,0.54)' : 'rgba(255,255,255,0.66)', padding: scale(3), marginBottom: scale(2) },
   subcategoryName: { fontSize: scale(10), fontWeight: '700', lineHeight: scale(13), color: colors.charcoal, flex: 1, minWidth: 0 },
   subcategoryCounts: { flexDirection: 'row', alignItems: 'center', gap: scale(2), flexShrink: 0 },
@@ -563,6 +580,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   previewNote: { position: 'relative', flexDirection: 'row', alignItems: 'flex-start', gap: scale(4), borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.54)' : 'rgba(255,255,255,0.66)', paddingHorizontal: scale(4), paddingVertical: scale(3), marginTop: 0 },
   previewNoteMenuOpen: { elevation: 16 },
   previewTextScroller: { flex: 1, minWidth: 0, maxHeight: scale(52), paddingRight: scale(24) },
+  previewTextButton: { flex: 1, minWidth: 0 },
   previewText: { fontSize: scale(11), fontWeight: '500', lineHeight: scale(13), color: colors.charcoal },
   previewHistoryBlock: { flex: 1, minWidth: 0, gap: scale(1), paddingRight: scale(24) },
   previewHistoryPrimary: { fontSize: scale(11), fontWeight: '700', lineHeight: scale(13), color: colors.charcoal },

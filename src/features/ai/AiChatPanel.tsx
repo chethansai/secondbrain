@@ -1,11 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { collapseExactNameCategories, listAllCategories } from '../categories/categoryTree';
+import { listNotesAtPath } from '../notes/noteMutations';
+import { sortPinnedNotesFirst } from '../notes/pinnedNotes';
+import { WorkspaceCategoryCard } from '../workspace/WorkspaceCategoryCard';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { rounded, spacing, typography } from '../../shared/design/tokens';
-import { NotesData } from '../../shared/types/notes';
+import { CategoryPath, FlatNote, NotesData, PinnedNoteRef } from '../../shared/types/notes';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
+import { consumeAiResponseText } from './aiReviewService';
 
 type AiChatRole = 'user' | 'assistant';
 
@@ -26,11 +31,26 @@ type AiChatConversation = {
 
 type Props = {
   data: NotesData;
+  pinnedNotes: PinnedNoteRef[];
+  onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean;
+  onCreateSubcategory: (path: CategoryPath) => void;
+  onCopyCategory: (path: CategoryPath) => void;
+  onSetSubcategoryPriority: (path: CategoryPath, priority: number) => void;
+  onRenameCategory: (path: CategoryPath) => void;
+  onDeleteCategory: (path: CategoryPath) => void;
+  onEditNote: (note: FlatNote) => void;
+  onMoveNote: (note: FlatNote) => void;
+  onCopyNote: (note: FlatNote) => void;
+  onCopyNoteText: (note: FlatNote) => void;
+  onSetNotePriority: (note: FlatNote, priority: number) => void;
+  onToggleNotePin: (note: FlatNote) => void;
+  onDeleteNote: (note: FlatNote) => void;
 };
 
 const aiChatHistoryKey = 'rnnotetaking.ai.conversations.v1';
+const promptCategoryName = 'notetakingprompts';
 
-export function AiChatPanel({ data }: Props) {
+export function AiChatPanel({ data, pinnedNotes, onAddNote, onCreateSubcategory, onCopyCategory, onSetSubcategoryPriority, onRenameCategory, onDeleteCategory, onEditNote, onMoveNote, onCopyNote, onCopyNoteText, onSetNotePriority, onToggleNotePin, onDeleteNote }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [conversations, setConversations] = useState<AiChatConversation[]>([]);
@@ -40,6 +60,15 @@ export function AiChatPanel({ data }: Props) {
   const [error, setError] = useState<string | null>(null);
   const activeConversation = conversations.find((conversation) => conversation.id === activeId) ?? conversations[0] ?? null;
   const scrollRef = useRef<ScrollView | null>(null);
+  const conversationsRef = useRef<AiChatConversation[]>([]);
+  const rawCategories = useMemo(() => listAllCategories(data), [data]);
+  const promptCategory = useMemo(() => findPromptCategory(rawCategories), [rawCategories]);
+  const promptNotes = useMemo(() => promptCategory ? sortPinnedNotesFirst(listNotesAtPath(data, promptCategory.path), pinnedNotes) : [], [data, pinnedNotes, promptCategory]);
+  const notesByCategoryKey = useMemo(() => new Map(rawCategories.map((category) => [pathKey(category.path), sortPinnedNotesFirst(listNotesAtPath(data, category.path), pinnedNotes)])), [data, pinnedNotes, rawCategories]);
+
+  function fillPrompt(noteText: string) {
+    setInput(noteText);
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -55,8 +84,13 @@ export function AiChatPanel({ data }: Props) {
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [activeConversation?.messages.length, busy]);
 
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
   async function persist(nextConversations: AiChatConversation[], nextActiveId?: string | null) {
     const sorted = [...nextConversations].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    conversationsRef.current = sorted;
     setConversations(sorted);
     if (nextActiveId !== undefined) setActiveId(nextActiveId);
     await AsyncStorage.setItem(aiChatHistoryKey, JSON.stringify(sorted));
@@ -98,19 +132,25 @@ export function AiChatPanel({ data }: Props) {
     try {
       assistantText = await requestAiChat(data, conversation.messages, cleanInput, (token) => {
         assistantText += token;
-        setConversations((current) => updateAssistantMessage(current, pendingConversation.id, assistantMessage.id, assistantText));
+        setConversations((current) => {
+          const next = updateAssistantMessage(current, pendingConversation.id, assistantMessage.id, assistantText);
+          conversationsRef.current = next;
+          return next;
+        });
       });
     } catch (requestError) {
       assistantText = formatAiRequestError(requestError);
       setError(assistantText);
     }
 
-    const finishedConversation = {
-      ...pendingConversation,
-      updatedAt: new Date().toISOString(),
-      messages: pendingConversation.messages.map((message) => message.id === assistantMessage.id ? { ...message, content: assistantText || 'No response.' } : message),
-    };
-    await persist(upsertConversation(conversations, finishedConversation), finishedConversation.id);
+    const finishedAt = new Date().toISOString();
+    const finishedContent = assistantText || 'No response.';
+    const finishedConversations = upsertConversationFromLatest(conversationsRef.current, pendingConversation.id, (current) => ({
+      ...current,
+      updatedAt: finishedAt,
+      messages: current.messages.map((message) => message.id === assistantMessage.id ? { ...message, content: finishedContent } : message),
+    }), pendingConversation);
+    await persist(finishedConversations, pendingConversation.id);
     setBusy(false);
   }
 
@@ -139,7 +179,7 @@ export function AiChatPanel({ data }: Props) {
         {activeConversation?.messages.length ? activeConversation.messages.map((message) => (
           <View key={message.id} style={[styles.messageBubble, message.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
             <Text style={[styles.messageRole, message.role === 'user' ? styles.userRole : styles.assistantRole]}>{message.role === 'user' ? 'You' : 'Assistant'}</Text>
-            <Text style={[styles.messageText, message.role === 'user' ? styles.userText : styles.assistantText]}>{message.content || (busy ? 'Thinking' : '')}</Text>
+            <Text selectable style={[styles.messageText, message.role === 'user' ? styles.userText : styles.assistantText]}>{message.content || (busy ? 'Thinking' : '')}</Text>
           </View>
         )) : (
           <View style={styles.emptyState}>
@@ -150,13 +190,61 @@ export function AiChatPanel({ data }: Props) {
       </ScrollView>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <View style={styles.composer}>
-        <TextInput accessibilityLabel="AI chat message" value={input} onChangeText={setInput} placeholder="Message AI" placeholderTextColor={colors.stone} multiline style={styles.input} />
+        <TextInput accessibilityLabel="AI chat message" value={input} onChangeText={setInput} placeholder="Message AI" placeholderTextColor={colors.stone} multiline selectionColor={colors.primary} contextMenuHidden={false} style={styles.input} />
         <Pressable accessibilityRole="button" accessibilityLabel="Send AI chat message" disabled={busy || !input.trim()} onPress={submit} style={[styles.sendButton, (busy || !input.trim()) && styles.sendButtonDisabled]}>
           <Icon name="arrow-forward" size={18} color={colors.onPrimary} />
         </Pressable>
       </View>
+      {promptCategory ? (
+        <View style={styles.promptArea}>
+          {promptNotes.length ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.promptCardList} keyboardShouldPersistTaps="handled">
+              {promptNotes.map((note, index) => (
+                <Pressable key={`${note.path.join('/')}-${note.index}-${index}`} accessibilityRole="button" accessibilityLabel="Use note taking prompt" onPress={() => fillPrompt(note.note)} style={styles.promptCard}>
+                  <Text style={styles.promptCardText} numberOfLines={5}>{note.note}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : null}
+          <WorkspaceCategoryCard
+            category={promptCategory}
+            allCategories={rawCategories}
+            notesByCategoryKey={notesByCategoryKey}
+            notes={promptNotes}
+            pinnedNotes={pinnedNotes}
+            priority={1}
+            workspaceName="AI Chat"
+            showWorkspaceIntro={false}
+            onOpen={() => undefined}
+            onOpenCategory={() => undefined}
+            onAddNote={onAddNote}
+            onCreateSubcategory={onCreateSubcategory}
+            onCopyCategory={onCopyCategory}
+            onSetSubcategoryPriority={onSetSubcategoryPriority}
+            onRenameCategory={onRenameCategory}
+            onDeleteCategory={onDeleteCategory}
+            onEditNote={onEditNote}
+            onMoveNote={onMoveNote}
+            onCopyNote={onCopyNote}
+            onCopyNoteText={onCopyNoteText}
+            onSetNotePriority={onSetNotePriority}
+            onToggleNotePin={onToggleNotePin}
+            onDeleteNote={onDeleteNote}
+            onPressNote={(note) => fillPrompt(note.note)}
+          />
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
+}
+
+function findPromptCategory(categories: ReturnType<typeof listAllCategories>) {
+  const visibleCategories = collapseExactNameCategories(categories);
+  return visibleCategories.find((category) => category.name.toLowerCase() === promptCategoryName) ?? null;
+}
+
+function pathKey(path: CategoryPath) {
+  return path.join('\u001f');
 }
 
 async function readAiChatConversations(): Promise<AiChatConversation[]> {
@@ -179,7 +267,7 @@ async function requestAiChat(data: NotesData, messages: AiChatMessage[], input: 
   });
   if (!response.ok) throw new Error(`AI request failed with ${response.status}.`);
   const text = await response.text();
-  return consumeSseText(text, onToken);
+  return consumeAiResponseText(text, onToken);
 }
 
 function formatAiRequestError(error: unknown) {
@@ -215,26 +303,6 @@ function buildPrompt(data: NotesData, messages: AiChatMessage[], input: string) 
   ].filter(Boolean).join('\n\n');
 }
 
-function consumeSseText(text: string, onToken: (token: string) => void) {
-  let fullText = '';
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith('data:')) continue;
-    const payload = trimmed.slice(5).trim();
-    if (!payload || payload === '[DONE]') continue;
-    try {
-      const parsed = JSON.parse(payload) as { choices?: Array<{ delta?: { content?: string } }> };
-      const token = parsed.choices?.[0]?.delta?.content ?? '';
-      if (!token) continue;
-      fullText += token;
-      onToken(token);
-    } catch {
-      continue;
-    }
-  }
-  return fullText;
-}
-
 function upsertConversation(conversations: AiChatConversation[], conversation: AiChatConversation) {
   const withoutConversation = conversations.filter((item) => item.id !== conversation.id);
   return [conversation, ...withoutConversation];
@@ -245,6 +313,14 @@ function updateAssistantMessage(conversations: AiChatConversation[], conversatio
     if (conversation.id !== conversationId) return conversation;
     return { ...conversation, messages: conversation.messages.map((message) => message.id === messageId ? { ...message, content } : message) };
   });
+}
+
+function upsertConversationFromLatest(conversations: AiChatConversation[], conversationId: string, update: (conversation: AiChatConversation) => AiChatConversation, fallback: AiChatConversation) {
+  const index = conversations.findIndex((conversation) => conversation.id === conversationId);
+  if (index === -1) return upsertConversation(conversations, update(fallback));
+  const next = [...conversations];
+  next[index] = update(next[index]);
+  return next;
 }
 
 function createMessage(role: AiChatRole, content: string): AiChatMessage {
@@ -288,5 +364,9 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     input: { flex: 1, minHeight: 48, maxHeight: 132, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.ink, backgroundColor: colors.canvas, ...typography.bodySm },
     sendButton: { width: 48, height: 48, borderRadius: rounded.md, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
     sendButtonDisabled: { backgroundColor: colors.muted },
+    promptArea: { gap: spacing.sm },
+    promptCardList: { gap: spacing.sm, paddingRight: spacing.sm },
+    promptCard: { width: 220, minHeight: 104, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.surfaceSoft, padding: spacing.md, justifyContent: 'center' },
+    promptCardText: { ...typography.bodySmMedium, color: colors.charcoal },
   });
 }
