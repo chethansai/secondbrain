@@ -367,6 +367,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-14: Expanded `CLAUDE.md` from the compact summary into a full Claude-readable project contract based on `plan.md`, `design.md`, and prior decisions. Decision: future implemented chat steps must update both `plan.md` and `CLAUDE.md` history before the mandatory git status/add/commit/push workflow.
+
 - 2026-05-14: Added `plan.md` guidance into `CLAUDE.md`. Decision: summarize the mandatory post-step Git workflow, source-file size limits, feature-boundary rules, AI-clean notes data contract, auth/security caveats, Android ADB/deep-link reference, and automation setup instead of copying the entire implementation plan verbatim.
 
 - 2026-05-13: Implemented AI Chat notetaking prompt cards. Decision: detect the `notetakingprompts` category case-insensitively, render its notes as tappable quick cards that fill the AI Chat composer, and show the same category-card controls below so prompt notes and subcategories can still be added, edited, copied, moved, ordered, pinned, and deleted through existing deterministic mutations.

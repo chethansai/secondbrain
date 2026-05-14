@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working in this repository. It is the operational version of `plan.md`: preserve the same constraints, decisions, and workflow, but phrase them as direct instructions for future coding sessions.
 
 ## Commands
 
@@ -15,55 +15,401 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 There is no test script in `package.json`; use `npm run typecheck` as the available automated validation unless tests are added.
 
-## Mandatory project workflow from `plan.md`
+## Mandatory project workflow
 
-After each implemented chat step, update the `## history` section in `plan.md` with a dated summary of the completed step and any redirection/decision that happened. Then run the required Git handoff sequence: `git status`, `git add .`, `git commit -m "<proper message>"`, and `git push -u origin main`. Because pushing affects shared remote state, ask the user for confirmation before the push unless they have already explicitly authorized that push in the current step.
+After every implemented chat step or redirection/decision that changes the repo:
 
-## Plan constraints
+1. Update `plan.md` under `## history` with a dated summary of the completed step and any decision/redirection.
+2. Update this file under `## history` with the same dated summary in concise Claude-readable form.
+3. Run `git status`.
+4. Run `git add .`.
+5. Run `git commit -m "<proper message>"`.
+6. Run `git push -u origin main`.
 
-- Keep the main notes document AI-clean: `reactnativecollection/main` has a `data` field containing only the simple nested JSON of category keys, note strings, and nested single-key category objects.
-- Do not store old tree metadata in `data`: no IDs, node types, children fields, mirror metadata, category connection metadata, Instagram/OCR metadata, CSRF/Django metadata, or per-note timestamps.
-- Workspace/category selection metadata belongs outside the main `data` field, currently in sidecar metadata such as `reactnativecollection/workspaceslist`.
-- The app is React Native + Firebase client SDK only; do not add Django dependencies or call old Django URLs.
-- Password-only auth protects the UI only. Do not treat it as Firestore security; real multi-user security would require Firebase Auth and restricted rules.
-- Notes remain plain strings in v1. Duplicate exact notes are allowed.
-- Note operations should use path arrays plus exact full-note text, with selected rendered occurrence/index when available. Avoid substring matching for writes.
-- Internal category paths are arrays like `["Category", "Subcategory"]`; display strings using `>` must not be the source of truth for writes when an array path is available.
-- Copied notes and categories are independent in v1. Do not reintroduce mirror propagation without explicit sidecar metadata.
-- URLs may render clickable, but do not mutate note text for URL metadata and do not add Instagram-specific parsing/embed behavior.
-- AI integration must not write directly to notes. AI suggestions should be applied through deterministic app mutations.
+This post-step Git workflow is mandatory and must not be skipped after implemented changes. The project-level default is to push completed committed work to `origin/main` unless the user says otherwise.
 
-## Source organization rules from `plan.md`
+## Product scope
 
-- Use strict feature-based architecture under `src/features`; shared UI is only for reusable primitives and shared types/libs are only for genuinely cross-feature code.
-- No source file may exceed 600 lines. Prefer 300-450 lines, and split files before adding behavior if they approach 450-500 lines.
-- Keep business logic out of UI components where practical; persistence, sync, validation, and mutations should live in feature services/hooks/helpers.
+- This is an Expo React Native + Firebase notes app named "Native Note Taking" with web support.
+- The app replaces the old Django-dependent notes flow. Do not add Django dependencies or call old Django URLs.
+- Store notes in Firestore collection/document `reactnativecollection/main`.
+- Keep the main notes document AI-clean and simple enough to feed directly to AI.
+- First-release scope includes the core notes/category/search/settings/sync/auth workflows; AI categorization is deferred until after core behavior works.
+- Deliberately excluded from the clean v1 notes model: instant/full load, Instagram-specific rendering, OCR/Tesseract, Django APIs, complex mirror propagation, old tree metadata, internal IDs in visible note data, per-note timestamps, and hidden note objects.
+- Single-user, single-notebook v1. Multiple workspaces/users may be added later only with sidecar metadata or a deliberate schema change.
+
+## Firestore data contract
+
+Primary document: `reactnativecollection/main`.
+
+Required fields:
+
+- `data`: the simple nested notes JSON.
+- `version`: schema version, currently `1`.
+- `updatedAt`: server timestamp.
+
+Valid `data` shape:
+
+```json
+{
+  "Category 1": ["Note 1", "Note 2"],
+  "Category 2": [{ "Subcategory A": ["Note 3"] }]
+}
+```
+
+Rules:
+
+- Root keys are category names.
+- Category values are arrays only.
+- Valid array items are note strings or single-key objects for nested categories.
+- Notes remain plain strings in v1.
+- Duplicate exact notes are allowed.
+- Root `data` missing should initialize to `{}`.
+- Root `data` that is not an object is malformed and should be rejected with recovery/import options.
+- Do not store old tree fields inside `data`: no `id`, `type`, `children`, `mirror_group_id`, `mirror_origin_id`, `mirror_ids`, `category_connections`, `has_instagram`, OCR metadata, CSRF metadata, Django workspace metadata, note timestamps, or per-note object wrappers.
+- Workspace/category selection metadata belongs outside `data`, currently in sidecar metadata such as `reactnativecollection/workspaceslist`.
+- If the document approaches Firestore's 1 MiB limit, split later by root category or workspace while preserving AI export that reconstructs the same simple JSON.
+
+## Architecture rules
+
+- Use strict feature-based architecture under `src/features`.
+- Every feature must own its components, hooks, types, services, and helpers.
+- Shared UI is only for genuinely reusable primitives such as buttons, inputs, modals, list rows, empty/error/loading states, and theme primitives.
+- Shared libs/types are only for genuinely cross-feature utilities/types.
+- No source file may exceed 600 lines. Prefer 300-450 lines. Split before adding behavior when a file approaches 450-500 lines.
+- Do not create monolithic components, screens, services, or catch-all utility files.
+- Screens should mostly compose feature components instead of owning all UI, state, and data access directly.
+- Keep business logic out of UI components where practical. Persistence, sync, validation, and mutations belong in feature services/hooks/helpers.
+- Use the simplest state management that fits: local state local, lift only when necessary, extract duplicated stateful logic into hooks.
+- Prefer TypeScript types/interfaces for app data structures, paths, mutation results, repository payloads, and import/export results.
+- Prefer composition over inheritance and keep props minimal and flow-specific.
+- Remove dead code quickly.
 - Before adding code, identify the owning feature boundary and extend the smallest appropriate file set.
-- Remove dead code quickly and avoid catch-all components, services, or utility files.
 
-## Architecture
+## Feature boundaries
 
-This is an Expo React Native app named "Native Note Taking" with web support. `index.js` boots `App.tsx`, and `App.tsx` is the central coordinator for auth, sync, workspace/category navigation, note modals, automation imports, AI review, and settings tabs.
+- `src/features/auth/` - password setup/unlock, session hook, SecureStore/AsyncStorage service, auth UI components.
+- `src/features/notes/` - note list/card flows, note mutation helpers, note-specific types, note actions.
+- `src/features/categories/` - root/nested category list, category detail composition, category picker/path utilities, category mutations.
+- `src/features/editor/` - note editor modal/screen, text editing state, validation display, keyboard-aware editor UI.
+- `src/features/search/` - search screen, search bar, flattened results, debounced query hook.
+- `src/features/settings/` - import/export, logout, preferences, data recovery states.
+- `src/features/sync/` - Firestore repository, subscription/write coordination, pending/error/conflict state.
+- `src/features/automation/` - deep links and file queue imports.
+- `src/features/ai/` - AI chat/review surfaces; AI must apply note changes only through deterministic app mutations.
+- `src/shared/ui/` - reusable primitives only.
+- `src/shared/design/` - design tokens and theme plumbing.
+- `src/shared/lib/` or `src/shared/types/` - cross-feature utilities/types only.
 
-Source is organized by feature under `src/features` and shared primitives under `src/shared`:
+Build feature components around user flows, for example `NoteList`, `NoteCard`, `NoteEditor`, `CategoryList`, `CategoryDetailHeader`, `PathPicker`, `SearchBar`, `SearchResultItem`, and `EmptyNotesState`. If a screen grows large, break it into subcomponents within the relevant feature instead of expanding the screen file.
 
-- `src/shared/types/notes.ts` defines the core data shape. Notes are strings; categories are nested single-key objects inside arrays, with root categories stored as `Record<string, NoteItem[]>`. Workspace metadata stores selected/pinned category paths and pinned note refs.
-- `src/features/categories/categoryTree.ts` owns category tree mutation/query logic. It clones data before mutations and keeps standalone root category entries synchronized with nested category copies via `syncStandaloneCategory`.
+## Current code architecture
+
+- `index.js` boots `App.tsx`.
+- `App.tsx` is the central coordinator for auth, sync, workspace/category navigation, note modals, automation imports, AI review, and settings tabs.
+- `src/shared/types/notes.ts` defines the core notes shape. Notes are strings; categories are nested single-key objects inside arrays; root categories are `Record<string, NoteItem[]>`.
+- Workspace metadata stores selected/pinned category paths and pinned note refs outside the main notes JSON.
+- `src/features/categories/categoryTree.ts` owns category tree mutation/query logic. It clones before mutations and keeps standalone root category entries synchronized with nested category copies via `syncStandaloneCategory`.
 - `src/features/notes/noteMutations.ts` owns note CRUD, priority ordering, flattening, and `HISTORY` note formatting. Many UI actions append history notes through `App.tsx` before committing.
 - `src/features/sync/useNotesSync.ts` is the main notes/workspace sync hook. It subscribes to Firestore through `notesRepository.ts`, writes through repository functions, and falls back to AsyncStorage via `localNotesRepository.ts` when remote reads/writes fail.
-- `src/features/sync/notesRepository.ts` currently persists notes to Firestore document `reactnativecollection/main` and workspace lists to `reactnativecollection/workspaceslist`. The `workspaceId` parameter is mostly legacy/defaulted; do not assume per-workspace note documents without checking repository behavior.
-- AI review lives in `src/features/ai` and `src/features/sync/useAiReviewSync.ts`. `aiReviewService.ts` builds prompts from the full notes JSON, posts to the configured `/v1/responses` endpoint, parses score/action responses, and stores decisions in the AI review ledger.
-- AI workspace and scheduled AI notifications are separate sync areas under `src/features/sync/*AiWorkspace*` and `*aiNotifications*`. Background notification processing is in `aiNotificationRunner.ts` and uses Expo background task/notifications plus an Android native worker module when available.
-- Automation supports the `nativenotes:` URL scheme from `app.json`. `src/features/automation/deepLinks.ts` parses `add-note` and `import-file` actions, and `fileQueue.ts` reads `seek-notes.json` from Expo document storage, defaulting imported notes to the `SEEK` category.
-- Auth gating is local-only in `src/features/auth`: `AuthGate` wraps the app, `LockScreen` handles unlocking, and `authSession.ts` stores unlock timeout/session data.
-- Shared design values are in `src/shared/design/tokens.ts` and provided through `ThemeProvider`; prefer these tokens/components over ad hoc colors and spacing.
+- `src/features/sync/notesRepository.ts` persists notes to `reactnativecollection/main` and workspace lists to `reactnativecollection/workspaceslist`. The `workspaceId` parameter is mostly legacy/defaulted; do not assume per-workspace note documents without checking repository behavior.
+- AI review lives in `src/features/ai` and `src/features/sync/useAiReviewSync.ts`. AI prompts use the full notes JSON and AI decisions are stored in the AI review ledger.
+- AI workspace and scheduled AI notifications are separate sync areas under `src/features/sync/*AiWorkspace*` and `*aiNotifications*`.
+- Background notification processing is in `aiNotificationRunner.ts` and uses Expo background task/notifications plus an Android native worker module when available.
+- Automation supports the `nativenotes:` URL scheme from `app.json`. `src/features/automation/deepLinks.ts` parses `add-note` and `import-file`; `fileQueue.ts` reads `seek-notes.json` from Expo document storage and defaults imported notes to `SEEK`.
+- Auth is local-only in `src/features/auth`: `AuthGate` wraps the app, `LockScreen` handles unlocking, and `authSession.ts` stores unlock timeout/session data.
+- Shared design values are in `src/shared/design/tokens.ts` and provided through `ThemeProvider`; prefer tokens/components over ad hoc colors and spacing.
+
+## Mutation rules
+
+### Paths
+
+- Internal category paths must be arrays, for example `["Category 2", "Subcategory A"]`.
+- Display paths may use strings like `Category 2 > Subcategory A`, but writes must use arrays when available.
+- Root path `[]` means the root object, not a writable note container.
+- Adding a note to root is invalid unless root notes become an explicit future feature.
+- Missing category path on write returns/handles `path_not_found`.
+- Same category name under different parents is allowed because the full path distinguishes it.
+- Category names containing separators like `>` are allowed as literal names; never parse display strings as the source of truth when a path array is available.
+- Deep nesting should be supported in helpers; guard UI recursion/rendering where needed.
+
+### Note identity and matching
+
+- Note operations use `category_path + exact note text` as the simple lookup contract.
+- Matching is exact full-note matching, not substring matching.
+- Default writes are case-sensitive unless a specific case-insensitive option is provided.
+- Duplicate exact notes are allowed.
+- If multiple exact matches exist in the same path, operate on the first exact match or selected rendered occurrence/index depending on UI context.
+- If note text changed before an operation applies, show `not_found` and refresh.
+- Punctuation differences are meaningful.
+- Normalize line endings only if needed for comparison; preserve note content otherwise.
+- Empty or whitespace-only note content is rejected on create/edit.
+
+### Add/edit/delete notes
+
+- Add note to nonexistent path: reject.
+- Add duplicate note in same path: allow.
+- Edit note not found: return/show `not_found`.
+- Edit duplicate exact note in same path: update first exact match or selected occurrence.
+- Edit note to empty text: reject.
+- Edit note to text that already exists in same path: allow.
+- Delete note not found: return/show `not_found`.
+- Delete duplicate exact note in same path: delete first exact match or selected occurrence.
+- Delete from copied branch changes only that exact branch in v1.
+
+### Move/copy notes
+
+- Source path missing, destination path missing, or source note missing: reject.
+- Duplicate exact source note: move/copy first exact match or selected occurrence.
+- Move to same path: no-op or allow as no change.
+- Copy to same path: allow and create a duplicate.
+- Move/copy to destination where same exact note already exists: allow.
+- Move removes from source and appends to destination atomically in one data update.
+- Copy preserves source and appends to destination.
+- Preserve array order by appending unless explicit sort/order mode exists.
+
+### Categories
+
+- Create root category with existing root name: reject.
+- Create subcategory with existing sibling name: reject.
+- Create subcategory under missing path: reject.
+- Rename root/subcategory to an existing sibling/root name: reject.
+- Rename to empty/whitespace-only name: reject.
+- Trim category names for new creates; during migration/import warn if trimming would collide.
+- Delete last root category: allow because empty workspace is valid.
+- Delete category with notes/subcategories requires confirmation and count summary.
+- Category names with slashes, dots, emoji, or `>` are literal names.
+- Preserve JS object/array order for presentation, but do not rely on object key order for critical behavior.
+- Moving categories is out of v1 unless explicitly added; if added, prevent moving a category into itself/descendant.
+
+## Validation and import/export
+
+- Category value not an array: malformed.
+- Nested category object with zero keys or multiple keys: malformed.
+- Nested category value not an array: malformed.
+- Array item that is neither a string nor a valid nested object: malformed.
+- Empty string note: reject on create; preserve only during migration after warning.
+- Whitespace-only category names and notes are rejected.
+- Invalid Unicode/control characters in notes should be preserved, with line ending normalization only for comparison.
+- Export should output only simple nested `data`, or optionally a wrapper with metadata.
+- Import malformed JSON: reject with parse error.
+- Import valid JSON but invalid schema: reject with validation errors.
+- Import that would overwrite current notes requires confirmation and ideally backup/export first.
+- JSON object duplicate keys cannot be reliably represented; warn that duplicates may already be lost by parser.
+- Import non-string notes only with explicit conversion confirmation, otherwise reject.
+- Old tree imports should ignore metadata and convert visible category/note structure only.
+- Old mirrored/copied categories become independent branches in v1.
+- Old Instagram/OCR/timestamp metadata is ignored; URLs remain part of note text if present.
+
+## Sync and Firestore rules
+
+- Missing Firestore document should create `reactnativecollection/main` with `{ data: {}, version: 1 }`.
+- Missing collection is fine; Firestore creates it on first write.
+- Failed write after optimistic update should rollback or mark unsynced with retry.
+- Offline open with cached data: allow read.
+- Offline open without cache: show offline empty/error state; do not destructively write an empty document.
+- Offline create/edit should queue pending writes or preserve pending state.
+- Concurrent edits should use transactions or optimistic version checks when possible.
+- Last-write-wins can lose notes; avoid unless explicitly accepted.
+- Server timestamps are unavailable offline until sync; show pending state.
+- Security rules should restrict app collections and unauthenticated access if Firebase Auth is introduced.
+- Password-only app lock cannot secure Firestore by itself.
+- Do not expose service account keys in React Native. Firebase client config public keys are acceptable.
+- Avoid using category names as Firestore document IDs in the v1 single-doc model.
+
+## Auth and privacy
+
+- Auth model is password-only app lock like the previous app.
+- Password-only lock protects the UI only, not Firestore data.
+- Session persistence should use SecureStore where possible.
+- Expired session should lock the app without deleting notes.
+- Logout clears local auth/session state, not Firestore data.
+- Consider offline cache behavior after logout; clear local cache if needed.
+- Real multi-user support requires Firebase Auth and per-user paths such as `users/{uid}/reactnativecollection/main`.
+
+## URLs, search, AI, and copy semantics
+
+### URLs
+
+- Detect URLs only for clickable rendering.
+- Do not mutate note text to store URL metadata.
+- Do not detect or render Instagram specially.
+- Multiple URLs in one note may be clickable.
+- Avoid including trailing punctuation in rendered links where possible.
+- Do not open unsafe schemes like `javascript:`.
+- `http` and `https` are allowed; optionally `mailto:`.
+
+### Search
+
+- Search flattens notes with full paths.
+- Empty query returns no results or a prompt; do not write data.
+- Search is case-insensitive for discovery only.
+- Search result actions must carry exact path and exact note text.
+- Duplicate results should show full path and optionally index/display position.
+- Debounce search and memoize flattening for large documents.
+
+### AI
+
+- AI receives simple JSON or a flattened category catalog, not old tree metadata.
+- AI must return explicit destination path arrays or an unambiguous path that the user converts/chooses.
+- AI cannot directly write to notes; apply suggestions through deterministic helpers.
+- AI suggestion to nonexistent category asks whether to create it.
+- AI suggestion to duplicate category name without full path is rejected or requires user choice.
+- AI edits note content by applying edit with the current exact old note text.
+- Stale AI old-note text should show `not_found` and refresh.
+- Multiple category suggestions require user pick or copy mode.
+- Cloud/serverless AI requires security review before adding secrets or privileged calls.
+
+### Copy/mirror
+
+- V1 copied notes are independent.
+- V1 copied categories are independent duplicated branches.
+- Editing/deleting copied branches changes only that exact branch.
+- Mirrored propagation is excluded from v1.
+- If mirror behavior is added later, add explicit sidecar metadata such as `mirrorLinks`.
+- Do not silently update all same-text notes globally.
+
+## UI/UX requirements
+
+- Empty workspace is valid.
+- First action should be create root category.
+- Category detail with no notes still shows add note/subcategory controls.
+- Long category names wrap or truncate safely.
+- Long notes are readable/editable without layout break.
+- Keyboard avoiding behavior is required for mobile note editor.
+- Destructive deletes require confirmation.
+- Path picker shows full paths.
+- Move/copy disables submit until source note and destination path are valid.
+- Loading/saving states prevent double submits.
+- Errors are shown without crashing.
+- Export JSON is copyable/shareable.
+- Core buttons should have accessibility labels.
+- Manual UI changes should be verified in the app/browser/device when possible; if not possible, state that clearly.
+
+## Design system from `design.md`
+
+Use the Notion-inspired design direction captured in `design.md` when making UI changes.
+
+### Brand characteristics
+
+- Confident, illustration-rich, workspace/productivity feel.
+- Deep navy hero bands: `#0a1530` / `brand-navy`.
+- Signature purple CTA: `#5645d4` / `primary`.
+- Pastel feature/card tints: peach, rose, mint, lavender, sky, yellow, cream.
+- Real workspace/mockup surfaces should feel embedded in cards with hairline borders and restrained shadows.
+- Sober editorial geometry: regular buttons use 8px radius, cards use 12px radius. Do not make regular buttons pill-shaped.
+
+### Core colors
+
+- Primary purple: `#5645d4`; pressed `#4534b3`; deep `#3a2a99`.
+- Link blue: `#0075de`; use for text links, not primary CTA.
+- Canvas: `#ffffff`.
+- Surface: `#f6f5f4`; soft surface `#fafaf9`.
+- Hairlines: `#e5e3df`, `#ede9e4`, strong `#c8c4be`.
+- Ink: `#1a1a1a`; ink deep `#000000`; charcoal `#37352f`; slate `#5d5b54`; steel `#787671`.
+- Semantic success `#1aae39`, warning `#dd5b00`, error `#e03131`.
+
+### Typography and spacing
+
+- Prefer Notion Sans / Inter-based system fallbacks: Inter, system UI, Segoe UI, Helvetica, sans-serif.
+- Headlines use weight 600 with tight line heights and small negative letter spacing for large display sizes.
+- Body text uses 16px, weight 400, line height around 1.55.
+- Button text uses 14px, weight 500.
+- Base spacing unit is 4px, with common increments 8, 12, 16, 20, 24, 32, 40.
+- Touch targets should be roughly 40-44px high for buttons and 44px for inputs.
+
+### Component guidance
+
+- Primary buttons: purple background, white text, 8px radius, approximately `10px 18px` padding.
+- Secondary buttons: transparent/outlined, ink text, strong hairline border, 8px radius.
+- Ghost buttons: transparent, ink text, 6px radius.
+- Text inputs: white background, ink text, strong hairline border, 8px radius, 44px height; focus border uses primary purple.
+- Search pills: surface background, steel text, hairline border, 8px radius, 44px height.
+- Cards: white canvas, 12px radius, hairline border, restrained shadow only when needed.
+- Pastel feature cards use the named card tints with charcoal text.
+- Pill radius is reserved for status badges and pill tabs only.
+- Do not use purple for body text or large backgrounds.
+- Do not mix link blue and primary purple roles.
+- Do not apply heavy shadows to flat documentation/list cards.
 
 ## Platform and config notes
 
 - `app.json` sets scheme `nativenotes`, Android package `com.notes.nativenotetaking`, iOS bundle id `com.notes.native`, and includes `expo-secure-store` and `expo-background-task` plugins.
 - `metro.config.js` extends Expo Metro config and blocklists Android Gradle/build output folders so Metro does not scan generated native build artifacts.
-- `firebase.json` hosts `dist` and configures Firestore in `asia-south1`; `firestore.rules` currently allow read/write on the app collections.
+- `firebase.json` hosts `dist` and configures Firestore in `asia-south1`.
+- `firestore.rules` currently allow app collections used by this project; update deliberately when adding collections.
 - TypeScript is strict and uses Expo's base config with bundler module resolution; included source is `App.tsx` and `src/**/*.ts(x)`.
 - ADB path on this machine: `C:\Users\chethan sheshu\AppData\Local\Android\Sdk\platform-tools\adb.exe`.
-- Manual deep-link test after installing a build: `adb shell am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "nativenotes://add-note?category=SEEK&note=Intent%20test" com.notes.nativenotetaking`.
-- LlamaLab Automate should launch package `com.notes.nativenotetaking`, activity `com.notes.nativenotetaking.MainActivity`, action `android.intent.action.VIEW`, categories `DEFAULT` and `BROWSABLE`, and a data URI like `nativenotes://add-note?category=SEEK&note=Your%20note%20text`.
+
+Manual deep-link test after installing a build:
+
+```bash
+adb shell am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "nativenotes://add-note?category=SEEK&note=Intent%20test" com.notes.nativenotetaking
+```
+
+LlamaLab Automate should launch package `com.notes.nativenotetaking`, activity `com.notes.nativenotetaking.MainActivity`, action `android.intent.action.VIEW`, categories `DEFAULT` and `BROWSABLE`, and a data URI like `nativenotes://add-note?category=SEEK&note=Your%20note%20text`.
+
+The app also drains a JSON array queue named `seek-notes.json` from the Expo document automation folder on startup/import-file. Accepted entries include plain strings, `{ "note": "..." }`, `{ "text": "...", "category": "SEEK" }`, and `{ "note": "...", "categoryPath": ["SEEK"] }`.
+
+## Testing and verification
+
+- Prefer manual verification first, then add helper unit tests once behavior stabilizes.
+- Use `npm run typecheck` as the available automated validation.
+- Unit test pure JSON helpers when tests exist.
+- Run Firestore emulator tests for repository reads/writes/rules if possible.
+- Manually test Android and iOS simulators/devices for mobile UI behavior.
+- Inspect Firestore and verify writes go only to intended collections.
+- Confirm no Django URL is called from React Native code.
+- Confirm removed features stay removed: no instant/full load, no Instagram embed parser, no OCR/Tesseract import.
+- Check source file sizes during review; no source file may exceed 600 lines.
+- Review feature boundaries before handoff.
+
+Minimum behavior matrix to consider when touching core flows:
+
+- Empty Firestore document creation and empty data display.
+- Add root category, add nested subcategory, add note to category/deep subcategory.
+- Edit/delete exact notes, including duplicates.
+- Move/copy notes to same and different paths.
+- Rename/delete categories, including duplicate-name rejection and nested delete confirmation.
+- Search result path preservation.
+- URL clickable rendering without Instagram-specific behavior.
+- Import valid/invalid JSON and old tree conversion.
+- Offline read/write pending states.
+- Firestore permission denied and document-size warning.
+- App reload persistence and logout/session expiry.
+- Android/iOS keyboard behavior and light/dark mode if supported.
+
+## Decision history to preserve
+
+- Single-user app; one user at a time.
+- Main notes collection remains AI-clean simple JSON; workspace/category selection metadata may live separately.
+- Correct React Native folder name is `rnnotetaking/`.
+- Auth model is password-only app lock like the current app.
+- Fresh React Native app starts empty by default; old note import is optional later.
+- Duplicate notes are allowed; edit/delete/move use exact full-note matching with case-sensitivity option and simple first-match/selected-occurrence behavior.
+- Notes remain plain strings in v1; no hidden IDs or note objects.
+- AI integration is later/secondary after core notes work.
+- Workspaces are single-notebook now; multiple workspaces can be sidecar metadata later.
+- New storage location is `reactnativecollection`; primary v1 document is `reactnativecollection/main`.
+- Any workspace/category selection state is stored outside the main `data` field.
+- React Native + Firebase client SDK only; no Django.
+- Writes use deterministic path arrays plus exact normalized note text.
+- Old copied/mirrored branches become independent after migration/import.
+- Clickable URLs are allowed; no Instagram-specific parsing or embed rendering.
+- Internal IDs are excluded from v1 visible note data.
+- Recent implemented decisions include: AI prompt cards for `notetakingprompts`; vertical dropdown category actions; native floating icon popup scrolling; Never password timeout; Android overlay category save chips; full add-note editor routing; subcategory all-view toggle; copy/paste; category/subcategory copy; workspace priority redraw; subcategory order controls; note pinning; pinned notes metadata sidecar; automatic pinning for new subcategories; AI notification queue/history; AI Chat and CORS handling; exact-name category collapse/sync behaviors; deep-link and file-based SEEK automation.
+
+## Reference files
+
+- `plan.md` - full implementation plan, corner cases, and chronological history.
+- `design.md` - Notion-inspired design tokens and UI direction.
+- `exportchat.json` - prior discussion and preferred JSON shape.
+- `notetaking/src/FirestoreNotes.jsx` - feature reference only; do not port Django calls.
+- `notetaking/src/firebase.js` - Firebase config pattern reference.
+- `notetaking/src/PasswordProtection.jsx` - password/session behavior reference.
+- `notetaking/backend/api/views.py` - old tree mutation behavior reference only.
+- `notetaking/backend/api/urls.py` - old endpoints to avoid in React Native.
+
+## history
+
+- 2026-05-14: Expanded `CLAUDE.md` from the compact summary into a full Claude-readable project contract based on `plan.md`, `design.md`, and prior decisions. Decision: future implemented chat steps must update both `plan.md` and `CLAUDE.md` history before the mandatory git status/add/commit/push workflow.
