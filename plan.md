@@ -499,3 +499,7 @@ Added a simple ChatGPT-style AI tab that sends the current main notes JSON as co
 ### 2026-05-08 - AI chat fetch failure handling
 
 Investigated the AI chat `Failed to fetch` response. Direct POST to the Tailnet endpoint works, but browser-style CORS preflight returns 404 and POST responses do not include `Access-Control-Allow-Origin`, so Expo web cannot call it directly. Updated the AI chat error handling to explain that web is blocked by endpoint CORS and that Android/iOS native or server-side CORS/OPTIONS support is required.
+
+## history
+
+- 2026-05-15: Implemented long-press note ordering controls. Long-pressing notes in the main note list or workspace preview reveals Up/Down controls below the options button, reusing the existing deterministic note priority mutation and disabling invalid edge moves.

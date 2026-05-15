@@ -22,14 +22,18 @@ type Props = {
 export function NoteList({ notes, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete, pinnedNotes }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [quickOrderKey, setQuickOrderKey] = useState<string | null>(null);
   return (
     <View style={styles.list}>
-      {notes.map((note, index) => (
-        <View key={`${note.path.join('/')}-${note.index}-${index}`} style={[styles.card, { zIndex: notes.length - index }]}>
-          <NoteText note={note} styles={styles} />
-          <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={index + 1} pinned={isPinnedNote(note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onCopy={onCopy} onCopyText={onCopyText} onSetPriority={onSetPriority} onTogglePin={onTogglePin} onDelete={onDelete} />
-        </View>
-      ))}
+      {notes.map((note, index) => {
+        const noteKey = `${note.path.join('/')}-${note.index}-${index}`;
+        return (
+          <Pressable key={noteKey} onLongPress={() => setQuickOrderKey((current) => current === noteKey ? null : noteKey)} delayLongPress={250} style={[styles.card, { zIndex: notes.length - index }]}>
+            <NoteText note={note} styles={styles} />
+            <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={index + 1} quickOrderOpen={quickOrderKey === noteKey} pinned={isPinnedNote(note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onCopy={onCopy} onCopyText={onCopyText} onSetPriority={(selectedNote, priority) => { setQuickOrderKey(null); onSetPriority(selectedNote, priority); }} onTogglePin={onTogglePin} onDelete={onDelete} />
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -49,7 +53,7 @@ function NoteText({ note, styles }: { note: FlatNote; styles: ReturnType<typeof 
   );
 }
 
-function NoteActionsDropdown({ note, noteCount, currentOrder, pinned, colors, styles, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; pinned: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onCopyText: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onTogglePin: (note: FlatNote) => void; onDelete: (note: FlatNote) => void }) {
+function NoteActionsDropdown({ note, noteCount, currentOrder, quickOrderOpen, pinned, colors, styles, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete }: { note: FlatNote; noteCount: number; currentOrder: number; quickOrderOpen: boolean; pinned: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onCopyText: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onTogglePin: (note: FlatNote) => void; onDelete: (note: FlatNote) => void }) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
@@ -74,6 +78,18 @@ function NoteActionsDropdown({ note, noteCount, currentOrder, pinned, colors, st
       <Pressable accessibilityRole="button" accessibilityLabel={pinned ? 'Pinned note actions' : 'Note actions'} onPress={() => setOpen((current) => !current)} style={[styles.iconButton, pinned && styles.iconButtonPinned]}>
         <Icon name="settings-outline" size={18} color={pinned ? colors.onPrimary : colors.ink} />
       </Pressable>
+      {quickOrderOpen ? (
+        <View style={styles.quickOrderPanel}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Move note up" disabled={currentOrder <= 1} onPress={() => onSetPriority(note, currentOrder - 1)} style={[styles.quickOrderButton, currentOrder <= 1 && styles.quickOrderButtonDisabled]}>
+            <Icon name="chevron-up" size={14} color={currentOrder <= 1 ? colors.stone : colors.ink} />
+            <Text style={[styles.quickOrderText, currentOrder <= 1 && styles.quickOrderTextDisabled]}>Up</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Move note down" disabled={currentOrder >= noteCount} onPress={() => onSetPriority(note, currentOrder + 1)} style={[styles.quickOrderButton, currentOrder >= noteCount && styles.quickOrderButtonDisabled]}>
+            <Icon name="chevron-down" size={14} color={currentOrder >= noteCount ? colors.stone : colors.ink} />
+            <Text style={[styles.quickOrderText, currentOrder >= noteCount && styles.quickOrderTextDisabled]}>Down</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {open ? (
         <View style={styles.dropdown}>
           <Pressable accessibilityRole="button" accessibilityLabel={pinned ? 'Unpin note' : 'Pin note'} onPress={() => { close(); onTogglePin(note); }} style={[styles.dropdownItem, pinned && styles.dropdownItemPinned]}>
@@ -150,6 +166,11 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   actions: { position: 'relative', flexDirection: 'row', gap: spacing.xs, justifyContent: 'flex-end', zIndex: 3 },
   iconButton: { width: 40, height: 40, borderRadius: rounded.md, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   iconButtonPinned: { backgroundColor: colors.primary, borderWidth: 1, borderColor: colors.primaryDeep },
+  quickOrderPanel: { position: 'absolute', top: 44, right: 0, width: 120, borderRadius: rounded.md, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: spacing.xs, gap: 3, zIndex: 4, elevation: 7 },
+  quickOrderButton: { minHeight: 36, borderRadius: rounded.sm, paddingHorizontal: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.surfaceSoft },
+  quickOrderButtonDisabled: { opacity: 0.45 },
+  quickOrderText: { ...typography.bodySmMedium, color: colors.charcoal, flex: 1 },
+  quickOrderTextDisabled: { color: colors.stone },
   dropdown: { position: 'absolute', top: 44, right: 0, width: 172, borderRadius: rounded.md, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: spacing.xs, gap: 3, zIndex: 5, elevation: 8 },
   dropdownItem: { minHeight: 36, borderRadius: rounded.sm, paddingHorizontal: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.surfaceSoft },
   dropdownItemPinned: { backgroundColor: colors.primary },

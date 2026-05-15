@@ -25,6 +25,7 @@ export type IconName =
   | 'sparkles-outline'
   | 'sunny-outline'
   | 'trash-outline'
+  | 'chevron-up'
   | 'chevron-down'
   | 'chevron-forward';
 
@@ -59,6 +60,7 @@ const labels: Record<IconName, string> = {
   'sparkles-outline': '*',
   'sunny-outline': '☼',
   'trash-outline': '!',
+  'chevron-up': '^',
   'chevron-down': 'v',
   'chevron-forward': '>',
 };
