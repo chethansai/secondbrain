@@ -39,6 +39,7 @@ type Props = {
   onOpenCategory: (path: CategoryPath) => void;
   onCreateRootCategory: () => void;
   onToggleCategory: (path: CategoryPath) => void;
+  onToggleCategoryPin: (path: CategoryPath) => void;
   onSetCategoryPriority: (path: CategoryPath, priority: number, visibleCategoryPaths?: CategoryPath[]) => void;
   onSetSubcategoryPriority: (path: CategoryPath, priority: number) => void;
   onAddNote: (path: CategoryPath, text: string) => Promise<boolean> | boolean;
@@ -81,6 +82,7 @@ export function WorkspaceBoard({
   onOpenCategory,
   onCreateRootCategory,
   onToggleCategory,
+  onToggleCategoryPin,
   onSetCategoryPriority,
   onSetSubcategoryPriority,
   onAddNote,
@@ -109,6 +111,7 @@ export function WorkspaceBoard({
   const rawCategories = useMemo(() => listAllCategories(data), [data]);
   const visibleCategories = useMemo(() => collapseExactNameCategories(rawCategories), [rawCategories]);
   const selectedPaths = activeWorkspace?.selectedCategoryPaths ?? [];
+  const pinnedCategoryPaths = activeWorkspace?.pinnedCategoryPaths ?? [];
   const pinnedNotes = activeWorkspace?.pinnedNotes ?? [];
   const rawCategoriesByKey = new Map(rawCategories.map((category) => [pathKey(category.path), category]));
   const visibleCategoriesByName = new Map(visibleCategories.map((category) => [category.name, category]));
@@ -377,12 +380,14 @@ export function WorkspaceBoard({
                 const selected = selectedIndex >= 0;
                 const priority = selected ? selectedIndex + 1 : prioritizedCategories.length + 1;
                 const menuOpen = priorityMenuKey === key;
+                const pinned = pinnedCategoryPaths.some((path) => pathKey(path) === key);
                 const priorityOptions = Array.from({ length: Math.max(prioritizedCategories.length, 1) + (selected ? 0 : 1) }, (_, index) => index + 1);
                 return (
                   <WorkspaceCategoryPickerRow
                     key={key}
                     category={category}
                     selected={selected}
+                    pinned={pinned}
                     priority={priority}
                     priorityOptions={priorityOptions}
                     priorityMenuOpen={menuOpen}
@@ -392,6 +397,7 @@ export function WorkspaceBoard({
                     onTogglePriorityMenu={() => { setCategoryActionsKey(null); setPriorityMenuKey(menuOpen ? null : key); }}
                     onSetPriority={setCategoryPriority}
                     onToggleActionsMenu={() => { setPriorityMenuKey(null); setCategoryActionsKey(categoryActionsKey === key ? null : key); }}
+                    onTogglePin={(path) => { setPriorityMenuKey(null); setCategoryActionsKey(null); onToggleCategoryPin(path); }}
                     onCreateSubcategory={(path) => { setShowCategoryPicker(false); setPriorityMenuKey(null); setCategoryActionsKey(null); onCreateSubcategory(path); }}
                   />
                 );

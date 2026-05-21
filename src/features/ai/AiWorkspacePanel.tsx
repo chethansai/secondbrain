@@ -317,6 +317,7 @@ export function AiWorkspacePanel() {
           onOpenCategory={setPath}
           onCreateRootCategory={() => setPromptMode('root')}
           onToggleCategory={toggleWorkspaceCategory}
+          onToggleCategoryPin={togglePinnedMoveCopyCategory}
           onSetCategoryPriority={setWorkspaceCategoryPriority}
           onSetSubcategoryPriority={setSubcategoryOrderPriority}
           onAddNote={addWorkspaceNote}

@@ -263,6 +263,16 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     return ok;
   }
 
+  async function createEditorSubcategory(parentPath: CategoryPath, name: string) {
+    const cleanName = name.trim();
+    const nextPath = [...parentPath, cleanName];
+    const result = createSubcategory(data, parentPath, cleanName);
+    const ok = await commitWithHistory(result, `${formatHistoryPath(nextPath)} category created - ${formatHistoryPath(nextPath)} - ${formatHistoryTime()} - Event: SUBCATEGORY_CREATED - Parent: ${formatHistoryPath(parentPath)}`);
+    if (!ok || !result.ok) return null;
+    await includeWorkspacePinnedCategory(nextPath);
+    return nextPath;
+  }
+
   async function addSeekNote(text: string) {
     const seekResult = getCategoryItems(data, [SEEK_CATEGORY]) ? { ok: true as const, data } : createRootCategory(data, SEEK_CATEGORY);
     if (!seekResult.ok) return commit(seekResult);
@@ -544,6 +554,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onOpenCategory={setPath}
                   onCreateRootCategory={() => setPromptMode('root')}
                   onToggleCategory={toggleWorkspaceCategory}
+                  onToggleCategoryPin={togglePinnedMoveCopyCategory}
                   onSetCategoryPriority={setWorkspaceCategoryPriority}
                   onSetSubcategoryPriority={setSubcategoryOrderPriority}
                   onAddNote={addBoardNote}
@@ -678,6 +689,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           return ok;
         }}
         onSubmitToCategory={editorMode === 'add' ? addWorkspaceNote : undefined}
+        onCreateSubcategory={editorMode === 'add' ? createEditorSubcategory : undefined}
       />
       <MoveCopyModal
         visible={moveVisible}

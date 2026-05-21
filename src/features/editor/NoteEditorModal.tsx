@@ -19,9 +19,10 @@ type Props = {
   onClose: () => void;
   onSubmit: (text: string) => Promise<boolean> | boolean;
   onSubmitToCategory?: (path: CategoryPath, text: string) => Promise<boolean> | boolean;
+  onCreateSubcategory?: (path: CategoryPath, name: string) => Promise<CategoryPath | null> | CategoryPath | null;
 };
 
-export function NoteEditorModal({ visible, title, initialText = '', categoryData, selectedPath = null, onClose, onSubmit, onSubmitToCategory }: Props) {
+export function NoteEditorModal({ visible, title, initialText = '', categoryData, selectedPath = null, onClose, onSubmit, onSubmitToCategory, onCreateSubcategory }: Props) {
   const [text, setText] = useState(initialText);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [busy, setBusy] = useState(false);
@@ -75,7 +76,7 @@ export function NoteEditorModal({ visible, title, initialText = '', categoryData
               <Button label="SEEK" icon="checkmark" onPress={submit} disabled={!canSubmit} style={styles.mainActionButton} />
               <Button label="Cancel" icon="close" variant="secondary" onPress={onClose} disabled={busy} style={styles.mainActionButton} />
             </View>
-            <InlineCategorySavePicker data={categoryData} selectedPath={selectedPath} excludedPath={[SEEK_CATEGORY]} disabled={!canSubmit} onSelect={submitToCategory} />
+            <InlineCategorySavePicker data={categoryData} selectedPath={selectedPath} excludedPath={[SEEK_CATEGORY]} disabled={!canSubmit} onSelect={submitToCategory} onCreateSubcategory={onCreateSubcategory} />
           </>
         ) : (
           <Button label="Save note" icon="checkmark" onPress={submit} disabled={!canSubmit} />

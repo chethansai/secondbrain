@@ -6,7 +6,8 @@
       "Bash(git commit *)",
       "Bash(git *)",
       "Bash(./gradlew assembleRelease)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(./gradlew compileDebugKotlin)"
     ]
   }
 }
