@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
@@ -186,6 +187,26 @@ class OverlayService : Service() {
       addView(seekButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
       addView(closeButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
     }
+    val categoryInput = EditText(this).apply {
+      hint = "New category name"
+      minLines = 1
+      maxLines = 1
+      textSize = 14f
+      setTextColor(0xff1a1a1a.toInt())
+      setHintTextColor(0xff787671.toInt())
+      setSingleLine(true)
+      imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+    }
+    val createCategoryButton = Button(this).apply {
+      text = "Create category + note"
+      setOnClickListener { submitNewCategoryInput(editText, categoryInput) }
+    }
+    val createCategoryBox = LinearLayout(this).apply {
+      orientation = LinearLayout.VERTICAL
+      setPadding(0, dp(8), 0, dp(6))
+      addView(categoryInput, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+      addView(createCategoryButton, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    }
     val chipWrap = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
       setPadding(0, dp(8), 0, 0)
@@ -211,6 +232,7 @@ class OverlayService : Service() {
       elevation = dp(10).toFloat()
       addView(editText, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(controls, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+      addView(createCategoryBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(chipScroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
     }
     val frame = FrameLayout(this).apply {
@@ -240,6 +262,15 @@ class OverlayService : Service() {
         false
       }
     }
+    categoryInput.setOnEditorActionListener { _, actionId, event ->
+      val enterPressed = event?.keyCode == android.view.KeyEvent.KEYCODE_ENTER && event.action == android.view.KeyEvent.ACTION_UP
+      if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE || enterPressed) {
+        submitNewCategoryInput(editText, categoryInput)
+        true
+      } else {
+        false
+      }
+    }
 
     windowManager.addView(frame, params)
     inputView = frame
@@ -253,9 +284,10 @@ class OverlayService : Service() {
   private fun loadCategoryChips(chipWrap: LinearLayout, editText: EditText) {
     Thread {
       try {
+        val recentCategoryKey = readRecentCreatedCategoryKey()
         val categories = notesStore.readCategoryPaths()
           .filter { it.path != listOf(OverlayNotesStore.seekCategoryName) }
-          .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.label })
+          .sortedWith(compareBy<OverlayNotesStore.CategoryPath> { pathKey(it.path) != recentCategoryKey }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
         Handler(Looper.getMainLooper()).post { renderCategoryChips(chipWrap, editText, categories) }
       } catch (_: Exception) {
         Handler(Looper.getMainLooper()).post {
@@ -299,47 +331,83 @@ class OverlayService : Service() {
   }
 
   private fun createCategoryChip(category: OverlayNotesStore.CategoryPath, editText: EditText): View {
+    val wrap = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
     val chip = LinearLayout(this).apply {
       orientation = LinearLayout.HORIZONTAL
       gravity = Gravity.CENTER_VERTICAL
-      background = GradientDrawable().apply {
-        shape = GradientDrawable.RECTANGLE
-        cornerRadius = dp(18).toFloat()
-        setColor(0xfffafaf9.toInt())
-        setStroke(dp(1), 0xffc8c4be.toInt())
-      }
+      background = GradientDrawable().apply { shape = GradientDrawable.RECTANGLE; cornerRadius = dp(18).toFloat(); setColor(0xfffafaf9.toInt()); setStroke(dp(1), 0xffc8c4be.toInt()) }
+    }
+    val subcategoryInput = EditText(this).apply {
+      hint = "Subcategory name"; minLines = 1; maxLines = 1; textSize = 13f
+      setTextColor(0xff1a1a1a.toInt()); setHintTextColor(0xff787671.toInt()); setSingleLine(true)
+      imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+    }
+    val subcategoryBox = LinearLayout(this).apply {
+      orientation = LinearLayout.VERTICAL; visibility = View.GONE; setPadding(dp(6), dp(6), dp(6), dp(4))
+      addView(subcategoryInput, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+      addView(Button(this@OverlayService).apply { text = "Create as subcategory"; setOnClickListener { submitNewSubcategoryInput(editText, subcategoryInput, category.path) } }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     }
     val label = TextView(this).apply {
-      text = category.label
-      textSize = 12f
-      setTextColor(0xff37352f.toInt())
-      setSingleLine(false)
-      ellipsize = null
-      includeFontPadding = false
-      setPadding(dp(12), dp(9), dp(8), dp(9))
-      setOnClickListener { submitInput(editText, category.path) }
+      text = category.label; textSize = 12f; setTextColor(0xff37352f.toInt()); setSingleLine(false); ellipsize = null; includeFontPadding = false
+      setPadding(dp(12), dp(9), dp(8), dp(9)); setOnClickListener { submitInput(editText, category.path) }
     }
     val overflow = TextView(this).apply {
-      text = "⋮"
-      textSize = 18f
-      gravity = Gravity.CENTER
-      setTextColor(0xff787671.toInt())
-      minWidth = dp(40)
-      setPadding(dp(8), dp(6), dp(10), dp(6))
-      setOnClickListener { submitInput(editText, category.path) }
+      text = "⋮"; textSize = 18f; gravity = Gravity.CENTER; setTextColor(0xff787671.toInt()); minWidth = dp(40); setPadding(dp(8), dp(6), dp(10), dp(6))
+      setOnClickListener { toggleSubcategoryBox(subcategoryBox, subcategoryInput) }
+    }
+    subcategoryInput.setOnEditorActionListener { _, actionId, event ->
+      val enterPressed = event?.keyCode == android.view.KeyEvent.KEYCODE_ENTER && event.action == android.view.KeyEvent.ACTION_UP
+      if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE || enterPressed) { submitNewSubcategoryInput(editText, subcategoryInput, category.path); true } else false
     }
     chip.addView(label, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
     chip.addView(overflow, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT))
-    return chip
+    wrap.addView(chip, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    wrap.addView(subcategoryBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    return wrap
   }
 
-  private fun submitInput(editText: EditText, path: List<String>) {
+  private fun toggleSubcategoryBox(box: LinearLayout, input: EditText) {
+    box.visibility = if (box.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+    if (box.visibility == View.VISIBLE) {
+      input.requestFocus()
+      ContextCompat.getSystemService(this, InputMethodManager::class.java)?.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+    }
+  }
+
+  private fun submitNewCategoryInput(editText: EditText, categoryInput: EditText) {
+    val categoryName = categoryInput.text?.toString()?.trim().orEmpty()
+    if (categoryName.isBlank()) {
+      Toast.makeText(this, "Category name cannot be empty.", Toast.LENGTH_SHORT).show()
+      categoryInput.requestFocus()
+      ContextCompat.getSystemService(this, InputMethodManager::class.java)?.showSoftInput(categoryInput, InputMethodManager.SHOW_IMPLICIT)
+      return
+    }
+    val path = listOf(categoryName)
+    writeRecentCreatedCategoryKey(path)
+    submitInput(editText, path, categoryInput)
+  }
+
+  private fun submitNewSubcategoryInput(editText: EditText, subcategoryInput: EditText, parentPath: List<String>) {
+    val subcategoryName = subcategoryInput.text?.toString()?.trim().orEmpty()
+    if (subcategoryName.isBlank()) {
+      Toast.makeText(this, "Subcategory name cannot be empty.", Toast.LENGTH_SHORT).show()
+      subcategoryInput.requestFocus()
+      ContextCompat.getSystemService(this, InputMethodManager::class.java)?.showSoftInput(subcategoryInput, InputMethodManager.SHOW_IMPLICIT)
+      return
+    }
+    val path = parentPath + subcategoryName
+    writeRecentCreatedCategoryKey(path)
+    submitInput(editText, path, subcategoryInput)
+  }
+
+  private fun submitInput(editText: EditText, path: List<String>, categoryInput: EditText? = null) {
     val note = editText.text?.toString()?.trim().orEmpty()
     if (note.isBlank()) {
       Toast.makeText(this, "Note text cannot be empty.", Toast.LENGTH_SHORT).show()
       return
     }
     editText.isEnabled = false
+    categoryInput?.isEnabled = false
     Thread {
       try {
         notesStore.appendNote(path, note)
@@ -350,6 +418,7 @@ class OverlayService : Service() {
       } catch (_: Exception) {
         Handler(Looper.getMainLooper()).post {
           editText.isEnabled = true
+          categoryInput?.isEnabled = true
           editText.requestFocus()
           ContextCompat.getSystemService(this, InputMethodManager::class.java)?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
           Toast.makeText(this, "Could not add to Firestore.", Toast.LENGTH_LONG).show()
@@ -361,6 +430,18 @@ class OverlayService : Service() {
   private fun hideInput() {
     removeView(inputView)
     inputView = null
+  }
+
+  private fun readRecentCreatedCategoryKey(): String? {
+    return getSharedPreferences(overlayPreferencesName, Context.MODE_PRIVATE).getString(recentCreatedCategoryKey, null)
+  }
+
+  private fun writeRecentCreatedCategoryKey(path: List<String>) {
+    getSharedPreferences(overlayPreferencesName, Context.MODE_PRIVATE).edit().putString(recentCreatedCategoryKey, pathKey(path)).apply()
+  }
+
+  private fun pathKey(path: List<String>): String {
+    return path.joinToString("")
   }
 
   private fun runAction(action: String) {
@@ -515,6 +596,8 @@ class OverlayService : Service() {
   companion object {
     private const val NOTIFICATION_CHANNEL_ID = "floating_note_icon"
     private const val NOTIFICATION_ID = 1101
+    private const val overlayPreferencesName = "floating_note_overlay"
+    private const val recentCreatedCategoryKey = "recent_created_category_key"
     const val ACTION_STOP = "com.notes.nativenotetaking.overlay.STOP"
     const val ACTION_UPDATE = "com.notes.nativenotetaking.overlay.UPDATE"
     const val ACTION_RESET_POSITION = "com.notes.nativenotetaking.overlay.RESET_POSITION"
