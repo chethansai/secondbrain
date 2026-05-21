@@ -197,15 +197,21 @@ export function AiChatPanel({ data, pinnedNotes, onAddNote, onCreateSubcategory,
       </View>
       {promptCategory ? (
         <View style={styles.promptArea}>
+          <View style={styles.promptHeader}>
+            <Text style={styles.promptTitle}>Saved AI prompts</Text>
+            <Text style={styles.promptHint}>Tap a card or note to fill the chat box, then edit before sending.</Text>
+          </View>
           {promptNotes.length ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.promptCardList} keyboardShouldPersistTaps="handled">
               {promptNotes.map((note, index) => (
-                <Pressable key={`${note.path.join('/')}-${note.index}-${index}`} accessibilityRole="button" accessibilityLabel="Use note taking prompt" onPress={() => fillPrompt(note.note)} style={styles.promptCard}>
-                  <Text style={styles.promptCardText} numberOfLines={5}>{note.note}</Text>
+                <Pressable key={`${note.path.join('/')}-${note.index}-${index}`} accessibilityRole="button" accessibilityLabel="Fill AI chat with saved prompt" onPress={() => fillPrompt(note.note)} style={styles.promptCard}>
+                  <Text style={styles.promptCardText}>{note.note}</Text>
                 </Pressable>
               ))}
             </ScrollView>
-          ) : null}
+          ) : (
+            <Text style={styles.promptEmptyText}>Add notes to notetakingprompts to create reusable AI prompt cards.</Text>
+          )}
           <WorkspaceCategoryCard
             category={promptCategory}
             allCategories={rawCategories}
@@ -365,8 +371,12 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     sendButton: { width: 48, height: 48, borderRadius: rounded.md, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
     sendButtonDisabled: { backgroundColor: colors.muted },
     promptArea: { gap: spacing.sm },
+    promptHeader: { gap: spacing.xs },
+    promptTitle: { ...typography.bodySmMedium, color: colors.ink },
+    promptHint: { ...typography.micro, color: colors.slate },
+    promptEmptyText: { ...typography.micro, color: colors.slate },
     promptCardList: { gap: spacing.sm, paddingRight: spacing.sm },
-    promptCard: { width: 220, minHeight: 104, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.surfaceSoft, padding: spacing.md, justifyContent: 'center' },
+    promptCard: { width: 240, minHeight: 112, maxHeight: 180, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.surfaceSoft, padding: spacing.md, justifyContent: 'center' },
     promptCardText: { ...typography.bodySmMedium, color: colors.charcoal },
   });
 }

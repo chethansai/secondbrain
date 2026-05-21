@@ -26,6 +26,8 @@ type PanelHeaderProps = {
 };
 
 type ActionGridProps = {
+  discloseLabel?: 'Disclose' | 'Enclose';
+  onDisclose?: () => void;
   onAddNote: () => void;
   onSubcategory: () => void;
   onCopy: () => void;
@@ -92,13 +94,14 @@ export function PanelHeader({ title, onBack }: PanelHeaderProps) {
   );
 }
 
-export function ActionGrid({ onAddNote, onSubcategory, onCopy, onRename, onDelete }: ActionGridProps) {
+export function ActionGrid({ discloseLabel, onDisclose, onAddNote, onSubcategory, onCopy, onRename, onDelete }: ActionGridProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.actionGrid}>
       <Button label="Note" icon="add" onPress={onAddNote} style={styles.gridButton} />
       <Button label="Folder" icon="folder-outline" variant="secondary" onPress={onSubcategory} style={styles.gridButton} />
+      {discloseLabel && onDisclose ? <Button label={discloseLabel} icon={discloseLabel === 'Enclose' ? 'chevron-up' : 'chevron-down'} variant="secondary" onPress={onDisclose} style={styles.gridButton} /> : null}
       <Button label="Copy" icon="copy-outline" variant="secondary" onPress={onCopy} style={styles.gridButton} />
       <Button label="Rename" icon="create-outline" variant="secondary" onPress={onRename} style={styles.gridButton} />
       <Button label="Delete" icon="trash-outline" variant="danger" onPress={onDelete} style={styles.gridButton} />

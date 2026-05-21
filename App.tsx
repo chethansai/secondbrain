@@ -10,7 +10,7 @@ import { createDecisionFromSuggestion, formatAiReviewRequestError, nextSimpleRev
 import { AiReviewLedger, SEEK_CATEGORY } from './src/features/ai/aiReviewTypes';
 import { AiWorkspacePanel } from './src/features/ai/AiWorkspacePanel';
 import { CategoryList } from './src/features/categories/CategoryList';
-import { categoryDeleteMessage, copyCategory, createRootCategory, createSubcategory, deleteCategory, getCategoryItems, listChildCategories, renameCategory, setCategoryPriority, startsWithPath } from './src/features/categories/categoryTree';
+import { categoryDeleteMessage, copyCategory, createRootCategory, createSubcategory, deleteCategory, getCategoryItems, listAllCategories, listChildCategories, renameCategory, setCategoryPriority, startsWithPath } from './src/features/categories/categoryTree';
 import { TextPromptModal } from './src/features/editor/TextPromptModal';
 import { NoteEditorModal } from './src/features/editor/NoteEditorModal';
 import { MoveCopyModal } from './src/features/notes/MoveCopyModal';
@@ -87,12 +87,16 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const [moveCopyAction, setMoveCopyAction] = useState<MoveCopyAction>('move');
   const [moveCopyTarget, setMoveCopyTarget] = useState<MoveCopyTarget>(null);
   const [boardTopActionsVisible, setBoardTopActionsVisible] = useState(true);
+  const [expandedCategoryKeys, setExpandedCategoryKeys] = useState<Set<string>>(() => new Set());
   const runningAutomationKey = useRef<string | null>(null);
   const fileAutomationRunKey = useRef<string | null>(null);
   const runningAiReviewFingerprints = useRef(new Set<string>());
 
   const currentItems = path.length ? getCategoryItems(data, path) : null;
   const childCategories = useMemo(() => (currentItems ? listChildCategories(currentItems, path) : []), [currentItems, path]);
+  const detailCategories = useMemo(() => listAllCategories(data).filter((category) => startsWithPath(category.path, path) && category.path.length > path.length), [data, path]);
+  const expandableDetailKeys = useMemo(() => detailCategories.filter((category) => category.childCount > 0).map((category) => category.path.join('')), [detailCategories]);
+  const allDetailCategoriesExpanded = expandableDetailKeys.length > 0 && expandableDetailKeys.every((key) => expandedCategoryKeys.has(key));
   const pinnedNotes = activeWorkspace?.pinnedNotes ?? [];
   const notes = useMemo(() => (path.length ? sortPinnedNotesFirst(listNotesAtPath(data, path), pinnedNotes) : []), [data, path, pinnedNotes]);
   const activeTitle = path.length ? path[path.length - 1] : activeWorkspace?.name ?? 'Workspace';
@@ -401,6 +405,33 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     if (!copied) setError('Clipboard copy is not available on this device.');
   }
 
+  function toggleDetailCategory(categoryPath: CategoryPath) {
+    const key = categoryPath.join('');
+    setExpandedCategoryKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
+  function setDetailCategoriesExpanded(expanded: boolean) {
+    setExpandedCategoryKeys((current) => {
+      const next = new Set(current);
+      expandableDetailKeys.forEach((key) => {
+        if (expanded) {
+          next.add(key);
+        } else {
+          next.delete(key);
+        }
+      });
+      return next;
+    });
+  }
+
   async function toggleWorkspaceCategory(categoryPath: CategoryPath) {
     const selected = activeWorkspace?.selectedCategoryPaths ?? [];
     const key = categoryPath.join('\u001f');
@@ -543,13 +574,15 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     onOpenAiWorkspace={() => setTab('aiWorkspace')}
                   />
                   <ActionGrid
+                    discloseLabel={expandableDetailKeys.length ? (allDetailCategoriesExpanded ? 'Enclose' : 'Disclose') : undefined}
+                    onDisclose={expandableDetailKeys.length ? () => setDetailCategoriesExpanded(!allDetailCategoriesExpanded) : undefined}
                     onAddNote={() => openAddNoteEditor(path)}
                     onSubcategory={() => { setPromptPath(path); setPromptMode('subcategory'); }}
                     onRename={() => setPromptMode('rename')}
                     onDelete={confirmDeleteCategory}
                     onCopy={() => openCategoryCopy(path)}
                   />
-                  {childCategories.length ? <CategoryList categories={childCategories} onSelect={setPath} /> : null}
+                  {childCategories.length ? <CategoryList categories={detailCategories} expandedKeys={expandedCategoryKeys} onToggleCategory={toggleDetailCategory} onSelect={setPath} /> : null}
                   {notes.length ? (
                     <NoteList
                       notes={notes}

@@ -10,6 +10,7 @@ import { CategoryPath, CategorySummary, FlatNote, NotesData, WorkspaceMeta } fro
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { Icon } from '../../shared/ui/Icon';
 import { WorkspaceCategoryCard } from './WorkspaceCategoryCard';
+import { WorkspaceCategoryPickerRow } from './WorkspaceCategoryPickerRow';
 import { ZoomableCategorySlot } from './ZoomableCategorySlot';
 
 type Props = {
@@ -103,6 +104,7 @@ export function WorkspaceBoard({
   const [authHoursText, setAuthHoursText] = useState(formatAuthTimeoutInput(authTimeoutHours));
   const [authHoursStatus, setAuthHoursStatus] = useState<string | null>(null);
   const [priorityMenuKey, setPriorityMenuKey] = useState<string | null>(null);
+  const [categoryActionsKey, setCategoryActionsKey] = useState<string | null>(null);
   const [categorySearch, setCategorySearch] = useState('');
   const rawCategories = useMemo(() => listAllCategories(data), [data]);
   const visibleCategories = useMemo(() => collapseExactNameCategories(rawCategories), [rawCategories]);
@@ -137,6 +139,7 @@ export function WorkspaceBoard({
 
   function setCategoryPriority(path: CategoryPath, priority: number) {
     setPriorityMenuKey(null);
+    setCategoryActionsKey(null);
     onSetCategoryPriority(path, priority, boardCategories.map((category) => category.path));
   }
 
@@ -148,6 +151,7 @@ export function WorkspaceBoard({
   function reloadRecentData() {
     setShowCategoryPicker(false);
     setPriorityMenuKey(null);
+    setCategoryActionsKey(null);
     closeHeaderMenus();
     onRefresh();
   }
@@ -173,6 +177,7 @@ export function WorkspaceBoard({
     if (!floatingActionsVisible) {
       setShowCategoryPicker(false);
       setPriorityMenuKey(null);
+      setCategoryActionsKey(null);
       closeHeaderMenus();
     }
   }, [floatingActionsVisible]);
@@ -342,14 +347,14 @@ export function WorkspaceBoard({
 
       {showCategoryPicker ? (
         <View style={styles.paneLayer}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close shown categories" onPress={() => { setShowCategoryPicker(false); setPriorityMenuKey(null); }} style={styles.paneScrim} />
+          <Pressable accessibilityRole="button" accessibilityLabel="Close shown categories" onPress={() => { setShowCategoryPicker(false); setPriorityMenuKey(null); setCategoryActionsKey(null); }} style={styles.paneScrim} />
           <View style={styles.categoryPane}>
             <View style={styles.paneHeader}>
               <View style={styles.paneTitleBlock}>
                 <Text style={styles.paneKicker}>Shown</Text>
                 <Text style={styles.paneTitle}>Categories</Text>
               </View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Close shown categories" onPress={() => { setShowCategoryPicker(false); setPriorityMenuKey(null); }} style={styles.paneCloseButton}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close shown categories" onPress={() => { setShowCategoryPicker(false); setPriorityMenuKey(null); setCategoryActionsKey(null); }} style={styles.paneCloseButton}>
                 <Icon name="close" size={13} color={colors.steel} />
               </Pressable>
             </View>
@@ -357,7 +362,7 @@ export function WorkspaceBoard({
             <TextInput
               accessibilityLabel="Search shown categories"
               value={categorySearch}
-              onChangeText={(text) => { setPriorityMenuKey(null); setCategorySearch(text); }}
+              onChangeText={(text) => { setPriorityMenuKey(null); setCategoryActionsKey(null); setCategorySearch(text); }}
               placeholder="Search categories"
               placeholderTextColor={colors.stone}
               autoCapitalize="none"
@@ -374,32 +379,21 @@ export function WorkspaceBoard({
                 const menuOpen = priorityMenuKey === key;
                 const priorityOptions = Array.from({ length: Math.max(prioritizedCategories.length, 1) + (selected ? 0 : 1) }, (_, index) => index + 1);
                 return (
-                  <View key={key} style={[styles.paneCategoryRow, selected && styles.paneCategoryRowSelected, menuOpen && styles.paneCategoryRowMenuOpen]}>
-                    <Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${formatPath(category.path)}`} onPress={() => { setPriorityMenuKey(null); onToggleCategory(category.path); }} style={styles.paneCategoryMain}>
-                      <View style={[styles.selectionBox, selected && styles.selectionBoxSelected]}>
-                        {selected ? <Icon name="checkmark" size={11} color={colors.onPrimary} /> : null}
-                      </View>
-                      <View style={styles.paneCategoryTextBlock}>
-                        <Text style={[styles.paneCategoryName, selected && styles.paneCategoryNameSelected]} numberOfLines={1}>{category.name}</Text>
-                        <Text style={styles.paneCategoryPath} numberOfLines={1}>{formatPath(category.path)}</Text>
-                      </View>
-                    </Pressable>
-                    <View style={styles.priorityControlWrap}>
-                      <Pressable accessibilityRole="button" accessibilityLabel={`Priority ${priority} for ${category.name}`} onPress={() => setPriorityMenuKey(menuOpen ? null : key)} style={[styles.priorityButton, selected && styles.priorityButtonSelected]}>
-                        <Text style={[styles.priorityButtonText, selected && styles.priorityButtonTextSelected]}>{priority}</Text>
-                        <Icon name="chevron-down" size={10} color={selected ? colors.charcoal : colors.steel} />
-                      </Pressable>
-                      {menuOpen ? (
-                        <View style={styles.priorityMenu}>
-                          {priorityOptions.map((option) => (
-                            <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Set ${category.name} priority ${option}`} onPress={() => setCategoryPriority(category.path, option)} style={[styles.priorityMenuItem, option === priority && selected && styles.priorityMenuItemActive]}>
-                              <Text style={[styles.priorityMenuItemText, option === priority && selected && styles.priorityMenuItemTextActive]}>{option}</Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                      ) : null}
-                    </View>
-                  </View>
+                  <WorkspaceCategoryPickerRow
+                    key={key}
+                    category={category}
+                    selected={selected}
+                    priority={priority}
+                    priorityOptions={priorityOptions}
+                    priorityMenuOpen={menuOpen}
+                    actionsMenuOpen={categoryActionsKey === key}
+                    colors={colors}
+                    onToggleCategory={(path) => { setPriorityMenuKey(null); setCategoryActionsKey(null); onToggleCategory(path); }}
+                    onTogglePriorityMenu={() => { setCategoryActionsKey(null); setPriorityMenuKey(menuOpen ? null : key); }}
+                    onSetPriority={setCategoryPriority}
+                    onToggleActionsMenu={() => { setPriorityMenuKey(null); setCategoryActionsKey(categoryActionsKey === key ? null : key); }}
+                    onCreateSubcategory={(path) => { setShowCategoryPicker(false); setPriorityMenuKey(null); setCategoryActionsKey(null); onCreateSubcategory(path); }}
+                  />
                 );
               }) : <Text style={styles.emptyPickerText}>{categorySearchText ? 'No matching categories.' : 'Create a category to show it here.'}</Text>}
             </ScrollView>
@@ -538,26 +532,6 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   categorySearchInput: { minHeight: 40, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.surfaceSoft, color: colors.ink, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, ...typography.bodySm },
   paneScroll: { flexGrow: 0, maxHeight: shownCategoryListMaxHeight },
   paneList: { gap: spacing.xs, paddingBottom: spacing.xl },
-  paneCategoryRow: { position: 'relative', minHeight: 52, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surfaceSoft, padding: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, zIndex: 1 },
-  paneCategoryRowSelected: { backgroundColor: colors.cardTintYellow, borderColor: colors.brandYellow, zIndex: 2 },
-  paneCategoryRowMenuOpen: { zIndex: 100, elevation: 12 },
-  paneCategoryMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  selectionBox: { width: 24, height: 24, borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  selectionBoxSelected: { borderColor: colors.primary, backgroundColor: colors.primary },
-  paneCategoryTextBlock: { flex: 1, minWidth: 0 },
-  paneCategoryName: { ...typography.bodySmMedium, color: colors.slate },
-  paneCategoryNameSelected: { color: colors.charcoal },
-  paneCategoryPath: { ...typography.micro, color: colors.steel },
-  priorityControlWrap: { position: 'relative', zIndex: 110, elevation: 12, flexShrink: 0 },
-  priorityButton: { width: 54, height: 34, borderRadius: rounded.md, paddingHorizontal: spacing.xs, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.canvas },
-  priorityButtonSelected: { borderColor: colors.brandYellow, backgroundColor: colors.cardTintYellowBold },
-  priorityButtonText: { ...typography.captionBold, color: colors.steel, minWidth: 18, textAlign: 'center' },
-  priorityButtonTextSelected: { color: colors.charcoal },
-  priorityMenu: { position: 'absolute', top: 38, right: 0, width: 54, maxHeight: 220, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.canvas, padding: 3, gap: 2, zIndex: 140, elevation: 18 },
-  priorityMenuItem: { height: 28, borderRadius: rounded.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceSoft },
-  priorityMenuItemActive: { backgroundColor: colors.primary },
-  priorityMenuItemText: { ...typography.micro, color: colors.charcoal },
-  priorityMenuItemTextActive: { color: colors.onPrimary },
   emptyPickerText: { ...typography.bodySm, color: colors.slate, paddingVertical: spacing.md, paddingHorizontal: spacing.xs },
   grid: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', marginVertical: -boardCardHalfGutter },
   cardSlot: { width: '50%', minWidth: 0, paddingVertical: boardCardHalfGutter },
