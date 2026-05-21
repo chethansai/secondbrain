@@ -1,5 +1,8 @@
 package com.notes.nativenotetaking.overlay
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
@@ -56,6 +59,7 @@ class OverlayService : Service() {
       stopSelf()
       return
     }
+    startForeground(NOTIFICATION_ID, createNotification())
     showButton()
   }
 
@@ -276,12 +280,20 @@ class OverlayService : Service() {
       })
       return
     }
-    categories.forEach { category ->
+    categories.chunked(2).forEach { pair ->
       val row = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         setPadding(0, 0, 0, dp(6))
       }
-      row.addView(createCategoryChip(category, editText), LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+      pair.forEachIndexed { index, category ->
+        val params = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+          if (index == 0) marginEnd = dp(6) else marginStart = dp(6)
+        }
+        row.addView(createCategoryChip(category, editText), params)
+      }
+      if (pair.size == 1) {
+        row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(6) })
+      }
       chipWrap.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     }
   }
@@ -364,6 +376,29 @@ class OverlayService : Service() {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     }
     startActivity(intent)
+  }
+
+  private fun createNotification(): Notification {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val channel = NotificationChannel(
+        NOTIFICATION_CHANNEL_ID,
+        "Floating note icon",
+        NotificationManager.IMPORTANCE_LOW,
+      )
+      getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    }
+    val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
+    } else {
+      @Suppress("DEPRECATION")
+      Notification.Builder(this)
+    }
+    return builder
+      .setSmallIcon(android.R.drawable.ic_dialog_info)
+      .setContentTitle("Native Note Taking")
+      .setContentText("Floating note icon is running")
+      .setOngoing(true)
+      .build()
   }
 
   private fun canDrawOverlays(): Boolean {
@@ -478,6 +513,8 @@ class OverlayService : Service() {
   }
 
   companion object {
+    private const val NOTIFICATION_CHANNEL_ID = "floating_note_icon"
+    private const val NOTIFICATION_ID = 1101
     const val ACTION_STOP = "com.notes.nativenotetaking.overlay.STOP"
     const val ACTION_UPDATE = "com.notes.nativenotetaking.overlay.UPDATE"
     const val ACTION_RESET_POSITION = "com.notes.nativenotetaking.overlay.RESET_POSITION"

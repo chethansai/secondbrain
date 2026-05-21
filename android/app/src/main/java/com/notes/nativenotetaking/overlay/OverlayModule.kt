@@ -43,13 +43,13 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
       promise.reject("overlay_permission_missing", "Display over other apps permission is not granted.")
       return
     }
-    reactContext.startService(Intent(reactContext, OverlayService::class.java))
+    startOverlayService(Intent(reactContext, OverlayService::class.java))
     promise.resolve(true)
   }
 
   @ReactMethod
   fun stopOverlay(promise: Promise) {
-    reactContext.startService(Intent(reactContext, OverlayService::class.java).apply { action = OverlayService.ACTION_STOP })
+    startOverlayService(Intent(reactContext, OverlayService::class.java).apply { action = OverlayService.ACTION_STOP })
     promise.resolve(true)
   }
 
@@ -61,14 +61,14 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
     val swipeLeftAction = if (settings.hasKey("swipeLeftAction") && !settings.isNull("swipeLeftAction")) settings.getString("swipeLeftAction") else null
     val swipeDownAction = if (settings.hasKey("swipeDownAction") && !settings.isNull("swipeDownAction")) settings.getString("swipeDownAction") else null
     OverlaySettings.update(reactContext, opacity, size, tapAction, swipeLeftAction, swipeDownAction)
-    reactContext.startService(Intent(reactContext, OverlayService::class.java).apply { action = OverlayService.ACTION_UPDATE })
+    startOverlayService(Intent(reactContext, OverlayService::class.java).apply { action = OverlayService.ACTION_UPDATE })
     promise.resolve(true)
   }
 
   @ReactMethod
   fun resetOverlayPlacement(promise: Promise) {
     OverlaySettings.resetPosition(reactContext)
-    reactContext.startService(Intent(reactContext, OverlayService::class.java).apply { action = OverlayService.ACTION_RESET_POSITION })
+    startOverlayService(Intent(reactContext, OverlayService::class.java).apply { action = OverlayService.ACTION_RESET_POSITION })
     promise.resolve(true)
   }
 
@@ -84,6 +84,14 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
       putBoolean("permissionGranted", canDrawOverlays())
     }
     promise.resolve(map)
+  }
+
+  private fun startOverlayService(intent: Intent) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      reactContext.startForegroundService(intent)
+    } else {
+      reactContext.startService(intent)
+    }
   }
 
   private fun canDrawOverlays(): Boolean {
