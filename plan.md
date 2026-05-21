@@ -503,3 +503,4 @@ Investigated the AI chat `Failed to fetch` response. Direct POST to the Tailnet 
 ## history
 
 - 2026-05-15: Implemented long-press note ordering controls. Long-pressing notes in the main note list or workspace preview reveals Up/Down controls below the options button, reusing the existing deterministic note priority mutation and disabling invalid edge moves.
+- 2026-05-21: Fixed overflowing category labels in native floating/add-note category chips. Category picker labels now wrap across multiple lines and chips can grow taller so long category paths remain visible and understandable when selecting a category.

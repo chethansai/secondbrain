@@ -62,7 +62,7 @@ export function FloatingCategoryDial({ data, disabled = false, selectedPath = nu
                   style={[styles.categoryButton, active && styles.categoryButtonActive, disabled && styles.disabled]}
                 >
                   <Icon name="folder-outline" size={12} color={active ? colors.onDark : colors.primary} />
-                  <Text style={[styles.categoryText, active && styles.categoryTextActive]} numberOfLines={2}>{formatPath(path)}</Text>
+                  <Text style={[styles.categoryText, active && styles.categoryTextActive]}>{formatPath(path)}</Text>
                 </Pressable>
               );
             })}
@@ -86,7 +86,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     disabled: { opacity: 0.55 },
     dialPanel: { width: '100%', borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.canvas, padding: spacing.xs, zIndex: 30, elevation: 16 },
     scroll: { maxHeight: 224 },
-    buttonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingBottom: spacing.xs },
+    buttonGrid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', gap: spacing.xs, paddingBottom: spacing.xs },
     categoryButton: { minHeight: 42, maxWidth: '100%', borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surfaceSoft, paddingHorizontal: spacing.xs, paddingVertical: spacing.xs, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: spacing.xxs, flexGrow: 1, flexBasis: '31%' },
     categoryButtonActive: { backgroundColor: colors.inkDeep, borderColor: colors.inkDeep },
     categoryText: { ...typography.micro, color: colors.charcoal, textAlign: 'center', flexShrink: 1, minWidth: 0 },

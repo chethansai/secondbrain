@@ -46,7 +46,7 @@ export function InlineCategorySavePicker({ data, disabled = false, excludedPath 
           <View key={key} style={[styles.chipWrap, menuOpen && styles.chipWrapOpen]}>
             <View style={[styles.chip, active && styles.chipActive, disabled && styles.disabled]}>
               <Pressable accessibilityRole="button" accessibilityLabel={`Save note to ${label}`} disabled={disabled} onPress={() => selectCategory(path)} style={styles.chipLabelButton}>
-                <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>{label}</Text>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -83,10 +83,10 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     chipGroup: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: spacing.xs, padding: spacing.xs, paddingBottom: spacing.md },
     chipWrap: { position: 'relative', maxWidth: '100%', zIndex: 1 },
     chipWrapOpen: { zIndex: 20, elevation: 8 },
-    chip: { minHeight: 38, maxWidth: '100%', borderRadius: rounded.full, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.canvas, flexDirection: 'row', alignItems: 'center', overflow: 'visible' },
+    chip: { minHeight: 38, maxWidth: '100%', borderRadius: rounded.full, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.canvas, flexDirection: 'row', alignItems: 'stretch', overflow: 'visible' },
     chipActive: { backgroundColor: colors.primary, borderColor: colors.primaryDeep },
-    chipLabelButton: { minHeight: 36, maxWidth: 232, justifyContent: 'center', paddingLeft: spacing.sm, paddingRight: spacing.xs },
-    chipText: { ...typography.bodySmMedium, color: colors.charcoal, flexShrink: 1 },
+    chipLabelButton: { minHeight: 36, maxWidth: 232, justifyContent: 'center', paddingLeft: spacing.sm, paddingRight: spacing.xs, paddingVertical: spacing.xs },
+    chipText: { ...typography.bodySmMedium, color: colors.charcoal, flexShrink: 1, flexWrap: 'wrap' },
     chipTextActive: { color: colors.onPrimary },
     overflowButton: { width: 34, minHeight: 36, borderLeftWidth: 1, borderLeftColor: colors.hairlineSoft, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: rounded.full, borderBottomRightRadius: rounded.full },
     overflowButtonActive: { borderLeftColor: colors.primaryDeep },
