@@ -4,7 +4,9 @@
       "Bash(npm *)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(./gradlew assembleRelease)",
+      "Bash(python *)"
     ]
   }
 }

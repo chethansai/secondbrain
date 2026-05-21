@@ -3,8 +3,10 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { rounded, shadows, spacing, typography } from '../../shared/design/tokens';
 import { CategoryPath, CategorySummary, FlatNote, PinnedNoteRef } from '../../shared/types/notes';
-import { Icon, IconName } from '../../shared/ui/Icon';
-import { isHistoryPath, normalizeNoteText, parseHistoryNote } from '../notes/noteMutations';
+import { Icon } from '../../shared/ui/Icon';
+import { normalizeNoteText } from '../notes/noteMutations';
+import { WorkspaceCategoryActionItem } from './WorkspaceCategoryActionItem';
+import { WorkspacePreviewNote } from './WorkspacePreviewNote';
 import { isPinnedNote } from '../notes/pinnedNotes';
 
 type Props = {
@@ -79,6 +81,8 @@ export function WorkspaceCategoryCard({
   const childCategoriesByParentKey = useMemo(() => groupChildCategories(allCategories, category.path), [allCategories, category.path]);
   const childCategories = childCategoriesByParentKey.get(pathKey(category.path)) ?? [];
   const visibleSubcategories = useMemo(() => (showAllSubcategories ? listDescendantCategories(allCategories, category.path) : childCategories), [allCategories, category.path, childCategories, showAllSubcategories]);
+  const expandableDescendantKeys = useMemo(() => listExpandableDescendantKeys(allCategories, category.path, notesByCategoryKey), [allCategories, category.path, notesByCategoryKey]);
+  const allDescendantsExpanded = expandableDescendantKeys.length > 0 && expandableDescendantKeys.every((key) => expandedCategoryKeys.has(key));
   const previewItems = useMemo(() => createOrderedPreviewItems(visibleSubcategories, notes, showAllSubcategories), [notes, showAllSubcategories, visibleSubcategories]);
 
   async function submitNote() {
@@ -114,6 +118,21 @@ export function WorkspaceCategoryCard({
     });
   }
 
+  function setDescendantsExpanded(expanded: boolean) {
+    setExpandedCategoryKeys((current) => {
+      const next = new Set(current);
+      expandableDescendantKeys.forEach((key) => {
+        if (expanded) {
+          next.add(key);
+        } else {
+          next.delete(key);
+        }
+      });
+      return next;
+    });
+    setActionsOpen(false);
+  }
+
   return (
     <View style={[styles.card, { backgroundColor: tint }]}>
       <View style={styles.header}>
@@ -141,11 +160,12 @@ export function WorkspaceCategoryCard({
 
       {actionsOpen ? (
         <View style={styles.actionsPanel}>
-          <CategoryActionItem label={showAllSubcategories ? 'Direct' : 'All subcats'} icon="git-branch-outline" colors={colors} styles={styles} onPress={() => setShowAllSubcategories((current) => !current)} />
-          <CategoryActionItem label="Rename" icon="create-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onRenameCategory(category.path); }} />
-          <CategoryActionItem label="Folder" icon="folder-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onCreateSubcategory(category.path); }} />
-          <CategoryActionItem label="Copy" icon="copy-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onCopyCategory(category.path); }} />
-          <CategoryActionItem label="Delete" icon="trash-outline" danger colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onDeleteCategory(category.path); }} />
+          <WorkspaceCategoryActionItem label={showAllSubcategories ? 'Direct' : 'All subcats'} icon="git-branch-outline" colors={colors} styles={styles} onPress={() => setShowAllSubcategories((current) => !current)} />
+          {expandableDescendantKeys.length ? <WorkspaceCategoryActionItem label={allDescendantsExpanded ? 'Enclose' : 'Disclose'} icon={allDescendantsExpanded ? 'chevron-up' : 'chevron-down'} colors={colors} styles={styles} onPress={() => setDescendantsExpanded(!allDescendantsExpanded)} /> : null}
+          <WorkspaceCategoryActionItem label="Rename" icon="create-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onRenameCategory(category.path); }} />
+          <WorkspaceCategoryActionItem label="Folder" icon="folder-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onCreateSubcategory(category.path); }} />
+          <WorkspaceCategoryActionItem label="Copy" icon="copy-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onCopyCategory(category.path); }} />
+          <WorkspaceCategoryActionItem label="Delete" icon="trash-outline" danger colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onDeleteCategory(category.path); }} />
         </View>
       ) : null}
 
@@ -250,6 +270,8 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
   const expanded = expandedCategoryKeys.has(key);
   const hasChildren = children.length > 0;
   const expandable = childItems.length > 0;
+  const expandableDescendantKeys = useMemo(() => listExpandableDescendantKeysFromGroups(category.path, childCategoriesByParentKey, notesByCategoryKey), [category.path, childCategoriesByParentKey, notesByCategoryKey]);
+  const allDescendantsExpanded = expandableDescendantKeys.length > 0 && expandableDescendantKeys.every((key) => expandedCategoryKeys.has(key));
   const indent = Math.min(depth, 4) * styles.subcategoryIndent.width;
   const priorityOptions = createPriorityOptions(itemCount, prioritySearch);
 
@@ -274,6 +296,14 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
       setAdding(false);
       if (!expanded) onToggleCategory(category.path);
     }
+  }
+
+  function setDescendantsExpanded(expanded: boolean) {
+    expandableDescendantKeys.forEach((key) => {
+      const isExpanded = expandedCategoryKeys.has(key);
+      if (expanded !== isExpanded) onToggleCategory(key.split(''));
+    });
+    setActionsOpen(false);
   }
 
   return (
@@ -303,12 +333,13 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
         </Pressable>
       </View>
       {actionsOpen ? (
-        <View style={[styles.subcategoryActionsPanel, { marginLeft: indent + styles.subcategoryIndent.width }]}> 
-          <CategoryActionItem label="Rename" icon="create-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onRenameCategory(category.path); }} />
-          <CategoryActionItem label="Folder" icon="folder-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onCreateSubcategory(category.path); }} />
-          <CategoryActionItem label="Copy" icon="copy-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onCopyCategory(category.path); }} />
-          <CategoryActionItem label="Order" icon="albums-outline" colors={colors} styles={styles} onPress={() => setPriorityOpen((current) => !current)} />
-          <CategoryActionItem label="Delete" icon="trash-outline" danger colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onDeleteCategory(category.path); }} />
+        <View style={[styles.subcategoryActionsPanel, { marginLeft: indent + styles.subcategoryIndent.width }]}>
+          {expandableDescendantKeys.length ? <WorkspaceCategoryActionItem label={allDescendantsExpanded ? 'Enclose' : 'Disclose'} icon={allDescendantsExpanded ? 'chevron-up' : 'chevron-down'} colors={colors} styles={styles} onPress={() => setDescendantsExpanded(!allDescendantsExpanded)} /> : null}
+          <WorkspaceCategoryActionItem label="Rename" icon="create-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onRenameCategory(category.path); }} />
+          <WorkspaceCategoryActionItem label="Folder" icon="folder-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onCreateSubcategory(category.path); }} />
+          <WorkspaceCategoryActionItem label="Copy" icon="copy-outline" colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onCopyCategory(category.path); }} />
+          <WorkspaceCategoryActionItem label="Order" icon="albums-outline" colors={colors} styles={styles} onPress={() => setPriorityOpen((current) => !current)} />
+          <WorkspaceCategoryActionItem label="Delete" icon="trash-outline" danger colors={colors} styles={styles} onPress={() => { setActionsOpen(false); onDeleteCategory(category.path); }} />
         </View>
       ) : null}
       {actionsOpen && priorityOpen ? (
@@ -395,91 +426,6 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
   );
 }
 
-function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinned, colors, styles, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete, onPressNote }: { note: FlatNote; itemCount: number; currentOrder: number; stackOrder: number; pinned: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onEdit: (note: FlatNote) => void; onMove: (note: FlatNote) => void; onCopy: (note: FlatNote) => void; onCopyText: (note: FlatNote) => void; onSetPriority: (note: FlatNote, priority: number) => void; onTogglePin: (note: FlatNote) => void; onDelete: (note: FlatNote) => void; onPressNote?: (note: FlatNote) => void }) {
-  const [open, setOpen] = useState(false);
-  const [quickOrderOpen, setQuickOrderOpen] = useState(false);
-  const [priorityOpen, setPriorityOpen] = useState(false);
-  const [prioritySearch, setPrioritySearch] = useState('');
-  const priorityScrollRef = useRef<ScrollView>(null);
-  const priorityOptions = createPriorityOptions(itemCount, prioritySearch);
-  const openUpward = currentOrder > Math.ceil(itemCount / 2);
-  const historyNote = isHistoryPath(note.path) ? parseHistoryNote(note.note) : null;
-
-  useEffect(() => {
-    if (!priorityOpen || prioritySearch) return;
-    requestAnimationFrame(() => {
-      priorityScrollRef.current?.scrollTo({ y: Math.max(0, (currentOrder - 2) * previewPriorityOptionHeight), animated: true });
-    });
-  }, [currentOrder, priorityOpen, prioritySearch]);
-
-  return (
-    <Pressable onLongPress={() => setQuickOrderOpen((current) => !current)} delayLongPress={250} style={[styles.previewNote, (open || quickOrderOpen) && styles.previewNoteMenuOpen, { zIndex: open || quickOrderOpen ? 1000 : stackOrder }]}>
-      {historyNote ? (
-        <Pressable disabled={!onPressNote} onPress={() => onPressNote?.(note)} style={styles.previewHistoryBlock}>
-          <Text selectable style={styles.previewHistoryPrimary} numberOfLines={3}>{historyNote.primary}</Text>
-          <Text selectable style={styles.previewHistoryMeta} numberOfLines={2}>{[historyNote.event ? formatHistoryEvent(historyNote.event) : null, ...historyNote.metadata].filter(Boolean).join(' · ')}</Text>
-        </Pressable>
-      ) : (
-        <Pressable disabled={!onPressNote} onPress={() => onPressNote?.(note)} style={styles.previewTextButton}>
-          <ScrollView style={styles.previewTextScroller} nestedScrollEnabled showsVerticalScrollIndicator>
-            <Text selectable style={styles.previewText}>{note.note}</Text>
-          </ScrollView>
-        </Pressable>
-      )}
-      <Pressable accessibilityRole="button" accessibilityLabel={pinned ? 'Pinned note actions' : 'Note actions'} onPress={() => setOpen((current) => !current)} style={[styles.previewMenuButton, pinned && styles.previewMenuButtonPinned]}>
-        <Icon name="settings-outline" size={11} color={pinned ? colors.onPrimary : colors.steel} />
-      </Pressable>
-      {quickOrderOpen ? (
-        <View style={styles.previewQuickOrderPanel}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Move note up" disabled={currentOrder <= 1} onPress={() => { setQuickOrderOpen(false); onSetPriority(note, currentOrder - 1); }} style={[styles.previewQuickOrderButton, currentOrder <= 1 && styles.previewQuickOrderButtonDisabled]}>
-            <Icon name="chevron-up" size={11} color={currentOrder <= 1 ? colors.stone : colors.ink} />
-            <Text style={[styles.previewQuickOrderText, currentOrder <= 1 && styles.previewQuickOrderTextDisabled]}>Up</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Move note down" disabled={currentOrder >= itemCount} onPress={() => { setQuickOrderOpen(false); onSetPriority(note, currentOrder + 1); }} style={[styles.previewQuickOrderButton, currentOrder >= itemCount && styles.previewQuickOrderButtonDisabled]}>
-            <Icon name="chevron-down" size={11} color={currentOrder >= itemCount ? colors.stone : colors.ink} />
-            <Text style={[styles.previewQuickOrderText, currentOrder >= itemCount && styles.previewQuickOrderTextDisabled]}>Down</Text>
-          </Pressable>
-        </View>
-      ) : null}
-      {open ? (
-        <View style={[styles.previewActions, openUpward && styles.previewActionsAbove]}>
-          <Pressable onPress={() => { setOpen(false); onTogglePin(note); }} style={[styles.previewAction, pinned && styles.previewActionPinnedRow]}><Text style={[styles.previewActionText, pinned && styles.previewActionPinnedText]}>{pinned ? 'Unpin' : 'Pin'}</Text></Pressable>
-          <Pressable onPress={() => { setOpen(false); onEdit(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Edit</Text></Pressable>
-          <Pressable onPress={() => { setOpen(false); onMove(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Move</Text></Pressable>
-          <Pressable onPress={() => { setOpen(false); onCopyText(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Copy text</Text></Pressable>
-          <Pressable onPress={() => setPriorityOpen((current) => !current)} style={styles.previewAction}><Text style={styles.previewActionText}>Order</Text></Pressable>
-          {priorityOpen ? (
-            <View style={styles.previewPriorityPicker}>
-              <TextInput value={prioritySearch} onChangeText={setPrioritySearch} placeholder="Search number" placeholderTextColor={colors.stone} keyboardType="number-pad" style={styles.previewPrioritySearch} />
-              <ScrollView ref={priorityScrollRef} style={styles.previewPriorityScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                {priorityOptions.map((option) => {
-                  const current = option === currentOrder;
-                  return (
-                    <Pressable key={option} accessibilityRole="button" accessibilityLabel={`Set note order ${option}${current ? ', current order' : ''}`} onPress={() => { setOpen(false); setPriorityOpen(false); setPrioritySearch(''); onSetPriority(note, option); }} style={[styles.previewPriorityOption, current && styles.previewPriorityOptionCurrent]}>
-                      <Text style={[styles.previewPriorityOptionText, current && styles.previewPriorityOptionTextCurrent]}>{option}</Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          ) : null}
-          <Pressable onPress={() => { setOpen(false); onDelete(note); }} style={styles.previewAction}><Text style={styles.previewActionDanger}>Delete</Text></Pressable>
-          <Pressable onPress={() => { setOpen(false); onCopy(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Copy to category</Text></Pressable>
-        </View>
-      ) : null}
-    </Pressable>
-  );
-}
-
-function CategoryActionItem({ label, icon, danger, colors, styles, onPress }: { label: string; icon: IconName; danger?: boolean; colors: typeof import('../../shared/design/tokens').colors; styles: ReturnType<typeof createStyles>; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.categoryActionItem, danger && styles.categoryActionItemDanger, pressed && styles.categoryActionItemPressed]}>
-      <Icon name={icon} size={12} color={danger ? colors.semanticError : colors.steel} />
-      <Text style={[styles.categoryActionText, danger && styles.categoryActionTextDanger]} numberOfLines={1}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const previewPriorityOptionHeight = 26;
 
 function createPriorityOptions(count: number, search: string) {
@@ -508,6 +454,27 @@ function compareCategoryPreviewItems(left: Extract<PreviewItem, { type: 'categor
 
 function listDescendantCategories(categories: CategorySummary[], rootPath: CategoryPath) {
   return categories.filter((category) => isDescendantPath(rootPath, category.path));
+}
+
+function listExpandableDescendantKeys(categories: CategorySummary[], rootPath: CategoryPath, notesByCategoryKey: Map<string, FlatNote[]>) {
+  const childGroups = groupChildCategories(categories, rootPath);
+  return listDescendantCategories(categories, rootPath)
+    .filter((category) => (childGroups.get(pathKey(category.path))?.length ?? 0) > 0 || (notesByCategoryKey.get(pathKey(category.path))?.length ?? 0) > 0)
+    .map((category) => pathKey(category.path));
+}
+
+function listExpandableDescendantKeysFromGroups(rootPath: CategoryPath, childGroups: Map<string, CategorySummary[]>, notesByCategoryKey: Map<string, FlatNote[]>) {
+  const keys: string[] = [];
+  const pending = [...(childGroups.get(pathKey(rootPath)) ?? [])];
+  while (pending.length) {
+    const category = pending.shift();
+    if (!category) continue;
+    const key = pathKey(category.path);
+    const children = childGroups.get(key) ?? [];
+    if (children.length > 0 || (notesByCategoryKey.get(key)?.length ?? 0) > 0) keys.push(key);
+    pending.push(...children);
+  }
+  return keys;
 }
 
 function groupChildCategories(categories: CategorySummary[], rootPath: CategoryPath) {
