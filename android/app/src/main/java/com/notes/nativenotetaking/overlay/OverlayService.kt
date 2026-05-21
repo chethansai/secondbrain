@@ -198,7 +198,7 @@ class OverlayService : Service() {
       addView(chipWrap)
     }
     val bounds = displayBounds()
-    val width = min(bounds.width() - dp(32), dp(340))
+    val width = min(bounds.width() - dp(24), dp(380))
     val popupHeight = min(bounds.height() - dp(48), dp(420))
     val container = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
@@ -276,15 +276,12 @@ class OverlayService : Service() {
       })
       return
     }
-    categories.chunked(2).forEach { rowCategories ->
+    categories.forEach { category ->
       val row = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         setPadding(0, 0, 0, dp(6))
       }
-      rowCategories.forEach { category ->
-        row.addView(createCategoryChip(category, editText), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) })
-      }
-      if (rowCategories.size == 1) row.addView(FrameLayout(this), LinearLayout.LayoutParams(0, 1, 1f))
+      row.addView(createCategoryChip(category, editText), LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       chipWrap.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     }
   }
@@ -304,8 +301,10 @@ class OverlayService : Service() {
       text = category.label
       textSize = 12f
       setTextColor(0xff37352f.toInt())
-      maxLines = 1
-      setPadding(dp(10), dp(8), dp(6), dp(8))
+      setSingleLine(false)
+      ellipsize = null
+      includeFontPadding = false
+      setPadding(dp(12), dp(9), dp(8), dp(9))
       setOnClickListener { submitInput(editText, category.path) }
     }
     val overflow = TextView(this).apply {
@@ -313,7 +312,8 @@ class OverlayService : Service() {
       textSize = 18f
       gravity = Gravity.CENTER
       setTextColor(0xff787671.toInt())
-      setPadding(dp(6), dp(4), dp(10), dp(4))
+      minWidth = dp(40)
+      setPadding(dp(8), dp(6), dp(10), dp(6))
       setOnClickListener { submitInput(editText, category.path) }
     }
     chip.addView(label, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
