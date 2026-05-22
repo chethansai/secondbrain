@@ -25,7 +25,6 @@ type Props = {
 
 export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinned, colors, styles, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete, onPressNote }: Props) {
   const [open, setOpen] = useState(false);
-  const [quickOrderOpen, setQuickOrderOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
   const priorityScrollRef = useRef<ScrollView>(null);
@@ -41,7 +40,7 @@ export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder
   }, [currentOrder, priorityOpen, prioritySearch]);
 
   return (
-    <Pressable onLongPress={() => setQuickOrderOpen((current) => !current)} delayLongPress={250} style={[styles.previewNote, (open || quickOrderOpen) && styles.previewNoteMenuOpen, { zIndex: open || quickOrderOpen ? 1000 : stackOrder }]}>
+    <Pressable style={[styles.previewNote, open && styles.previewNoteMenuOpen, { zIndex: open ? 1000 : stackOrder }]}>
       {historyNote ? (
         <Pressable disabled={!onPressNote} onPress={() => onPressNote?.(note)} style={styles.previewHistoryBlock}>
           <Text selectable style={styles.previewHistoryPrimary} numberOfLines={3}>{historyNote.primary}</Text>
@@ -57,18 +56,6 @@ export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder
       <Pressable accessibilityRole="button" accessibilityLabel={pinned ? 'Pinned note actions' : 'Note actions'} onPress={() => setOpen((current) => !current)} style={[styles.previewMenuButton, pinned && styles.previewMenuButtonPinned]}>
         <Icon name="settings-outline" size={11} color={pinned ? colors.onPrimary : colors.steel} />
       </Pressable>
-      {quickOrderOpen ? (
-        <View style={styles.previewQuickOrderPanel}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Move note up" disabled={currentOrder <= 1} onPress={() => { setQuickOrderOpen(false); onSetPriority(note, currentOrder - 1); }} style={[styles.previewQuickOrderButton, currentOrder <= 1 && styles.previewQuickOrderButtonDisabled]}>
-            <Icon name="chevron-up" size={11} color={currentOrder <= 1 ? colors.stone : colors.ink} />
-            <Text style={[styles.previewQuickOrderText, currentOrder <= 1 && styles.previewQuickOrderTextDisabled]}>Up</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Move note down" disabled={currentOrder >= itemCount} onPress={() => { setQuickOrderOpen(false); onSetPriority(note, currentOrder + 1); }} style={[styles.previewQuickOrderButton, currentOrder >= itemCount && styles.previewQuickOrderButtonDisabled]}>
-            <Icon name="chevron-down" size={11} color={currentOrder >= itemCount ? colors.stone : colors.ink} />
-            <Text style={[styles.previewQuickOrderText, currentOrder >= itemCount && styles.previewQuickOrderTextDisabled]}>Down</Text>
-          </Pressable>
-        </View>
-      ) : null}
       {open ? (
         <View style={[styles.previewActions, openUpward && styles.previewActionsAbove]}>
           <Pressable onPress={() => { setOpen(false); onTogglePin(note); }} style={[styles.previewAction, pinned && styles.previewActionPinnedRow]}><Text style={[styles.previewActionText, pinned && styles.previewActionPinnedText]}>{pinned ? 'Unpin' : 'Pin'}</Text></Pressable>
