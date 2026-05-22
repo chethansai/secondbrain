@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { GestureResponderEvent, PanResponder, PanResponderGestureState, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { colors, rounded, spacing, typography } from '../../shared/design/tokens';
@@ -19,28 +19,94 @@ type Props = {
   pinnedNotes: import('../../shared/types/notes').PinnedNoteRef[];
 };
 
+type DragState = {
+  key: string;
+  note: FlatNote;
+  fromOrder: number;
+  targetOrder: number;
+  dy: number;
+};
+
+type NoteLayout = {
+  y: number;
+  height: number;
+};
+
 export function NoteList({ notes, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete, pinnedNotes }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const dragStateRef = useRef<DragState | null>(null);
+  const layoutsRef = useRef<Record<string, NoteLayout>>({});
+
+  function updateDragState(next: DragState | null) {
+    dragStateRef.current = next;
+    setDragState(next);
+  }
 
   function noteKey(note: FlatNote, renderedIndex: number) {
     return `${note.path.join('/')}-${note.index}-${renderedIndex}`;
   }
 
+  function getTargetOrder(activeKey: string, dragCenter: number) {
+    const entries = notes
+      .map((note, index) => ({ key: noteKey(note, index), layout: layoutsRef.current[noteKey(note, index)] }))
+      .filter((entry) => entry.key !== activeKey && entry.layout);
+    const precedingCount = entries.filter((entry) => dragCenter > entry.layout.y + entry.layout.height / 2).length;
+    return Math.min(notes.length, precedingCount + 1);
+  }
+
+  function startDrag(key: string, note: FlatNote, order: number) {
+    updateDragState({ key, note, fromOrder: order, targetOrder: order, dy: 0 });
+  }
+
+  function moveDrag(_: GestureResponderEvent, gesture: PanResponderGestureState) {
+    const current = dragStateRef.current;
+    if (!current) return;
+    const layout = layoutsRef.current[current.key];
+    if (!layout) return;
+    const dragCenter = layout.y + layout.height / 2 + gesture.dy;
+    updateDragState({ ...current, dy: gesture.dy, targetOrder: getTargetOrder(current.key, dragCenter) });
+  }
+
+  function releaseDrag() {
+    const current = dragStateRef.current;
+    updateDragState(null);
+    if (!current || current.targetOrder === current.fromOrder) return;
+    onSetPriority(current.note, current.targetOrder);
+  }
+
   return (
     <View style={styles.list}>
       {notes.map((note, index) => {
+        const key = noteKey(note, index);
         const order = index + 1;
+        const dragging = dragState?.key === key;
+        const insertionAfterLast = dragState && order === notes.length && dragState.targetOrder === notes.length && dragState.fromOrder !== notes.length;
+        const insertionBefore = dragState && dragState.key !== key && dragState.targetOrder === order && !insertionAfterLast;
+        const sortResponder = PanResponder.create({
+          onStartShouldSetPanResponder: () => true,
+          onMoveShouldSetPanResponder: () => true,
+          onPanResponderGrant: () => startDrag(key, note, order),
+          onPanResponderMove: moveDrag,
+          onPanResponderRelease: releaseDrag,
+          onPanResponderTerminate: releaseDrag,
+        });
         return (
-          <View key={noteKey(note, index)} style={{ zIndex: notes.length - index }}>
-            <View style={styles.card}>
+          <View key={key} style={{ zIndex: dragging ? notes.length + 1 : notes.length - index }}>
+            {insertionBefore ? <View style={styles.dropIndicator} /> : null}
+            <View
+              onLayout={(event) => { layoutsRef.current[key] = event.nativeEvent.layout; }}
+              style={[styles.card, dragging && styles.cardDragging, dragging && { transform: [{ translateY: dragState.dy }] }]}
+            >
               <NoteText note={note} styles={styles} />
-              <View accessibilityRole="button" accessibilityLabel="Sort note" style={styles.sortButton}>
+              <View accessibilityRole="adjustable" accessibilityLabel="Drag note to reorder" style={[styles.sortButton, dragging && styles.sortButtonActive]} {...sortResponder.panHandlers}>
                 <View style={styles.sortButtonLine} />
                 <View style={styles.sortButtonLine} />
               </View>
               <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={order} pinned={isPinnedNote(note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onCopy={onCopy} onCopyText={onCopyText} onSetPriority={onSetPriority} onTogglePin={onTogglePin} onDelete={onDelete} />
             </View>
+            {insertionAfterLast ? <View style={styles.dropIndicator} /> : null}
           </View>
         );
       })}
@@ -155,6 +221,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   return StyleSheet.create({
   list: { gap: spacing.sm },
   card: { position: 'relative', minHeight: 76, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, borderRadius: rounded.lg, padding: spacing.lg, paddingRight: 104, gap: 1 },
+  cardDragging: { borderColor: colors.primary, shadowColor: colors.ink, shadowOpacity: 0.14, shadowRadius: 10, elevation: 8 },
   text: { ...typography.body, color: colors.charcoal },
   historyTextBlock: { gap: spacing.xs },
   historyPrimary: { ...typography.body, color: colors.ink, fontWeight: '700' },
@@ -163,7 +230,9 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   historyEvent: { ...typography.captionBold, color: colors.steel, textTransform: 'uppercase' },
   actions: { position: 'absolute', top: spacing.lg, right: spacing.lg, zIndex: 3 },
   sortButton: { position: 'absolute', top: spacing.lg, right: spacing.lg + 48, width: 40, height: 40, borderRadius: rounded.md, backgroundColor: colors.surfaceSoft, borderWidth: 1, borderColor: colors.hairline, alignItems: 'center', justifyContent: 'center', gap: 5, zIndex: 2 },
+  sortButtonActive: { borderColor: colors.primary, backgroundColor: colors.surface },
   sortButtonLine: { width: 18, height: 3, borderRadius: 2, backgroundColor: colors.steel },
+  dropIndicator: { height: 3, borderRadius: 2, backgroundColor: colors.primary, marginVertical: spacing.xs },
   iconButton: { width: 40, height: 40, borderRadius: rounded.md, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   iconButtonPinned: { backgroundColor: colors.primary, borderWidth: 1, borderColor: colors.primaryDeep },
   dropdown: { position: 'absolute', top: 44, right: 0, width: 172, borderRadius: rounded.md, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: spacing.xs, gap: 3, zIndex: 5, elevation: 8 },
