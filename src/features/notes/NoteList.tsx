@@ -35,6 +35,10 @@ export function NoteList({ notes, onEdit, onMove, onCopy, onCopyText, onSetPrior
           <View key={noteKey(note, index)} style={{ zIndex: notes.length - index }}>
             <View style={styles.card}>
               <NoteText note={note} styles={styles} />
+              <View accessibilityRole="button" accessibilityLabel="Sort note" style={styles.sortButton}>
+                <View style={styles.sortButtonLine} />
+                <View style={styles.sortButtonLine} />
+              </View>
               <NoteActionsDropdown note={note} noteCount={notes.length} currentOrder={order} pinned={isPinnedNote(note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEdit} onMove={onMove} onCopy={onCopy} onCopyText={onCopyText} onSetPriority={onSetPriority} onTogglePin={onTogglePin} onDelete={onDelete} />
             </View>
           </View>
@@ -150,7 +154,7 @@ function formatHistoryEvent(event: string) {
 function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
   return StyleSheet.create({
   list: { gap: spacing.sm },
-  card: { position: 'relative', backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, borderRadius: rounded.lg, padding: spacing.lg, paddingRight: 56, gap: 1 },
+  card: { position: 'relative', minHeight: 76, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, borderRadius: rounded.lg, padding: spacing.lg, paddingRight: 104, gap: 1 },
   text: { ...typography.body, color: colors.charcoal },
   historyTextBlock: { gap: spacing.xs },
   historyPrimary: { ...typography.body, color: colors.ink, fontWeight: '700' },
@@ -158,6 +162,8 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   historyMeta: { ...typography.bodySm, color: colors.slate, flexShrink: 1 },
   historyEvent: { ...typography.captionBold, color: colors.steel, textTransform: 'uppercase' },
   actions: { position: 'absolute', top: spacing.lg, right: spacing.lg, zIndex: 3 },
+  sortButton: { position: 'absolute', top: spacing.lg, right: spacing.lg + 48, width: 40, height: 40, borderRadius: rounded.md, backgroundColor: colors.surfaceSoft, borderWidth: 1, borderColor: colors.hairline, alignItems: 'center', justifyContent: 'center', gap: 5, zIndex: 2 },
+  sortButtonLine: { width: 18, height: 3, borderRadius: 2, backgroundColor: colors.steel },
   iconButton: { width: 40, height: 40, borderRadius: rounded.md, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   iconButtonPinned: { backgroundColor: colors.primary, borderWidth: 1, borderColor: colors.primaryDeep },
   dropdown: { position: 'absolute', top: 44, right: 0, width: 172, borderRadius: rounded.md, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: spacing.xs, gap: 3, zIndex: 5, elevation: 8 },
