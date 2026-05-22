@@ -690,6 +690,8 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         }}
         onSubmitToCategory={editorMode === 'add' ? addWorkspaceNote : undefined}
         onCreateSubcategory={editorMode === 'add' ? createEditorSubcategory : undefined}
+        pinnedPaths={activeWorkspace?.pinnedCategoryPaths ?? []}
+        onToggleCategoryPin={togglePinnedMoveCopyCategory}
       />
       <MoveCopyModal
         visible={moveVisible}

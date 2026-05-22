@@ -139,7 +139,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 6. Edit note to text that already exists in same path: allow.
 7. Delete note not found: return `not_found`.
 8. Delete duplicate exact note in same path: delete the first exact match or selected occurrence.
-9. Delete from copied branch: delete only in that exact branch in v1.
+9. Delete from a same-name copied category branch: synchronize the named category branches through deterministic category mutations.
 
 **Corner Cases: Move/Copy Note**
 1. Source path missing: reject.
@@ -174,7 +174,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 5. Import has duplicate sibling category names: JSON object cannot represent duplicate keys reliably; warn that duplicates may already be lost by parser.
 6. Import has non-string notes: reject or convert only with explicit user confirmation.
 7. Import from old tree should ignore metadata and convert visible category/note structure only.
-8. Old mirrored/copied categories should become independent branches in v1.
+8. Old mirrored/copied category imports may become independent unless converted into explicit same-name synchronized categories by user action.
 9. Source note count should equal exported string-note count unless intentionally filtering invalid notes.
 10. Old Instagram metadata ignored; URL remains part of note text if present.
 11. OCR metadata ignored.
@@ -213,13 +213,11 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 **Corner Cases: Copy/Mirror Semantics**
 1. V1 copied notes are independent.
-2. V1 copied categories are independent duplicated branches.
-3. Editing a copied branch changes only that exact branch.
-4. Deleting from a copied branch changes only that exact branch.
-5. Mirrored propagation is excluded from v1.
-6. If mirror behavior is added later, simple `data` is insufficient; add sidecar metadata such as `mirrorLinks`.
-7. Migration from old mirrored categories should not preserve hidden links unless `mirrorLinks` is explicitly designed.
-8. Do not silently update all same-text notes globally.
+2. V1 copied categories use the original category name under the selected parent, not a `copy` suffix.
+3. Same-name copied category branches synchronize through deterministic category-tree mutations.
+4. Copying into a parent that already has a direct child with that category name is rejected to avoid ambiguous sibling paths.
+5. Hidden mirror IDs and old tree mirror metadata remain excluded from the simple notes JSON.
+6. Do not silently update all same-text notes globally except where the current exact-note edit behavior deliberately updates exact matches.
 
 **Corner Cases: Auth And Privacy**
 1. Password-only app lock protects UI only, not Firestore data by itself.
@@ -296,7 +294,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 23. Import valid simple JSON.
 24. Import invalid JSON.
 25. Import old tree conversion.
-26. Old copied/mirrored branches become independent.
+26. Same-name copied category branches synchronize while old imported mirror metadata stays ignored.
 27. Offline read with cache.
 28. Offline write pending state.
 29. Concurrent write conflict.
@@ -334,7 +332,7 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 - Before adding code, identify the owning feature boundary and avoid expanding shared files unless the code is truly cross-feature.
 - Writes use deterministic path arrays plus exact normalized note text.
 - Duplicate exact notes are allowed. Edit/delete/move should use exact full-note matching with case-sensitive/case-insensitive option and keep behavior simple: first exact match or selected rendered occurrence.
-- Old copied/mirrored branches are independent after migration/import.
+- Same-name copied category branches synchronize through deterministic category-tree mutations; old mirror metadata remains excluded from imports.
 - Clickable URLs are allowed; no Instagram-specific parsing or embed rendering.
 - Internal IDs are excluded from v1 visible note data.
 
@@ -362,10 +360,12 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 1. Because duplicates are allowed, note actions can use the first exact match for simple flows, or the selected rendered occurrence when the user tapped a specific note.
 2. If Firestore document size approaches limits, split by workspace/root category while keeping AI export able to reconstruct the same simple JSON.
 3. If real multi-user access matters later, password-only lock will not be enough; add Firebase Auth and per-user paths.
-4. If mirror propagation becomes essential, add explicit sidecar metadata instead of changing the simple visible JSON.
+4. Same-name category synchronization is allowed through deterministic mutations, but hidden mirror IDs should stay out of the simple visible JSON.
 5.  The Conundrum onversation export requests such as `exportocnversation.txt` / `exportconversation.txt` are separate transcript utility tasks, not part of the React Native notes app implementation plan.
 
 ## history
+
+- 2026-05-22: Changed category Copy semantics to create same-name synchronized category branches instead of unique `copy` branches. Copying a category into a selected parent now keeps the original category name, rejects duplicate same-name siblings under that parent, and relies on deterministic category-tree synchronization so changes in one same-name branch reflect in the others while hidden mirror IDs remain excluded.
 
 - 2026-05-14: Expanded `CLAUDE.md` from the compact summary into a full Claude-readable project contract based on `plan.md`, `design.md`, and prior decisions. Decision: future implemented chat steps must update both `plan.md` and `CLAUDE.md` history before the mandatory git status/add/commit/push workflow.
 
@@ -515,3 +515,5 @@ Investigated the AI chat `Failed to fetch` response. Direct POST to the Tailnet 
 - 2026-05-21: Made the Android floating overlay run as a foreground service with an ongoing notification and Android 14 special-use foreground service metadata. Decision: the floating icon should remain alive after being started instead of relying on a normal background service that Android may kill after some time.
 - 2026-05-21: Added multi-category pinning to the native floating Shown Categories picker. Each category row three-dot menu now has Pin/Unpin, pinned rows show a pin badge and highlighted border, and multiple pinned category paths can be stored per workspace.
 - 2026-05-21: Updated the Android floating overlay add-note popup so a newly created root category or subcategory is remembered and sorted first in the overlay category chip list on the next open, making the recent category behave like the first pinned destination.
+- 2026-05-22: Replaced the main category note long-press reorder affordance with an Uber-style two-line drag handle below the note options button. Dragging the handle now reorders notes through the existing deterministic note priority mutation while the Order menu remains as a fallback.
+- 2026-05-22: Added Pin/Unpin to the native floating add-note category picker three-dot menu. Pinned categories are stored as multiple workspace pinned paths, appended after existing pins, highlighted in the picker, and sorted first by pin order.

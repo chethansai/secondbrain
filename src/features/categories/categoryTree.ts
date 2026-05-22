@@ -154,18 +154,15 @@ export function copyCategory(data: NotesData, sourcePath: CategoryPath, destinat
   const destination = getCategoryItems(next, destinationPath);
   if (!sourceItems || !destination) return copyFailure('path_not_found', 'Source or destination category no longer exists.');
   if (startsWithPath(destinationPath, sourcePath)) return copyFailure('invalid_destination', 'Choose a category outside the copied category.');
+  if (destination.some((item) => isCategoryNode(item) && Object.prototype.hasOwnProperty.call(item, sourceName))) {
+    return copyFailure('duplicate_category', 'A category with this name already exists here.');
+  }
 
-  const usedNames = collectCategoryNames(next);
-  const destinationChildNames = new Set(destination.flatMap((item) => isCategoryNode(item) ? [Object.keys(item)[0]] : []));
-  const copyName = createUniqueCopyName(sourceName, new Set([...usedNames, ...destinationChildNames]));
-  usedNames.add(copyName);
-  const copiedItems = copyItemsWithUniqueCategoryNames(sourceItems, usedNames);
-  destination.push({ [copyName]: copiedItems });
-  next[copyName] = cloneItems(copiedItems);
-  addStandaloneCopiedCategories(next, copiedItems);
-  syncStandaloneCategory(next, destinationPath);
-  syncStandaloneCategory(next, [...destinationPath, copyName]);
-  return { ok: true, data: next, path: [...destinationPath, copyName] };
+  const copiedItems = cloneItems(sourceItems);
+  destination.push({ [sourceName]: copiedItems });
+  next[sourceName] = cloneItems(copiedItems);
+  syncStandaloneCategory(next, [...destinationPath, sourceName]);
+  return { ok: true, data: next, path: [...destinationPath, sourceName] };
 }
 
 export function setCategoryPriority(data: NotesData, path: CategoryPath, priority: number): MutationResult {
@@ -358,49 +355,6 @@ function deleteItemsNamed(items: NoteItem[], name: string) {
     }
     deleteItemsNamed(childItems, name);
   }
-}
-
-function copyItemsWithUniqueCategoryNames(items: NoteItem[], usedNames: Set<string>): NoteItem[] {
-  return items.map((item) => {
-    if (typeof item === 'string') return item;
-    if (!isCategoryNode(item)) return item;
-    const [name, childItems] = Object.entries(item)[0];
-    const copyName = createUniqueCopyName(name, usedNames);
-    usedNames.add(copyName);
-    return { [copyName]: copyItemsWithUniqueCategoryNames(childItems, usedNames) };
-  });
-}
-
-function addStandaloneCopiedCategories(data: NotesData, items: NoteItem[]) {
-  items.forEach((item) => {
-    if (!isCategoryNode(item)) return;
-    const [name, childItems] = Object.entries(item)[0];
-    data[name] = cloneItems(childItems);
-    addStandaloneCopiedCategories(data, childItems);
-  });
-}
-
-function collectCategoryNames(data: NotesData) {
-  const names = new Set(Object.keys(data));
-  Object.values(data).forEach((items) => collectCategoryNamesInItems(items, names));
-  return names;
-}
-
-function collectCategoryNamesInItems(items: NoteItem[], names: Set<string>) {
-  items.forEach((item) => {
-    if (!isCategoryNode(item)) return;
-    const [name, childItems] = Object.entries(item)[0];
-    names.add(name);
-    collectCategoryNamesInItems(childItems, names);
-  });
-}
-
-function createUniqueCopyName(name: string, usedNames: Set<string>) {
-  const baseName = `${name} copy`;
-  if (!usedNames.has(baseName)) return baseName;
-  let suffix = 2;
-  while (usedNames.has(`${baseName} ${suffix}`)) suffix += 1;
-  return `${baseName} ${suffix}`;
 }
 
 export function startsWithPath(path: CategoryPath, prefix: CategoryPath) {

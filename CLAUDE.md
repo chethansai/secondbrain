@@ -155,7 +155,7 @@ Build feature components around user flows, for example `NoteList`, `NoteCard`, 
 - Edit note to text that already exists in same path: allow.
 - Delete note not found: return/show `not_found`.
 - Delete duplicate exact note in same path: delete first exact match or selected occurrence.
-- Delete from copied branch changes only that exact branch in v1.
+- Delete from a same-name copied category branch synchronizes the named category branches through deterministic category mutations.
 
 ### Move/copy notes
 
@@ -198,7 +198,7 @@ Build feature components around user flows, for example `NoteList`, `NoteCard`, 
 - JSON object duplicate keys cannot be reliably represented; warn that duplicates may already be lost by parser.
 - Import non-string notes only with explicit conversion confirmation, otherwise reject.
 - Old tree imports should ignore metadata and convert visible category/note structure only.
-- Old mirrored/copied categories become independent branches in v1.
+- Old mirrored/copied category imports may become independent unless converted into explicit same-name synchronized categories by user action.
 - Old Instagram/OCR/timestamp metadata is ignored; URLs remain part of note text if present.
 
 ## Sync and Firestore rules
@@ -263,11 +263,11 @@ Build feature components around user flows, for example `NoteList`, `NoteCard`, 
 ### Copy/mirror
 
 - V1 copied notes are independent.
-- V1 copied categories are independent duplicated branches.
-- Editing/deleting copied branches changes only that exact branch.
-- Mirrored propagation is excluded from v1.
-- If mirror behavior is added later, add explicit sidecar metadata such as `mirrorLinks`.
-- Do not silently update all same-text notes globally.
+- V1 copied categories use the original category name under the selected parent, not a `copy` suffix.
+- Same-name copied category branches synchronize through deterministic category-tree mutations.
+- Copying into a parent that already has a direct child with that category name is rejected to avoid ambiguous sibling paths.
+- Hidden mirror IDs and old tree mirror metadata remain excluded from the simple notes JSON.
+- Do not silently update all same-text notes globally except where the current exact-note edit behavior deliberately updates exact matches.
 
 ## UI/UX requirements
 
@@ -394,7 +394,7 @@ Minimum behavior matrix to consider when touching core flows:
 - Any workspace/category selection state is stored outside the main `data` field.
 - React Native + Firebase client SDK only; no Django.
 - Writes use deterministic path arrays plus exact normalized note text.
-- Old copied/mirrored branches become independent after migration/import.
+- Same-name copied category branches synchronize through deterministic category-tree mutations; old mirror metadata remains excluded from imports.
 - Clickable URLs are allowed; no Instagram-specific parsing or embed rendering.
 - Internal IDs are excluded from v1 visible note data.
 - Recent implemented decisions include: AI prompt cards for `notetakingprompts`; vertical dropdown category actions; native floating icon popup scrolling; Never password timeout; Android overlay category save chips; full add-note editor routing; subcategory all-view toggle; copy/paste; category/subcategory copy; workspace priority redraw; subcategory order controls; note pinning; pinned notes metadata sidecar; automatic pinning for new subcategories; AI notification queue/history; AI Chat and CORS handling; exact-name category collapse/sync behaviors; deep-link and file-based SEEK automation.
@@ -412,6 +412,7 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-05-22: Changed category Copy semantics to create same-name synchronized category branches instead of unique `copy` branches. Copying a category into a selected parent now keeps the original category name, rejects duplicate same-name siblings under that parent, and relies on deterministic category-tree synchronization so changes in one same-name branch reflect in the others while hidden mirror IDs remain excluded.
 - 2026-05-14: Expanded `CLAUDE.md` from the compact summary into a full Claude-readable project contract based on `plan.md`, `design.md`, and prior decisions. Decision: future implemented chat steps must update both `plan.md` and `CLAUDE.md` history before the mandatory git status/add/commit/push workflow.
 - 2026-05-15: Implemented long-press note ordering controls. Long-pressing notes in the main note list or workspace preview reveals Up/Down controls below the options button, reusing the existing deterministic note priority mutation and disabling invalid edge moves.
 - 2026-05-21: Fixed overflowing category labels in native floating/add-note category chips. Category picker labels now wrap across multiple lines and chips can grow taller so long category paths remain visible and understandable when selecting a category.
@@ -426,3 +427,5 @@ Minimum behavior matrix to consider when touching core flows:
 - 2026-05-21: Made the Android floating overlay run as a foreground service with an ongoing notification and Android 14 special-use foreground service metadata. Decision: the floating icon should remain alive after being started instead of relying on a normal background service that Android may kill after some time.
 - 2026-05-21: Added multi-category pinning to the native floating Shown Categories picker. Each category row three-dot menu now has Pin/Unpin, pinned rows show a pin badge and highlighted border, and multiple pinned category paths can be stored per workspace.
 - 2026-05-21: Updated the Android floating overlay add-note popup so a newly created root category or subcategory is remembered and sorted first in the overlay category chip list on the next open, making the recent category behave like the first pinned destination.
+- 2026-05-22: Replaced the main category note long-press reorder affordance with an Uber-style two-line drag handle below the note options button. Dragging the handle now reorders notes through the existing deterministic note priority mutation while the Order menu remains as a fallback.
+- 2026-05-22: Added Pin/Unpin to the native floating add-note category picker three-dot menu. Pinned categories are stored as multiple workspace pinned paths, appended after existing pins, highlighted in the picker, and sorted first by pin order.

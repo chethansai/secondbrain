@@ -10,12 +10,14 @@ type Props = {
   data: NotesData;
   disabled?: boolean;
   excludedPath?: CategoryPath;
+  pinnedPaths?: CategoryPath[];
   selectedPath?: CategoryPath | null;
   onSelect: (path: CategoryPath) => Promise<boolean> | boolean;
   onCreateSubcategory?: (path: CategoryPath, name: string) => Promise<CategoryPath | null> | CategoryPath | null;
+  onTogglePin?: (path: CategoryPath) => Promise<boolean> | boolean | void;
 };
 
-export function InlineCategorySavePicker({ data, disabled = false, excludedPath = [], selectedPath = null, onSelect, onCreateSubcategory }: Props) {
+export function InlineCategorySavePicker({ data, disabled = false, excludedPath = [], pinnedPaths = [], selectedPath = null, onSelect, onCreateSubcategory, onTogglePin }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
@@ -24,12 +26,22 @@ export function InlineCategorySavePicker({ data, disabled = false, excludedPath 
   const [creating, setCreating] = useState(false);
   const excludedKey = pathKey(excludedPath);
   const selectedKey = selectedPath ? pathKey(selectedPath) : null;
+  const pinnedPathKeys = useMemo(() => new Map(pinnedPaths.map((path, index) => [pathKey(path), index])), [pinnedPaths]);
   const categories = useMemo(() => {
     return collapseExactNameCategories(listAllCategories(data))
       .map((category) => category.path)
       .filter((path) => pathKey(path) !== excludedKey)
-      .sort((left, right) => formatPath(left).localeCompare(formatPath(right), undefined, { sensitivity: 'base' }));
-  }, [data, excludedKey]);
+      .map((path) => ({ path, pinIndex: pinnedPathKeys.get(pathKey(path)) ?? -1 }))
+      .sort((left, right) => {
+        const leftPinned = left.pinIndex >= 0;
+        const rightPinned = right.pinIndex >= 0;
+        if (leftPinned && rightPinned) return left.pinIndex - right.pinIndex;
+        if (leftPinned) return -1;
+        if (rightPinned) return 1;
+        return formatPath(left.path).localeCompare(formatPath(right.path), undefined, { sensitivity: 'base' });
+      })
+      .map(({ path }) => path);
+  }, [data, excludedKey, pinnedPathKeys]);
 
   async function selectCategory(path: CategoryPath) {
     if (disabled) return;
@@ -53,6 +65,14 @@ export function InlineCategorySavePicker({ data, disabled = false, excludedPath 
     }
   }
 
+  async function togglePin(path: CategoryPath) {
+    if (disabled || !onTogglePin) return;
+    await onTogglePin(path);
+    setOpenMenuKey(null);
+    setSubcategoryParentKey(null);
+    setSubcategoryName('');
+  }
+
   if (categories.length === 0) return null;
 
   return (
@@ -61,11 +81,12 @@ export function InlineCategorySavePicker({ data, disabled = false, excludedPath 
         const key = pathKey(path);
         const label = formatPath(path);
         const active = selectedKey === key;
+        const pinned = pinnedPathKeys.has(key);
         const menuOpen = openMenuKey === key;
         const creatingHere = subcategoryParentKey === key;
         return (
           <View key={key} style={[styles.chipWrap, menuOpen && styles.chipWrapOpen]}>
-            <View style={[styles.chip, active && styles.chipActive, disabled && styles.disabled]}>
+            <View style={[styles.chip, pinned && styles.chipPinned, active && styles.chipActive, disabled && styles.disabled]}>
               <Pressable accessibilityRole="button" accessibilityLabel={`Save note to ${label}`} disabled={disabled} onPress={() => selectCategory(path)} style={styles.chipLabelButton}>
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
               </Pressable>
@@ -93,6 +114,12 @@ export function InlineCategorySavePicker({ data, disabled = false, excludedPath 
                   <Pressable accessibilityRole="menuitem" accessibilityLabel={`Create subcategory inside ${label}`} disabled={disabled} onPress={() => setSubcategoryParentKey(creatingHere ? null : key)} style={styles.menuItem}>
                     <Icon name="folder-outline" size={14} color={colors.primary} />
                     <Text style={styles.menuItemText}>Create as subcategory</Text>
+                  </Pressable>
+                ) : null}
+                {onTogglePin ? (
+                  <Pressable accessibilityRole="menuitem" accessibilityLabel={`${pinned ? 'Unpin' : 'Pin'} ${label}`} disabled={disabled} onPress={() => togglePin(path)} style={[styles.menuItem, pinned && styles.menuItemPinned]}>
+                    <Icon name="pin-outline" size={14} color={pinned ? colors.onPrimary : colors.primary} />
+                    <Text style={[styles.menuItemText, pinned && styles.menuItemTextPinned]}>{pinned ? 'Unpin' : 'Pin'}</Text>
                   </Pressable>
                 ) : null}
                 {creatingHere ? (
@@ -135,6 +162,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     chipWrap: { position: 'relative', width: '100%', maxWidth: 320, zIndex: 1 },
     chipWrapOpen: { zIndex: 20, elevation: 8 },
     chip: { minHeight: 38, maxWidth: '100%', borderRadius: rounded.full, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.canvas, flexDirection: 'row', alignItems: 'stretch', overflow: 'visible' },
+    chipPinned: { borderColor: colors.primary, backgroundColor: colors.surface },
     chipActive: { backgroundColor: colors.primary, borderColor: colors.primaryDeep },
     chipLabelButton: { minHeight: 36, flex: 1, justifyContent: 'center', paddingLeft: spacing.sm, paddingRight: spacing.xs, paddingVertical: spacing.xs },
     chipText: { ...typography.bodySmMedium, color: colors.charcoal, flexWrap: 'wrap', width: '100%' },
@@ -143,7 +171,9 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     overflowButtonActive: { borderLeftColor: colors.primaryDeep },
     menu: { position: 'absolute', top: 42, right: 0, width: 236, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.canvas, padding: spacing.xs, gap: spacing.xs, zIndex: 30, elevation: 12 },
     menuItem: { minHeight: 34, borderRadius: rounded.sm, backgroundColor: colors.surfaceSoft, paddingHorizontal: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    menuItemPinned: { backgroundColor: colors.primary },
     menuItemText: { ...typography.bodySmMedium, color: colors.charcoal, flex: 1 },
+    menuItemTextPinned: { color: colors.onPrimary },
     createBox: { gap: spacing.xs, borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairlineSoft, backgroundColor: colors.surfaceSoft, padding: spacing.xs },
     createInput: { minHeight: 38, borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.canvas, color: colors.ink, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, ...typography.bodySm },
     createButton: { minHeight: 34, borderRadius: rounded.sm, backgroundColor: colors.primary, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
