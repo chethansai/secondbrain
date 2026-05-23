@@ -266,7 +266,7 @@ async function readAiChatConversations(): Promise<AiChatConversation[]> {
 }
 
 async function requestAiChat(data: NotesData, messages: AiChatMessage[], input: string, onToken: (token: string) => void) {
-  const response = await fetch('https://chethan.tailb6229f.ts.net/v1/responses', {
+  const response = await fetch('https://vmi3321442.tailb6229f.ts.net/v1/responses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer dummy' },
     body: JSON.stringify({ model: 'oca/gpt-5.4', input: buildPrompt(data, messages, input) }),

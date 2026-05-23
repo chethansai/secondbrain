@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { GestureResponderEvent, PanResponderGestureState, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { rounded, shadows, spacing, typography } from '../../shared/design/tokens';
 import { CategoryPath, CategorySummary, FlatNote, PinnedNoteRef } from '../../shared/types/notes';
@@ -41,6 +41,22 @@ type PreviewItem =
   | { type: 'category'; category: CategorySummary; order: number }
   | { type: 'note'; note: FlatNote; order: number };
 
+type PreviewDragState = {
+  key: string;
+  note: FlatNote;
+  fromOrder: number;
+  targetOrder: number;
+  dy: number;
+  originY: number;
+  height: number;
+  originScrollY: number;
+};
+
+type PreviewLayout = {
+  y: number;
+  height: number;
+};
+
 export function WorkspaceCategoryCard({
   category,
   allCategories,
@@ -77,6 +93,13 @@ export function WorkspaceCategoryCard({
   const [busy, setBusy] = useState(false);
   const [showAllSubcategories, setShowAllSubcategories] = useState(false);
   const [expandedCategoryKeys, setExpandedCategoryKeys] = useState<Set<string>>(() => new Set());
+  const [previewDrag, setPreviewDrag] = useState<PreviewDragState | null>(null);
+  const previewDragRef = useRef<PreviewDragState | null>(null);
+  const previewLayoutsRef = useRef<Record<string, PreviewLayout>>({});
+  const previewScrollRef = useRef<ScrollView>(null);
+  const previewScrollYRef = useRef(0);
+  const previewViewportHeightRef = useRef(0);
+  const previewContentHeightRef = useRef(0);
   const tint = tints[(priority - 1) % tints.length];
   const childCategoriesByParentKey = useMemo(() => groupChildCategories(allCategories, category.path), [allCategories, category.path]);
   const childCategories = childCategoriesByParentKey.get(pathKey(category.path)) ?? [];
@@ -116,6 +139,67 @@ export function WorkspaceCategoryCard({
       }
       return next;
     });
+  }
+
+  function updatePreviewDrag(next: PreviewDragState | null) {
+    previewDragRef.current = next;
+    setPreviewDrag(next);
+  }
+
+  function previewNoteKey(note: FlatNote, index: number) {
+    return `${note.path.join('/')}-${note.index}-${index}`;
+  }
+
+  function getPreviewTargetOrder(activeKey: string, dragCenter: number, items: PreviewItem[]) {
+    const entries = items
+      .map((item, index) => item.type === 'note' ? { key: previewNoteKey(item.note, index), layout: previewLayoutsRef.current[previewNoteKey(item.note, index)] } : null)
+      .filter((entry): entry is { key: string; layout: PreviewLayout } => entry !== null && entry.layout !== undefined && entry.key !== activeKey);
+    const targetIndex = entries.findIndex((entry) => dragCenter < entry.layout.y + entry.layout.height / 2);
+    return targetIndex === -1 ? entries.length + 1 : targetIndex + 1;
+  }
+
+  function startPreviewDrag(key: string, note: FlatNote, order: number) {
+    const layout = previewLayoutsRef.current[key];
+    if (!layout) return;
+    updatePreviewDrag({ key, note, fromOrder: order, targetOrder: order, dy: 0, originY: layout.y, height: layout.height, originScrollY: previewScrollYRef.current });
+  }
+
+  function movePreviewDrag(_: GestureResponderEvent, gesture: PanResponderGestureState) {
+    const current = previewDragRef.current;
+    if (!current) return;
+    const edgeCenter = current.originY + current.height / 2 + gesture.dy + previewScrollYRef.current - current.originScrollY;
+    scrollPreviewAtEdge(edgeCenter);
+    const scrollDelta = previewScrollYRef.current - current.originScrollY;
+    const dragCenter = current.originY + current.height / 2 + gesture.dy + scrollDelta;
+    updatePreviewDrag({ ...current, dy: gesture.dy + scrollDelta, targetOrder: getPreviewTargetOrder(current.key, dragCenter, previewItems) });
+  }
+
+  function releasePreviewDrag() {
+    const current = previewDragRef.current;
+    updatePreviewDrag(null);
+    if (!current || current.targetOrder === current.fromOrder) return;
+    onSetNotePriority(current.note, current.targetOrder);
+  }
+
+  function setPreviewLayout(key: string, y: number, height: number) {
+    previewLayoutsRef.current[key] = { y, height };
+  }
+
+  function scrollPreviewAtEdge(dragCenter: number) {
+    const viewportHeight = previewViewportHeightRef.current;
+    if (!viewportHeight) return;
+    const edgeSize = Math.min(56, viewportHeight / 3);
+    const scrollY = previewScrollYRef.current;
+    const maxScrollY = Math.max(0, previewContentHeightRef.current - viewportHeight);
+    if (dragCenter - scrollY < edgeSize) {
+      const nextY = Math.max(0, scrollY - 18);
+      previewScrollYRef.current = nextY;
+      previewScrollRef.current?.scrollTo({ y: nextY, animated: false });
+    } else if (scrollY + viewportHeight - dragCenter < edgeSize) {
+      const nextY = Math.min(maxScrollY, scrollY + 18);
+      previewScrollYRef.current = nextY;
+      previewScrollRef.current?.scrollTo({ y: nextY, animated: false });
+    }
   }
 
   function setDescendantsExpanded(expanded: boolean) {
@@ -170,11 +254,16 @@ export function WorkspaceCategoryCard({
       ) : null}
 
       <ScrollView
+        ref={previewScrollRef}
         style={styles.previewScroller}
         contentContainerStyle={styles.previewList}
         nestedScrollEnabled
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={notes.length > 4}
+        scrollEventThrottle={16}
+        onLayout={(event) => { previewViewportHeightRef.current = event.nativeEvent.layout.height; }}
+        onContentSizeChange={(_, height) => { previewContentHeightRef.current = height; }}
+        onScroll={(event) => { previewScrollYRef.current = event.nativeEvent.contentOffset.y; }}
       >
         {priority === 1 && !adding ? (
           <Pressable accessibilityRole="button" accessibilityLabel={`Add note to ${category.name}`} onPress={(event) => { event.stopPropagation(); openAddNote(); }} style={styles.previewAddButton}>
@@ -210,7 +299,7 @@ export function WorkspaceCategoryCard({
           const stackOrder = previewItems.length - index;
           if (item.type === 'category') {
             return (
-              <View key={pathKey(item.category.path)} style={[styles.subcategoryBlock, { zIndex: stackOrder }]}> 
+              <View key={pathKey(item.category.path)} onLayout={(event) => setPreviewLayout(pathKey(item.category.path), event.nativeEvent.layout.y, event.nativeEvent.layout.height)} style={[styles.subcategoryBlock, { zIndex: stackOrder }]}>
                 <WorkspaceSubcategoryRow
                   category={item.category}
                   depth={0}
@@ -244,8 +333,15 @@ export function WorkspaceCategoryCard({
             );
           }
 
+          const key = previewNoteKey(item.note, index);
+          const noteOrder = getPreviewNoteOrder(previewItems, index);
+          const noteCount = getPreviewNoteCount(previewItems);
+          const dragging = previewDrag?.key === key;
+          const displaced = getPreviewDisplacement(previewDrag, noteOrder, previewLayoutsRef.current[key]?.height ?? 0);
           return (
-            <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={previewItems.length} currentOrder={index + 1} stackOrder={stackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onCopyText={onCopyNoteText} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} onPressNote={onPressNote} />
+            <View key={key} style={displaced ? { transform: [{ translateY: displaced }] } : undefined}>
+              <WorkspacePreviewNote note={item.note} itemCount={noteCount} currentOrder={noteOrder} stackOrder={stackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onCopyText={onCopyNoteText} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} onPressNote={onPressNote} dragKey={key} dragging={dragging} dragOffset={dragging ? previewDrag.dy : 0} onDragStart={startPreviewDrag} onDragMove={movePreviewDrag} onDragRelease={releasePreviewDrag} onLayoutNote={setPreviewLayout} />
+            </View>
           );
         }) : !adding ? (
           <View style={styles.emptyPreview}><Text style={styles.emptyPreviewText}>No notes yet.</Text></View>
@@ -263,6 +359,9 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
   const [prioritySearch, setPrioritySearch] = useState('');
   const priorityScrollRef = useRef<ScrollView>(null);
   const [busy, setBusy] = useState(false);
+  const [previewDrag, setPreviewDrag] = useState<PreviewDragState | null>(null);
+  const previewDragRef = useRef<PreviewDragState | null>(null);
+  const previewLayoutsRef = useRef<Record<string, PreviewLayout>>({});
   const key = pathKey(category.path);
   const children = childCategoriesByParentKey.get(key) ?? [];
   const childNotes = notesByCategoryKey.get(key) ?? [];
@@ -304,6 +403,47 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
       if (expanded !== isExpanded) onToggleCategory(key.split(''));
     });
     setActionsOpen(false);
+  }
+
+  function updatePreviewDrag(next: PreviewDragState | null) {
+    previewDragRef.current = next;
+    setPreviewDrag(next);
+  }
+
+  function previewNoteKey(note: FlatNote, index: number) {
+    return `${note.path.join('/')}-${note.index}-${index}`;
+  }
+
+  function getPreviewTargetOrder(activeKey: string, dragCenter: number, items: PreviewItem[]) {
+    const entries = items
+      .map((item, index) => item.type === 'note' ? { key: previewNoteKey(item.note, index), layout: previewLayoutsRef.current[previewNoteKey(item.note, index)] } : null)
+      .filter((entry): entry is { key: string; layout: PreviewLayout } => entry !== null && entry.layout !== undefined && entry.key !== activeKey);
+    const targetIndex = entries.findIndex((entry) => dragCenter < entry.layout.y + entry.layout.height / 2);
+    return targetIndex === -1 ? entries.length + 1 : targetIndex + 1;
+  }
+
+  function startPreviewDrag(key: string, note: FlatNote, order: number) {
+    const layout = previewLayoutsRef.current[key];
+    if (!layout) return;
+    updatePreviewDrag({ key, note, fromOrder: order, targetOrder: order, dy: 0, originY: layout.y, height: layout.height, originScrollY: 0 });
+  }
+
+  function movePreviewDrag(_: GestureResponderEvent, gesture: PanResponderGestureState) {
+    const current = previewDragRef.current;
+    if (!current) return;
+    const dragCenter = current.originY + current.height / 2 + gesture.dy;
+    updatePreviewDrag({ ...current, dy: gesture.dy, targetOrder: getPreviewTargetOrder(current.key, dragCenter, childItems) });
+  }
+
+  function releasePreviewDrag() {
+    const current = previewDragRef.current;
+    updatePreviewDrag(null);
+    if (!current || current.targetOrder === current.fromOrder) return;
+    onSetNotePriority(current.note, current.targetOrder);
+  }
+
+  function setPreviewLayout(key: string, y: number, height: number) {
+    previewLayoutsRef.current[key] = { y, height };
   }
 
   return (
@@ -416,8 +556,15 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
               );
             }
 
+            const key = previewNoteKey(item.note, index);
+            const noteOrder = getPreviewNoteOrder(childItems, index);
+            const noteCount = getPreviewNoteCount(childItems);
+            const dragging = previewDrag?.key === key;
+            const displaced = getPreviewDisplacement(previewDrag, noteOrder, previewLayoutsRef.current[key]?.height ?? 0);
             return (
-              <WorkspacePreviewNote key={`${item.note.path.join('/')}-${item.note.index}`} note={item.note} itemCount={childItems.length} currentOrder={index + 1} stackOrder={childStackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onCopyText={onCopyNoteText} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} onPressNote={onPressNote} />
+              <View key={key} style={displaced ? { transform: [{ translateY: displaced }] } : undefined}>
+                <WorkspacePreviewNote note={item.note} itemCount={noteCount} currentOrder={noteOrder} stackOrder={childStackOrder} pinned={isPinnedNote(item.note, pinnedNotes)} colors={colors} styles={styles} onEdit={onEditNote} onMove={onMoveNote} onCopy={onCopyNote} onCopyText={onCopyNoteText} onSetPriority={onSetNotePriority} onTogglePin={onToggleNotePin} onDelete={onDeleteNote} onPressNote={onPressNote} dragKey={key} dragging={dragging} dragOffset={dragging ? previewDrag.dy : 0} onDragStart={startPreviewDrag} onDragMove={movePreviewDrag} onDragRelease={releasePreviewDrag} onLayoutNote={setPreviewLayout} />
+              </View>
             );
           })}
         </View>
@@ -435,6 +582,21 @@ function createPriorityOptions(count: number, search: string) {
 
 function formatHistoryEvent(event: string) {
   return event.replace(/_/g, ' ').toLowerCase();
+}
+
+function getPreviewDisplacement(drag: PreviewDragState | null, order: number, itemHeight: number) {
+  if (!drag || !itemHeight || order === drag.fromOrder) return 0;
+  if (drag.targetOrder > drag.fromOrder && order > drag.fromOrder && order <= drag.targetOrder) return -itemHeight;
+  if (drag.targetOrder < drag.fromOrder && order >= drag.targetOrder && order < drag.fromOrder) return itemHeight;
+  return 0;
+}
+
+function getPreviewNoteOrder(items: PreviewItem[], itemIndex: number) {
+  return items.slice(0, itemIndex + 1).filter((item) => item.type === 'note').length;
+}
+
+function getPreviewNoteCount(items: PreviewItem[]) {
+  return items.filter((item) => item.type === 'note').length;
 }
 
 function createOrderedPreviewItems(categories: CategorySummary[], notes: FlatNote[], categoriesFirst = false): PreviewItem[] {
@@ -516,6 +678,9 @@ function createCategoryTints(colors: typeof import('../../shared/design/tokens')
 function createStyles(colors: typeof import('../../shared/design/tokens').colors, isDark: boolean, zoom: number) {
   const scale = (value: number) => Math.round(value * zoom);
   const scaledRadius = Math.max(rounded.xs, scale(rounded.lg));
+  const actionButtonSize = 18;
+  const previewActionButtonWidth = 22;
+  const previewActionButtonHeight = 16;
   return StyleSheet.create({
   card: { position: 'relative', width: '100%', minWidth: 0, height: scale(264), borderRadius: scaledRadius, borderWidth: 1, borderColor: isDark ? '#353a45' : colors.hairline, paddingHorizontal: scale(5), paddingVertical: scale(7), gap: scale(2), ...shadows.card },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: scale(3) },
@@ -526,8 +691,8 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   title: { fontSize: scale(13), fontWeight: '700', lineHeight: scale(16), color: colors.charcoal, flex: 1, minWidth: 0 },
   titleMeta: { flexShrink: 0, flexDirection: 'row', gap: scale(2), paddingTop: scale(1) },
   titleMetaText: { fontSize: scale(7), fontWeight: '700', lineHeight: scale(9), color: colors.steel, textTransform: 'uppercase' },
-  headerMeta: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: scale(3), maxWidth: scale(40) },
-  iconButtonSmall: { width: scale(18), height: scale(18), borderRadius: rounded.xs, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.12)' : colors.hairline, backgroundColor: isDark ? 'rgba(10,11,14,0.72)' : 'rgba(255,255,255,0.72)', alignItems: 'center', justifyContent: 'center' },
+  headerMeta: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 3, maxWidth: actionButtonSize * 2 + 3 },
+  iconButtonSmall: { width: actionButtonSize, height: actionButtonSize, borderRadius: rounded.xs, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.12)' : colors.hairline, backgroundColor: isDark ? 'rgba(10,11,14,0.72)' : 'rgba(255,255,255,0.72)', alignItems: 'center', justifyContent: 'center' },
   actionsPanel: { position: 'absolute', top: scale(30), right: scale(5), zIndex: 1200, width: scale(118), gap: scale(2), borderRadius: rounded.xs, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.canvas, padding: scale(3), ...shadows.card, elevation: 20 },
   categoryActionItem: { minHeight: scale(25), borderRadius: rounded.xs, flexDirection: 'row', alignItems: 'center', gap: scale(5), paddingHorizontal: scale(6), backgroundColor: colors.surfaceSoft },
   categoryActionItemDanger: { backgroundColor: isDark ? 'rgba(224,49,49,0.12)' : 'rgba(224,49,49,0.08)' },
@@ -544,7 +709,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   subcategoryToggle: { width: scale(18), height: scale(20), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'rgba(10,11,14,0.62)' : 'rgba(255,255,255,0.72)', borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, flexShrink: 0 },
   subcategoryToggleEmpty: { opacity: 0.45 },
   subcategoryMain: { flex: 1, minWidth: 0, minHeight: scale(22), borderRadius: rounded.xs, flexDirection: 'row', alignItems: 'center', gap: scale(4), paddingHorizontal: scale(4), backgroundColor: isDark ? 'rgba(10,11,14,0.42)' : 'rgba(255,255,255,0.56)' },
-  subcategoryAddButton: { width: scale(18), height: scale(20), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'rgba(10,11,14,0.62)' : 'rgba(255,255,255,0.72)', borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, flexShrink: 0 },
+  subcategoryAddButton: { width: actionButtonSize, height: 20, borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'rgba(10,11,14,0.62)' : 'rgba(255,255,255,0.72)', borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, flexShrink: 0 },
   subcategoryActionsPanel: { width: scale(118), gap: scale(2), borderRadius: rounded.xs, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.canvas, padding: scale(3), marginTop: scale(1), marginBottom: scale(2), ...shadows.card, elevation: 16, zIndex: 1000 },
   subcategoryPriorityPicker: { gap: scale(3), borderRadius: rounded.xs, borderWidth: 1, borderColor: colors.hairlineSoft, backgroundColor: isDark ? 'rgba(10,11,14,0.54)' : 'rgba(255,255,255,0.66)', padding: scale(3), marginBottom: scale(2) },
   subcategoryName: { fontSize: scale(10), fontWeight: '700', lineHeight: scale(13), color: colors.charcoal, flex: 1, minWidth: 0 }, subcategoryCounts: { flexDirection: 'row', alignItems: 'center', gap: scale(2), flexShrink: 0 }, subcategoryCount: { fontSize: scale(7), fontWeight: '700', lineHeight: scale(9), color: colors.steel },
@@ -553,10 +718,11 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   previewAddButton: { minHeight: scale(29), flexDirection: 'row', alignItems: 'center', gap: scale(5), borderWidth: 1, borderStyle: 'dashed', borderColor: colors.hairlineStrong, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.50)' : 'rgba(255,255,255,0.56)', paddingHorizontal: scale(5), paddingVertical: scale(3) }, previewAddIcon: { width: scale(20), height: scale(20), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'rgba(10,11,14,0.72)' : colors.surface, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, flexShrink: 0 },
   previewAddText: { fontSize: scale(11), fontWeight: '700', lineHeight: scale(14), color: colors.primary, flex: 1, minWidth: 0 },
   previewNote: { position: 'relative', flexDirection: 'row', alignItems: 'flex-start', gap: scale(4), borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, borderRadius: rounded.xs, backgroundColor: isDark ? 'rgba(10,11,14,0.54)' : 'rgba(255,255,255,0.66)', paddingHorizontal: scale(4), paddingVertical: scale(3), marginTop: 0 },
-  previewNoteMenuOpen: { elevation: 16 }, previewTextScroller: { flex: 1, minWidth: 0, maxHeight: scale(52), paddingRight: scale(24) }, previewTextButton: { flex: 1, minWidth: 0 },
-  previewText: { fontSize: scale(11), fontWeight: '500', lineHeight: scale(13), color: colors.charcoal }, previewHistoryBlock: { flex: 1, minWidth: 0, gap: scale(1), paddingRight: scale(24) },
+  previewNoteDragging: { borderColor: colors.primary, elevation: 12 }, previewDropIndicator: { height: scale(2), borderRadius: scale(1), backgroundColor: colors.primary, marginVertical: scale(2) }, previewNoteMenuOpen: { elevation: 16 }, previewTextScroller: { flex: 1, minWidth: 0, maxHeight: scale(52), paddingRight: scale(50) }, previewTextButton: { flex: 1, minWidth: 0 },
+  previewText: { fontSize: scale(11), fontWeight: '500', lineHeight: scale(13), color: colors.charcoal }, previewHistoryBlock: { flex: 1, minWidth: 0, gap: scale(1), paddingRight: scale(50) },
   previewHistoryPrimary: { fontSize: scale(11), fontWeight: '700', lineHeight: scale(13), color: colors.charcoal }, previewHistoryMeta: { fontSize: scale(8), fontWeight: '500', lineHeight: scale(10), color: colors.steel },
-  previewMenuButton: { position: 'absolute', top: scale(3), right: scale(3), width: scale(22), height: scale(16), borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, zIndex: 4 }, previewMenuButtonPinned: { backgroundColor: colors.primary, borderColor: colors.primaryDeep },
+  previewSortButton: { position: 'absolute', top: 3, right: previewActionButtonWidth + 6, width: previewActionButtonWidth, height: previewActionButtonHeight, borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', gap: 1, backgroundColor: colors.primary, borderWidth: 1, borderColor: colors.primaryDeep, zIndex: 4, elevation: 4 }, previewSortButtonActive: { backgroundColor: colors.primaryPressed }, previewSortButtonDisabled: { opacity: 0.45 }, previewSortButtonLine: { width: 12, height: 1.5, borderRadius: 1, backgroundColor: colors.onPrimary },
+  previewMenuButton: { position: 'absolute', top: 3, right: 3, width: previewActionButtonWidth, height: previewActionButtonHeight, borderRadius: rounded.xs, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: isDark ? 'rgba(243,241,236,0.10)' : colors.hairlineSoft, zIndex: 4 }, previewMenuButtonPinned: { backgroundColor: colors.primary, borderColor: colors.primaryDeep },
   previewActions: { position: 'absolute', top: scale(22), right: scale(3), zIndex: 1001, minWidth: scale(94), borderRadius: rounded.xs, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, padding: scale(3), ...shadows.card, elevation: 18 }, previewActionsAbove: { top: undefined, bottom: scale(22) }, previewAction: { minHeight: scale(22), justifyContent: 'center', paddingHorizontal: scale(6) },
   previewActionText: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.charcoal }, previewActionPinnedRow: { borderRadius: rounded.xs, backgroundColor: colors.primary }, previewActionPinnedText: { color: colors.onPrimary, fontWeight: '700' }, previewActionDanger: { ...typography.micro, fontSize: scale(12), lineHeight: scale(17), color: colors.semanticError },
   previewPriorityPicker: { gap: scale(3), borderTopWidth: 1, borderTopColor: colors.hairlineSoft, borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft, paddingVertical: scale(3), marginVertical: scale(2) }, previewPrioritySearch: { height: scale(26), borderRadius: rounded.xs, borderWidth: 1, borderColor: colors.hairlineStrong, color: colors.ink, backgroundColor: colors.surfaceSoft, paddingHorizontal: scale(6), paddingVertical: 0, fontSize: scale(11), lineHeight: scale(14) },

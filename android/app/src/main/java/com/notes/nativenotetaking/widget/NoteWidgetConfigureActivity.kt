@@ -2,9 +2,13 @@ package com.notes.nativenotetaking.widget
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.InputMethodManager
@@ -22,7 +26,10 @@ class NoteWidgetConfigureActivity : Activity() {
   private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
   private lateinit var noteInput: EditText
   private lateinit var categoryInput: EditText
+  private lateinit var categorySearchInput: EditText
   private lateinit var categoryList: LinearLayout
+  private var categories: List<OverlayNotesStore.CategoryPath> = emptyList()
+  private var initialCategoryPath: List<String>? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -33,6 +40,7 @@ class NoteWidgetConfigureActivity : Activity() {
       finish()
       return
     }
+    initialCategoryPath = intent?.getStringArrayExtra(initialPathExtra)?.toList()?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }
     buildContent()
     loadCategories()
   }
@@ -55,6 +63,21 @@ class NoteWidgetConfigureActivity : Activity() {
       setHintTextColor(0xff787671.toInt())
       setSingleLine(true)
     }
+    categorySearchInput = EditText(this).apply {
+      hint = "Search categories"
+      maxLines = 1
+      textSize = 14f
+      setTextColor(0xff1a1a1a.toInt())
+      setHintTextColor(0xff787671.toInt())
+      setSingleLine(true)
+      addTextChangedListener(object : TextWatcher {
+        override fun beforeTextChanged(text: CharSequence?, start: Int, count: Int, after: Int) {}
+        override fun onTextChanged(text: CharSequence?, start: Int, before: Int, count: Int) {
+          renderCategories(categories, text?.toString().orEmpty())
+        }
+        override fun afterTextChanged(text: Editable?) {}
+      })
+    }
     categoryList = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
       addView(statusText("Loading categories..."))
@@ -68,6 +91,13 @@ class NoteWidgetConfigureActivity : Activity() {
         setTextColor(0xff1a1a1a.toInt())
       }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(noteInput, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+      initialCategoryPath?.let { path ->
+        addView(Button(this@NoteWidgetConfigureActivity).apply {
+          text = "Add to ${path.joinToString(" > ")}"
+          setAllCaps(false)
+          setOnClickListener { submitNote(path) }
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+      }
       addView(Button(this@NoteWidgetConfigureActivity).apply {
         text = "Add to SEEK"
         setOnClickListener { submitNote(listOf(OverlayNotesStore.seekCategoryName)) }
@@ -83,6 +113,7 @@ class NoteWidgetConfigureActivity : Activity() {
         setTextColor(0xff5d5b54.toInt())
         setPadding(0, dp(10), 0, dp(4))
       })
+      addView(categorySearchInput, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(ScrollView(this@NoteWidgetConfigureActivity).apply {
         addView(categoryList)
       }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
@@ -97,10 +128,13 @@ class NoteWidgetConfigureActivity : Activity() {
   private fun loadCategories() {
     Thread {
       try {
-        val categories = notesStore.readCategoryPaths()
+        val loadedCategories = notesStore.readCategoryPaths()
           .filter { it.path != listOf(OverlayNotesStore.seekCategoryName) }
           .sortedBy { it.label.lowercase() }
-        Handler(Looper.getMainLooper()).post { renderCategories(categories) }
+        Handler(Looper.getMainLooper()).post {
+          categories = loadedCategories
+          renderCategories(categories, categorySearchInput.text?.toString().orEmpty())
+        }
       } catch (_: Exception) {
         Handler(Looper.getMainLooper()).post {
           categoryList.removeAllViews()
@@ -110,13 +144,15 @@ class NoteWidgetConfigureActivity : Activity() {
     }.start()
   }
 
-  private fun renderCategories(categories: List<OverlayNotesStore.CategoryPath>) {
+  private fun renderCategories(categories: List<OverlayNotesStore.CategoryPath>, query: String = "") {
     categoryList.removeAllViews()
-    if (categories.isEmpty()) {
-      categoryList.addView(statusText("No other categories."))
+    val cleanQuery = query.trim().lowercase()
+    val visibleCategories = if (cleanQuery.isBlank()) categories else categories.filter { it.label.lowercase().contains(cleanQuery) }
+    if (visibleCategories.isEmpty()) {
+      categoryList.addView(statusText(if (cleanQuery.isBlank()) "No other categories." else "No matching categories."))
       return
     }
-    categories.forEach { category -> categoryList.addView(categoryRow(category)) }
+    visibleCategories.forEach { category -> categoryList.addView(categoryRow(category)) }
   }
 
   private fun categoryRow(category: OverlayNotesStore.CategoryPath): View {
@@ -191,6 +227,7 @@ class NoteWidgetConfigureActivity : Activity() {
         notesStore.appendNote(path, note)
         NoteWidgetProvider.saveCategory(this, appWidgetId, path)
         Handler(Looper.getMainLooper()).post {
+          copyNoteToClipboard(note)
           updateWidgetAndFinish()
           Toast.makeText(this, "Added to ${path.joinToString(" > ")}", Toast.LENGTH_SHORT).show()
         }
@@ -206,9 +243,15 @@ class NoteWidgetConfigureActivity : Activity() {
   private fun updateWidgetAndFinish() {
     val appWidgetManager = AppWidgetManager.getInstance(this)
     NoteWidgetProvider.updateWidget(this, appWidgetManager, appWidgetId)
+    WorkspaceWidgetProvider.updateWidget(this, appWidgetManager, appWidgetId)
     val resultValue = intent.apply { putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId) }
     setResult(RESULT_OK, resultValue)
     finish()
+  }
+
+  private fun copyNoteToClipboard(note: String) {
+    val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText("Native Note", note))
   }
 
   private fun setInputsEnabled(enabled: Boolean) {
@@ -227,5 +270,9 @@ class NoteWidgetConfigureActivity : Activity() {
 
   private fun dp(value: Int): Int {
     return (value * resources.displayMetrics.density).toInt()
+  }
+
+  companion object {
+    const val initialPathExtra = "com.notes.nativenotetaking.widget.INITIAL_PATH"
   }
 }

@@ -20,9 +20,19 @@ class OverlayNotesStore(private val context: Context) {
     val label: String = path.joinToString(" > ")
   }
 
+  data class NoteSnapshot(val categories: List<CategorySnapshot>)
+  data class CategorySnapshot(val path: List<String>, val notes: List<String>) {
+    val label: String = path.joinToString(" > ")
+  }
+
   fun readCategoryPaths(): List<CategoryPath> {
     val fields = readDataFields()
-    return listCategoryPaths(fields).distinctBy { it.path.joinToString("\u001f") }
+    return listCategoryPaths(fields).distinctBy { it.path.joinToString("") }
+  }
+
+  fun readNoteSnapshot(): NoteSnapshot {
+    val fields = readDataFields()
+    return NoteSnapshot(listCategorySnapshots(fields).distinctBy { it.path.joinToString("") })
   }
 
   fun appendNote(path: List<String>, note: String): JSONObject {
@@ -121,6 +131,26 @@ class OverlayNotesStore(private val context: Context) {
       }
     }
     return paths
+  }
+
+  private fun listCategorySnapshots(fields: JSONObject, parentPath: List<String> = emptyList()): List<CategorySnapshot> {
+    val snapshots = mutableListOf<CategorySnapshot>()
+    val keys = fields.keys()
+    while (keys.hasNext()) {
+      val key = keys.next()
+      val path = parentPath + key
+      val notes = mutableListOf<String>()
+      val values = fields.optJSONObject(key)?.optJSONObject("arrayValue")?.optJSONArray("values") ?: JSONArray()
+      val childFieldsList = mutableListOf<JSONObject>()
+      for (index in 0 until values.length()) {
+        val value = values.optJSONObject(index) ?: continue
+        if (value.has("stringValue")) notes.add(value.optString("stringValue"))
+        value.optJSONObject("mapValue")?.optJSONObject("fields")?.let { childFieldsList.add(it) }
+      }
+      snapshots.add(CategorySnapshot(path, notes))
+      childFieldsList.forEach { snapshots.addAll(listCategorySnapshots(it, path)) }
+    }
+    return snapshots
   }
 
   private fun firestoreDataFieldsToNotesData(dataFields: JSONObject): JSONObject {

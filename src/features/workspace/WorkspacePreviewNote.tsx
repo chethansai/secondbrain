@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { GestureResponderEvent, PanResponder, PanResponderGestureState, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { colors as designColors } from '../../shared/design/tokens';
 import { FlatNote } from '../../shared/types/notes';
 import { Icon } from '../../shared/ui/Icon';
@@ -21,9 +21,16 @@ type Props = {
   onTogglePin: (note: FlatNote) => void;
   onDelete: (note: FlatNote) => void;
   onPressNote?: (note: FlatNote) => void;
+  dragKey?: string;
+  dragging?: boolean;
+  dragOffset?: number;
+  onDragStart?: (key: string, note: FlatNote, order: number) => void;
+  onDragMove?: (event: GestureResponderEvent, gesture: PanResponderGestureState) => void;
+  onDragRelease?: () => void;
+  onLayoutNote?: (key: string, y: number, height: number) => void;
 };
 
-export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinned, colors, styles, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete, onPressNote }: Props) {
+export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinned, colors, styles, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete, onPressNote, dragKey, dragging = false, dragOffset = 0, onDragStart, onDragMove, onDragRelease, onLayoutNote }: Props) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
@@ -31,6 +38,14 @@ export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder
   const priorityOptions = createPriorityOptions(itemCount, prioritySearch);
   const openUpward = currentOrder > Math.ceil(itemCount / 2);
   const historyNote = isHistoryPath(note.path) ? parseHistoryNote(note.note) : null;
+  const sortResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => Boolean(dragKey && onDragStart && onDragMove && onDragRelease),
+    onMoveShouldSetPanResponder: () => Boolean(dragKey && onDragStart && onDragMove && onDragRelease),
+    onPanResponderGrant: () => { if (dragKey) onDragStart?.(dragKey, note, currentOrder); },
+    onPanResponderMove: (event, gesture) => onDragMove?.(event, gesture),
+    onPanResponderRelease: () => onDragRelease?.(),
+    onPanResponderTerminate: () => onDragRelease?.(),
+  });
 
   useEffect(() => {
     if (!priorityOpen || prioritySearch) return;
@@ -40,19 +55,27 @@ export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder
   }, [currentOrder, priorityOpen, prioritySearch]);
 
   return (
-    <Pressable style={[styles.previewNote, open && styles.previewNoteMenuOpen, { zIndex: open ? 1000 : stackOrder }]}>
+    <View
+      onLayout={(event) => { if (dragKey) onLayoutNote?.(dragKey, event.nativeEvent.layout.y, event.nativeEvent.layout.height); }}
+      style={[styles.previewNote, open && styles.previewNoteMenuOpen, dragging && styles.previewNoteDragging, dragging && { transform: [{ translateY: dragOffset }] }, { zIndex: open || dragging ? 1000 : stackOrder }]}
+    >
       {historyNote ? (
-        <Pressable disabled={!onPressNote} onPress={() => onPressNote?.(note)} style={styles.previewHistoryBlock}>
+        <View style={styles.previewHistoryBlock}>
           <Text selectable style={styles.previewHistoryPrimary} numberOfLines={3}>{historyNote.primary}</Text>
           <Text selectable style={styles.previewHistoryMeta} numberOfLines={2}>{[historyNote.event ? formatHistoryEvent(historyNote.event) : null, ...historyNote.metadata].filter(Boolean).join(' · ')}</Text>
-        </Pressable>
+        </View>
       ) : (
-        <Pressable disabled={!onPressNote} onPress={() => onPressNote?.(note)} style={styles.previewTextButton}>
+        <View style={styles.previewTextButton}>
           <ScrollView style={styles.previewTextScroller} nestedScrollEnabled showsVerticalScrollIndicator>
             <Text selectable style={styles.previewText}>{note.note}</Text>
           </ScrollView>
-        </Pressable>
+        </View>
       )}
+      <View accessibilityRole="adjustable" accessibilityLabel="Drag note to reorder" style={[styles.previewSortButton, dragging && styles.previewSortButtonActive]} {...sortResponder.panHandlers}>
+        <View style={styles.previewSortButtonLine} />
+        <View style={styles.previewSortButtonLine} />
+        <View style={styles.previewSortButtonLine} />
+      </View>
       <Pressable accessibilityRole="button" accessibilityLabel={pinned ? 'Pinned note actions' : 'Note actions'} onPress={() => setOpen((current) => !current)} style={[styles.previewMenuButton, pinned && styles.previewMenuButtonPinned]}>
         <Icon name="settings-outline" size={11} color={pinned ? colors.onPrimary : colors.steel} />
       </Pressable>
@@ -82,7 +105,7 @@ export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder
           <Pressable onPress={() => { setOpen(false); onCopy(note); }} style={styles.previewAction}><Text style={styles.previewActionText}>Copy to category</Text></Pressable>
         </View>
       ) : null}
-    </Pressable>
+    </View>
   );
 }
 

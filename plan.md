@@ -365,6 +365,10 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-23: Copied native Android quick-entry notes to the system clipboard after successful saves from the floating overlay and home-screen widget. Decision: Enter-to-save, SEEK saves, category-chip saves, and new category/subcategory saves all share the same submit path, so failed Firestore writes do not overwrite the clipboard.
+
+- 2026-05-23: Confirmed category Copy creates same-name synchronized category branches with no `copy` suffix and fixed note edits to mutate the selected category path before running category synchronization, so edits in one same-name copied branch reflect in the other branches through deterministic helpers.
+
 - 2026-05-22: Changed category Copy semantics to create same-name synchronized category branches instead of unique `copy` branches. Copying a category into a selected parent now keeps the original category name, rejects duplicate same-name siblings under that parent, and relies on deterministic category-tree synchronization so changes in one same-name branch reflect in the others while hidden mirror IDs remain excluded.
 
 - 2026-05-14: Expanded `CLAUDE.md` from the compact summary into a full Claude-readable project contract based on `plan.md`, `design.md`, and prior decisions. Decision: future implemented chat steps must update both `plan.md` and `CLAUDE.md` history before the mandatory git status/add/commit/push workflow.
@@ -494,7 +498,7 @@ Automate can still launch `nativenotes://import-file` to trigger an immediate dr
 
 ### 2026-05-08 - AI chat interface
 
-Added a simple ChatGPT-style AI tab that sends the current main notes JSON as context to `https://chethan.tailb6229f.ts.net/v1/responses` using model `oca/gpt-5.4`, parses the returned `data:` SSE-style chunks, stores conversations locally in AsyncStorage as chat id plus user/assistant message JSON, and supports deleting conversations. Kept the notes Firestore document path untouched so the app still runs with local chat history when Firestore hosting/storage is unavailable.
+Added a simple ChatGPT-style AI tab that sends the current main notes JSON as context to `https://vmi3321442.tailb6229f.ts.net/v1/responses` using model `oca/gpt-5.4`, parses the returned `data:` SSE-style chunks, stores conversations locally in AsyncStorage as chat id plus user/assistant message JSON, and supports deleting conversations. Kept the notes Firestore document path untouched so the app still runs with local chat history when Firestore hosting/storage is unavailable.
 
 ### 2026-05-08 - AI chat fetch failure handling
 
@@ -502,6 +506,8 @@ Investigated the AI chat `Failed to fetch` response. Direct POST to the Tailnet 
 
 ## history
 
+- 2026-05-23: Kept workspace category-card option and purple note-order buttons at their base size while pinch-zooming category boxes. Decision: the category card content and container can still zoom larger, but small action controls use stable dimensions so they do not become oversized during pinch-out zoom.
+- 2026-05-23: Updated the AI chat/review Tailnet endpoint to `https://vmi3321442.tailb6229f.ts.net/v1/responses` in the runtime fetch call sites.
 - 2026-05-15: Implemented long-press note ordering controls. Long-pressing notes in the main note list or workspace preview reveals Up/Down controls below the options button, reusing the existing deterministic note priority mutation and disabling invalid edge moves.
 - 2026-05-21: Fixed overflowing category labels in native floating/add-note category chips. Category picker labels now wrap across multiple lines and chips can grow taller so long category paths remain visible and understandable when selecting a category.
 - 2026-05-21: Refined nested category path chips so labels such as `notetaking > featuresimplmentedfull` receive the full chip width instead of collapsing to only the parent category when wrapping.
@@ -521,3 +527,16 @@ Investigated the AI chat `Failed to fetch` response. Direct POST to the Tailnet 
 - 2026-05-22: Removed the hidden note quick reorder affordances after the Android drag handle was not visible. The main note list no longer renders the Uber-style two-line drag handle, workspace preview notes no longer open long-press Up/Down controls, and the explicit Order menu remains the reorder path.
 - 2026-05-22: Added a visible Uber-style two-line sort button beside the main note options button. Note cards now reserve extra right-side space so the sort affordance sits immediately left of the options button without overlapping note text; behavior wiring for multi-location Android sorting is deferred to the next step.
 - 2026-05-22: Wired the visible main note sort button to drag-to-reorder behavior. Dragging the two-line button now shows drop indicators, moves the note card while dragging, and applies the existing deterministic note priority mutation on release while keeping the Order menu as a fallback.
+
+- 2026-05-22: Made the main category note reorder affordance more obvious by changing it to a purple three-horizontal-lines sort button below the note options button and increasing note card height so it stays visible on web and Android.
+
+- 2026-05-22: Repositioned the main note three-line sort button immediately left of the note options button and added a matching visible three-line sort button to workspace preview note cards so the affordance appears in both category detail and preview contexts.
+
+- 2026-05-22: Added Uber-style drag-to-reorder behavior to the purple three-line note sort buttons in workspace preview cards, including expanded subcategory preview notes. Preview note cards now move while dragging, show drop indicators, and apply the existing note priority mutation on release.
+
+- 2026-05-22: Restored Android partial text selection in workspace preview notes by removing pressable wrappers around selectable note text. Long-pressing note text can use Android native selection handles and the copy menu again while whole-note Copy text remains available in the note options menu.
+
+- 2026-05-22: Simplified the Android home-screen widget to a compact square plus-only button with no title/category text or extra spacing. The widget provider now binds only the plus button click to the existing configure/add-note flow, and widget metadata targets a 1x1 home-screen cell.
+
+- 2026-05-22: Improved purple three-line note drag reordering so neighboring note cards visibly shift out of the way while dragging, and category preview lists auto-scroll when the dragged note is held near the top or bottom edge.
+- 2026-05-23: Fixed scrolling for long notes inside expanded nested subcategories on workspace category cards. Workspace preview notes now use a non-pressable outer layout so the inner note text scroller can receive vertical drag gestures reliably while action buttons and drag sorting remain interactive.

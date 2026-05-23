@@ -4,6 +4,7 @@ import { useTheme } from '../../shared/design/ThemeProvider';
 import { rounded, spacing, typography } from '../../shared/design/tokens';
 import { CategoryPath, NotesData } from '../../shared/types/notes';
 import { Icon } from '../../shared/ui/Icon';
+import { TextInputField } from '../../shared/ui/TextInputField';
 import { collapseExactNameCategories, formatPath, listAllCategories } from './categoryTree';
 
 type Props = {
@@ -17,11 +18,17 @@ export function FloatingCategoryDial({ data, disabled = false, selectedPath = nu
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const categories = useMemo(() => {
     return collapseExactNameCategories(listAllCategories(data))
       .map((category) => category.path)
       .sort((left, right) => formatPath(left).localeCompare(formatPath(right), undefined, { sensitivity: 'base' }));
   }, [data]);
+  const filteredCategories = useMemo(() => {
+    const cleanQuery = query.trim().toLowerCase();
+    if (!cleanQuery) return categories;
+    return categories.filter((path) => formatPath(path).toLowerCase().includes(cleanQuery));
+  }, [categories, query]);
 
   async function selectCategory(path: CategoryPath) {
     if (disabled) return;
@@ -49,8 +56,9 @@ export function FloatingCategoryDial({ data, disabled = false, selectedPath = nu
 
       {open ? (
         <View style={styles.dialPanel}>
+          <TextInputField value={query} onChangeText={setQuery} placeholder="Search categories" accessibilityLabel="Search categories" autoCapitalize="none" autoCorrect={false} editable={!disabled} />
           <ScrollView style={styles.scroll} contentContainerStyle={styles.buttonGrid} nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator>
-            {categories.map((path) => {
+            {filteredCategories.map((path) => {
               const active = selectedPath?.join('\u001f') === path.join('\u001f');
               return (
                 <Pressable
@@ -68,6 +76,7 @@ export function FloatingCategoryDial({ data, disabled = false, selectedPath = nu
                 </Pressable>
               );
             })}
+            {query.trim() && filteredCategories.length === 0 ? <Text style={styles.empty}>No matching categories.</Text> : null}
           </ScrollView>
         </View>
       ) : null}
@@ -86,7 +95,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     triggerCountOpen: { color: colors.onPrimary },
     triggerOpen: { backgroundColor: colors.primary, borderColor: colors.primary },
     disabled: { opacity: 0.55 },
-    dialPanel: { width: '100%', borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.canvas, padding: spacing.xs, zIndex: 30, elevation: 16 },
+    dialPanel: { width: '100%', borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.canvas, padding: spacing.xs, gap: spacing.xs, zIndex: 30, elevation: 16 },
     scroll: { maxHeight: 224 },
     buttonGrid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch', gap: spacing.xs, paddingBottom: spacing.xs },
     categoryButton: { minHeight: 42, maxWidth: '100%', borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surfaceSoft, paddingHorizontal: spacing.xs, paddingVertical: spacing.xs, justifyContent: 'center', alignItems: 'stretch', gap: spacing.xxs, flexGrow: 1, flexBasis: '31%' },
@@ -94,5 +103,6 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     categoryIconWrap: { alignItems: 'center' },
     categoryText: { ...typography.micro, color: colors.charcoal, textAlign: 'center', flexWrap: 'wrap', width: '100%' },
     categoryTextActive: { color: colors.onDark },
+    empty: { ...typography.bodySm, color: colors.slate, textAlign: 'center', padding: spacing.md, width: '100%' },
   });
 }

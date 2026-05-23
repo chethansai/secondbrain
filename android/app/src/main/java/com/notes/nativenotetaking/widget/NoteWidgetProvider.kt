@@ -21,11 +21,7 @@ class NoteWidgetProvider : AppWidgetProvider() {
 
     fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
       val views = RemoteViews(context.packageName, R.layout.note_widget)
-      val categoryLabel = readCategoryLabel(context, appWidgetId) ?: "SEEK"
-      views.setTextViewText(R.id.widget_category, categoryLabel)
       views.setOnClickPendingIntent(R.id.widget_button, createConfigureIntent(context, appWidgetId))
-      views.setOnClickPendingIntent(R.id.widget_title, createConfigureIntent(context, appWidgetId))
-      views.setOnClickPendingIntent(R.id.widget_category, createConfigureIntent(context, appWidgetId))
       appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 

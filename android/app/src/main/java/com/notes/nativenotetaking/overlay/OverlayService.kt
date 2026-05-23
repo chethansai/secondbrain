@@ -4,6 +4,8 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
@@ -13,6 +15,8 @@ import android.os.Build
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -207,6 +211,15 @@ class OverlayService : Service() {
       addView(categoryInput, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(createCategoryButton, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     }
+    val searchInput = EditText(this).apply {
+      hint = "Search categories"
+      minLines = 1
+      maxLines = 1
+      textSize = 14f
+      setTextColor(0xff1a1a1a.toInt())
+      setHintTextColor(0xff787671.toInt())
+      setSingleLine(true)
+    }
     val chipWrap = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
       setPadding(0, dp(8), 0, 0)
@@ -233,6 +246,7 @@ class OverlayService : Service() {
       addView(editText, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(controls, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(createCategoryBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+      addView(searchInput, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(chipScroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
     }
     val frame = FrameLayout(this).apply {
@@ -274,21 +288,30 @@ class OverlayService : Service() {
 
     windowManager.addView(frame, params)
     inputView = frame
-    loadCategoryChips(chipWrap, editText)
+    loadCategoryChips(chipWrap, editText, searchInput)
     editText.postDelayed({
       editText.requestFocus()
       ContextCompat.getSystemService(this, InputMethodManager::class.java)?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
     }, 120)
   }
 
-  private fun loadCategoryChips(chipWrap: LinearLayout, editText: EditText) {
+  private fun loadCategoryChips(chipWrap: LinearLayout, editText: EditText, searchInput: EditText) {
     Thread {
       try {
         val recentCategoryKey = readRecentCreatedCategoryKey()
         val categories = notesStore.readCategoryPaths()
           .filter { it.path != listOf(OverlayNotesStore.seekCategoryName) }
           .sortedWith(compareBy<OverlayNotesStore.CategoryPath> { pathKey(it.path) != recentCategoryKey }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
-        Handler(Looper.getMainLooper()).post { renderCategoryChips(chipWrap, editText, categories) }
+        Handler(Looper.getMainLooper()).post {
+          renderCategoryChips(chipWrap, editText, categories, searchInput.text?.toString().orEmpty())
+          searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(text: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(text: CharSequence?, start: Int, before: Int, count: Int) {
+              renderCategoryChips(chipWrap, editText, categories, text?.toString().orEmpty())
+            }
+            override fun afterTextChanged(text: Editable?) {}
+          })
+        }
       } catch (_: Exception) {
         Handler(Looper.getMainLooper()).post {
           chipWrap.removeAllViews()
@@ -302,17 +325,20 @@ class OverlayService : Service() {
     }.start()
   }
 
-  private fun renderCategoryChips(chipWrap: LinearLayout, editText: EditText, categories: List<OverlayNotesStore.CategoryPath>) {
+  private fun renderCategoryChips(chipWrap: LinearLayout, editText: EditText, categories: List<OverlayNotesStore.CategoryPath>, query: String = "") {
     chipWrap.removeAllViews()
-    if (categories.isEmpty()) {
+    val cleanQuery = query.trim().lowercase()
+    val visibleCategories = if (cleanQuery.isBlank()) categories else categories.filter { it.label.lowercase().contains(cleanQuery) }
+    if (visibleCategories.isEmpty()) {
       chipWrap.addView(TextView(this).apply {
-        text = "No other categories."
+        text = if (cleanQuery.isBlank()) "No other categories." else "No matching categories."
         textSize = 12f
         setTextColor(0xff787671.toInt())
+        setPadding(0, dp(8), 0, dp(8))
       })
       return
     }
-    categories.chunked(2).forEach { pair ->
+    visibleCategories.chunked(2).forEach { pair ->
       val row = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         setPadding(0, 0, 0, dp(6))
@@ -412,6 +438,7 @@ class OverlayService : Service() {
       try {
         notesStore.appendNote(path, note)
         Handler(Looper.getMainLooper()).post {
+          copyNoteToClipboard(note)
           Toast.makeText(this, "Added to ${path.joinToString(" > ")}", Toast.LENGTH_SHORT).show()
           hideInput()
         }
@@ -430,6 +457,11 @@ class OverlayService : Service() {
   private fun hideInput() {
     removeView(inputView)
     inputView = null
+  }
+
+  private fun copyNoteToClipboard(note: String) {
+    val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText("Native Note", note))
   }
 
   private fun readRecentCreatedCategoryKey(): String? {
