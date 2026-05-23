@@ -13,6 +13,7 @@ class OverlayButtonTouchHandler(
   private val clampParams: (WindowManager.LayoutParams, Int, Int) -> Unit,
   private val updateView: (View, WindowManager.LayoutParams) -> Unit,
   private val savePosition: (Int, Int) -> OverlaySettings.State,
+  private val getSettings: () -> OverlaySettings.State,
   private val runAction: (String) -> Unit,
 ) : View.OnTouchListener {
   private var downRawX = 0f
@@ -53,7 +54,7 @@ class OverlayButtonTouchHandler(
             runAction(settings.swipeDownAction)
           }
         } else {
-          runAction(savePosition(params.x, params.y).tapAction)
+          runAction(getSettings().tapAction)
         }
         return true
       }

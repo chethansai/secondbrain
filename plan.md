@@ -506,6 +506,7 @@ Investigated the AI chat `Failed to fetch` response. Direct POST to the Tailnet 
 
 ## history
 
+- 2026-05-23: Fixed purple note drag ordering so dragging moves notes to intermediate positions instead of jumping mostly to top/bottom, with smoother neighbor displacement based on each note card height and workspace preview note-only priority calculation when category rows are mixed in.
 - 2026-05-23: Kept workspace category-card option and purple note-order buttons at their base size while pinch-zooming category boxes. Decision: the category card content and container can still zoom larger, but small action controls use stable dimensions so they do not become oversized during pinch-out zoom.
 - 2026-05-23: Updated the AI chat/review Tailnet endpoint to `https://vmi3321442.tailb6229f.ts.net/v1/responses` in the runtime fetch call sites.
 - 2026-05-15: Implemented long-press note ordering controls. Long-pressing notes in the main note list or workspace preview reveals Up/Down controls below the options button, reusing the existing deterministic note priority mutation and disabling invalid edge moves.

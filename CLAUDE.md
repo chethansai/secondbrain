@@ -412,6 +412,7 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-05-23: Fixed purple note drag ordering so dragging moves notes to intermediate positions instead of jumping mostly to top/bottom, with smoother neighbor displacement based on each note card height and workspace preview note-only priority calculation when category rows are mixed in.
 - 2026-05-23: Copied native Android quick-entry notes to the system clipboard after successful saves from the floating overlay and home-screen widget. Enter-to-save, SEEK saves, category-chip saves, and new category/subcategory saves share the same submit path, so failed Firestore writes do not overwrite the clipboard.
 - 2026-05-23: Confirmed category Copy creates same-name synchronized category branches with no `copy` suffix and fixed note edits to mutate the selected category path before running category synchronization, so edits in one same-name copied branch reflect in the other branches through deterministic helpers.
 - 2026-05-23: Kept workspace category-card option and purple note-order buttons at their base size while pinch-zooming category boxes. Decision: the category card content and container can still zoom larger, but small action controls use stable dimensions so they do not become oversized during pinch-out zoom.

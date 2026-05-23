@@ -242,8 +242,11 @@ class NoteWidgetConfigureActivity : Activity() {
 
   private fun updateWidgetAndFinish() {
     val appWidgetManager = AppWidgetManager.getInstance(this)
-    NoteWidgetProvider.updateWidget(this, appWidgetManager, appWidgetId)
-    WorkspaceWidgetProvider.updateWidget(this, appWidgetManager, appWidgetId)
+    if (intent?.getBooleanExtra(workspaceWidgetExtra, false) == true) {
+      WorkspaceWidgetProvider.updateWidget(this, appWidgetManager, appWidgetId)
+    } else {
+      NoteWidgetProvider.updateWidget(this, appWidgetManager, appWidgetId)
+    }
     val resultValue = intent.apply { putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId) }
     setResult(RESULT_OK, resultValue)
     finish()
@@ -274,5 +277,6 @@ class NoteWidgetConfigureActivity : Activity() {
 
   companion object {
     const val initialPathExtra = "com.notes.nativenotetaking.widget.INITIAL_PATH"
+    const val workspaceWidgetExtra = "com.notes.nativenotetaking.widget.WORKSPACE_WIDGET"
   }
 }

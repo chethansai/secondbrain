@@ -18,7 +18,6 @@ import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
@@ -32,7 +31,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.notes.nativenotetaking.MainActivity
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -134,7 +132,21 @@ class OverlayService : Service() {
       clampParams(this, buttonSize, buttonSize)
     }
 
-    label.setOnTouchListener(ButtonTouchHandler(params))
+    label.setOnTouchListener(OverlayButtonTouchHandler(
+      params = params,
+      getButtonSize = { dp(settings.size) },
+      dragThreshold = dragThreshold,
+      swipeThreshold = swipeThreshold,
+      clampParams = ::clampParams,
+      updateView = { view, layoutParams -> updateView(view, layoutParams) },
+      savePosition = { x, y ->
+        OverlaySettings.savePosition(this, x, y)
+        settings = OverlaySettings.read(this)
+        settings
+      },
+      getSettings = { settings },
+      runAction = ::runAction,
+    ))
     windowManager.addView(label, params)
     buttonView = label
     buttonParams = params
@@ -576,54 +588,6 @@ class OverlayService : Service() {
     return (value * resources.displayMetrics.density).toInt()
   }
 
-  private inner class ButtonTouchHandler(private val params: WindowManager.LayoutParams) : View.OnTouchListener {
-    private var downRawX = 0f
-    private var downRawY = 0f
-    private var startX = 0
-    private var startY = 0
-    private var moved = false
-
-    override fun onTouch(view: View, event: MotionEvent): Boolean {
-      when (event.actionMasked) {
-        MotionEvent.ACTION_DOWN -> {
-          downRawX = event.rawX
-          downRawY = event.rawY
-          startX = params.x
-          startY = params.y
-          moved = false
-          return true
-        }
-        MotionEvent.ACTION_MOVE -> {
-          val deltaX = event.rawX - downRawX
-          val deltaY = event.rawY - downRawY
-          if (abs(deltaX) > dragThreshold || abs(deltaY) > dragThreshold) moved = true
-          val buttonSize = dp(settings.size)
-          params.x = startX + deltaX.toInt()
-          params.y = startY + deltaY.toInt()
-          clampParams(params, buttonSize, buttonSize)
-          updateView(view, params)
-          return true
-        }
-        MotionEvent.ACTION_UP -> {
-          val deltaX = event.rawX - downRawX
-          val deltaY = event.rawY - downRawY
-          if (moved) {
-            OverlaySettings.savePosition(this@OverlayService, params.x, params.y)
-            settings = OverlaySettings.read(this@OverlayService)
-            if (deltaX <= -swipeThreshold && abs(deltaX) > abs(deltaY)) {
-              runAction(settings.swipeLeftAction)
-            } else if (deltaY >= swipeThreshold && abs(deltaY) > abs(deltaX)) {
-              runAction(settings.swipeDownAction)
-            }
-          } else {
-            runAction(settings.tapAction)
-          }
-          return true
-        }
-      }
-      return false
-    }
-  }
 
   companion object {
     private const val NOTIFICATION_CHANNEL_ID = "floating_note_icon"

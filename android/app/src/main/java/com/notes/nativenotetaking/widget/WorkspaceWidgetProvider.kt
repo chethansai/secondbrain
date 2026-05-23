@@ -85,6 +85,7 @@ class WorkspaceWidgetProvider : AppWidgetProvider() {
       val intent = Intent(context, NoteWidgetConfigureActivity::class.java).apply {
         action = AppWidgetManager.ACTION_APPWIDGET_CONFIGURE
         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+        putExtra(NoteWidgetConfigureActivity.workspaceWidgetExtra, true)
         if (initialPath.isNotEmpty()) putExtra(NoteWidgetConfigureActivity.initialPathExtra, initialPath.toTypedArray())
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       }
