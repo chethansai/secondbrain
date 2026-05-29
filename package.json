@@ -12,7 +12,7 @@
     "android": "expo start --lan --android",
     "ios": "expo start --lan --ios",
     "web": "expo start --web",
-    "deploy:rules": "firebase deploy --only firestore:rules --project notes-55c97 --config firebase.json",
+    "deploy:rules": "firebase deploy --only firestore:rules --config firebase.json",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

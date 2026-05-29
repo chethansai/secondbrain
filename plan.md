@@ -365,6 +365,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-29: Externalized Firebase project configuration for fork-safe setup. Decision: Expo Firebase config now comes from local `EXPO_PUBLIC_FIREBASE_*` environment variables, Android native overlay/widgets read Firestore REST project/key values from Gradle/local environment config, `.firebaserc` is treated as local-only with a committed example, and rules deployment uses the Firebase CLI selected project instead of a hardcoded project.
+
 - 2026-05-23: Copied native Android quick-entry notes to the system clipboard after successful saves from the floating overlay and home-screen widget. Decision: Enter-to-save, SEEK saves, category-chip saves, and new category/subcategory saves all share the same submit path, so failed Firestore writes do not overwrite the clipboard.
 
 - 2026-05-23: Confirmed category Copy creates same-name synchronized category branches with no `copy` suffix and fixed note edits to mutate the selected category path before running category synchronization, so edits in one same-name copied branch reflect in the other branches through deterministic helpers.
@@ -506,6 +508,9 @@ Investigated the AI chat `Failed to fetch` response. Direct POST to the Tailnet 
 
 ## history
 
+- 2026-05-29: Externalized Firebase project configuration for fork-safe setup. Decision: Expo Firebase config now comes from local `EXPO_PUBLIC_FIREBASE_*` environment variables, Android native overlay/widgets read Firestore REST project/key values from Gradle/local environment config, `.firebaserc` is treated as local-only with a committed example, and rules deployment uses the Firebase CLI selected project instead of a hardcoded project.
+
+- 2026-05-24: Added Pin/Unpin to the Android native floating overlay category three-dot menu. Decision: native pinning writes to the existing `workspaceslist.pinnedcategories` metadata for the default workspace, appends new pins after existing pins to preserve multi-pin order, unpins existing entries, and sorts pinned overlay categories first by stored pin order.
 - 2026-05-23: Fixed purple note drag ordering so dragging moves notes to intermediate positions instead of jumping mostly to top/bottom, with smoother neighbor displacement based on each note card height and workspace preview note-only priority calculation when category rows are mixed in.
 - 2026-05-23: Kept workspace category-card option and purple note-order buttons at their base size while pinch-zooming category boxes. Decision: the category card content and container can still zoom larger, but small action controls use stable dimensions so they do not become oversized during pinch-out zoom.
 - 2026-05-23: Updated the AI chat/review Tailnet endpoint to `https://vmi3321442.tailb6229f.ts.net/v1/responses` in the runtime fetch call sites.

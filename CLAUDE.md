@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working in this
 - `npm run ios` - start Expo and open iOS.
 - `npm run web` - start Expo web.
 - `npm run typecheck` - run TypeScript in strict mode with no emit.
-- `npm run deploy:rules` - deploy Firestore rules to Firebase project `notes-55c97` using `firebase.json`.
+- `npm run deploy:rules` - deploy Firestore rules to the Firebase CLI selected project using `firebase.json`.
 - `npx eas build --profile development|preview|production --platform android` - build with EAS profiles from `eas.json`.
 
 There is no test script in `package.json`; use `npm run typecheck` as the available automated validation unless tests are added.
@@ -412,6 +412,9 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-05-29: Externalized Firebase project configuration for fork-safe setup. Expo Firebase config now reads local `EXPO_PUBLIC_FIREBASE_*` environment variables, Android native overlay/widgets read Firestore REST project/key values from Gradle/local environment config, `.firebaserc` is local-only with a committed example, and rules deployment uses the Firebase CLI selected project.
+
+- 2026-05-24: Added Pin/Unpin to the Android native floating overlay category three-dot menu. Decision: native pinning writes to the existing `workspaceslist.pinnedcategories` metadata for the default workspace, appends new pins after existing pins to preserve multi-pin order, unpins existing entries, and sorts pinned overlay categories first by stored pin order.
 - 2026-05-23: Fixed purple note drag ordering so dragging moves notes to intermediate positions instead of jumping mostly to top/bottom, with smoother neighbor displacement based on each note card height and workspace preview note-only priority calculation when category rows are mixed in.
 - 2026-05-23: Copied native Android quick-entry notes to the system clipboard after successful saves from the floating overlay and home-screen widget. Enter-to-save, SEEK saves, category-chip saves, and new category/subcategory saves share the same submit path, so failed Firestore writes do not overwrite the clipboard.
 - 2026-05-23: Confirmed category Copy creates same-name synchronized category branches with no `copy` suffix and fixed note edits to mutate the selected category path before running category synchronization, so edits in one same-name copied branch reflect in the other branches through deterministic helpers.
