@@ -412,6 +412,8 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-05-29: Fixed release APK startup crash after fork-safe Firebase config. Expo release bundles require direct `process.env.EXPO_PUBLIC_*` references for inlining, so Firebase config validation now captures direct env references instead of dynamically indexing `process.env` by variable name.
+
 - 2026-05-29: Externalized Firebase project configuration for fork-safe setup. Expo Firebase config now reads local `EXPO_PUBLIC_FIREBASE_*` environment variables, Android native overlay/widgets read Firestore REST project/key values from Gradle/local environment config, `.firebaserc` is local-only with a committed example, and rules deployment uses the Firebase CLI selected project.
 
 - 2026-05-24: Added Pin/Unpin to the Android native floating overlay category three-dot menu. Decision: native pinning writes to the existing `workspaceslist.pinnedcategories` metadata for the default workspace, appends new pins after existing pins to preserve multi-pin order, unpins existing entries, and sorts pinned overlay categories first by stored pin order.

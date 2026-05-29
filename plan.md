@@ -365,6 +365,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-05-29: Fixed release APK startup crash after fork-safe Firebase config. Decision: Expo release bundles require direct `process.env.EXPO_PUBLIC_*` references for inlining, so Firebase config validation now captures direct env references before building the config instead of dynamically indexing `process.env` by variable name.
+
 - 2026-05-29: Externalized Firebase project configuration for fork-safe setup. Decision: Expo Firebase config now comes from local `EXPO_PUBLIC_FIREBASE_*` environment variables, Android native overlay/widgets read Firestore REST project/key values from Gradle/local environment config, `.firebaserc` is treated as local-only with a committed example, and rules deployment uses the Firebase CLI selected project instead of a hardcoded project.
 
 - 2026-05-23: Copied native Android quick-entry notes to the system clipboard after successful saves from the floating overlay and home-screen widget. Decision: Enter-to-save, SEEK saves, category-chip saves, and new category/subcategory saves all share the same submit path, so failed Firestore writes do not overwrite the clipboard.
@@ -507,6 +509,8 @@ Added a simple ChatGPT-style AI tab that sends the current main notes JSON as co
 Investigated the AI chat `Failed to fetch` response. Direct POST to the Tailnet endpoint works, but browser-style CORS preflight returns 404 and POST responses do not include `Access-Control-Allow-Origin`, so Expo web cannot call it directly. Updated the AI chat error handling to explain that web is blocked by endpoint CORS and that Android/iOS native or server-side CORS/OPTIONS support is required.
 
 ## history
+
+- 2026-05-29: Fixed release APK startup crash after fork-safe Firebase config. Decision: Expo release bundles require direct `process.env.EXPO_PUBLIC_*` references for inlining, so Firebase config validation now captures direct env references before building the config instead of dynamically indexing `process.env` by variable name.
 
 - 2026-05-29: Externalized Firebase project configuration for fork-safe setup. Decision: Expo Firebase config now comes from local `EXPO_PUBLIC_FIREBASE_*` environment variables, Android native overlay/widgets read Firestore REST project/key values from Gradle/local environment config, `.firebaserc` is treated as local-only with a committed example, and rules deployment uses the Firebase CLI selected project instead of a hardcoded project.
 
