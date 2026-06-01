@@ -125,3 +125,5 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 FIREBASE_SERVICE_ACCOUNT_PATH = os.environ.get('FIREBASE_SERVICE_ACCOUNT_PATH') or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '')
+FIREBASE_PROJECT_ID = os.environ.get('FIREBASE_PROJECT_ID') or os.environ.get('EXPO_PUBLIC_FIREBASE_PROJECT_ID', '')
+FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY') or os.environ.get('EXPO_PUBLIC_FIREBASE_API_KEY', '')

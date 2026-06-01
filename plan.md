@@ -365,6 +365,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-06-01: Added a local Firestore REST fallback for the Django `/get/notetakingfeatures` bridge so it can run without a Firebase Admin service-account file when public Firestore reads are allowed. Decision: prefer Admin SDK when `FIREBASE_SERVICE_ACCOUNT_PATH`/`GOOGLE_APPLICATION_CREDENTIALS` is set, otherwise read `FIREBASE_PROJECT_ID`/`FIREBASE_API_KEY` from environment or Android local properties for local development.
+
 - 2026-06-01: Added a narrow unauthenticated Django GET bridge for `/get/notetakingfeatures` that reads Firestore `reactnativecollection/main`, extracts the exact root category `NOTETAKING FEATURES`, and returns it as JSON. Decision: keep this endpoint read-only and category-specific, use Firebase Admin server credentials from environment/local service account path, and avoid changing the React Native direct-Firebase sync architecture globally.
 
 - 2026-05-29: Fixed release APK startup crash after fork-safe Firebase config. Decision: Expo release bundles require direct `process.env.EXPO_PUBLIC_*` references for inlining, so Firebase config validation now captures direct env references before building the config instead of dynamically indexing `process.env` by variable name.
@@ -511,6 +513,8 @@ Added a simple ChatGPT-style AI tab that sends the current main notes JSON as co
 Investigated the AI chat `Failed to fetch` response. Direct POST to the Tailnet endpoint works, but browser-style CORS preflight returns 404 and POST responses do not include `Access-Control-Allow-Origin`, so Expo web cannot call it directly. Updated the AI chat error handling to explain that web is blocked by endpoint CORS and that Android/iOS native or server-side CORS/OPTIONS support is required.
 
 ## history
+
+- 2026-06-01: Added a local Firestore REST fallback for the Django `/get/notetakingfeatures` bridge so it can run without a Firebase Admin service-account file when public Firestore reads are allowed. Decision: prefer Admin SDK when `FIREBASE_SERVICE_ACCOUNT_PATH`/`GOOGLE_APPLICATION_CREDENTIALS` is set, otherwise read `FIREBASE_PROJECT_ID`/`FIREBASE_API_KEY` from environment or Android local properties for local development.
 
 - 2026-06-01: Added a narrow unauthenticated Django GET bridge for `/get/notetakingfeatures` that reads Firestore `reactnativecollection/main`, extracts the exact root category `NOTETAKING FEATURES`, and returns it as JSON. Decision: keep this endpoint read-only and category-specific, use Firebase Admin server credentials from environment/local service account path, and avoid changing the React Native direct-Firebase sync architecture globally.
 
