@@ -44,6 +44,11 @@ build/Release
 
 # Dependency directories
 node_modules/
+backend/venv/
+__pycache__/
+*.py[cod]
+*.sqlite3
+db.sqlite3
 
 # Optional npm cache directory
 .npm
@@ -64,6 +69,11 @@ node_modules/
 .env
 .env.local
 .env.*.local
+
+# Firebase Admin service account credentials
+*service-account*.json
+*firebase-admin*.json
+firebase-service-account.json
 
 # dataconnect generated files
 .dataconnect
