@@ -1,5 +1,7 @@
 package com.notes.nativenotetaking
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 
@@ -16,7 +18,14 @@ class MainActivity : ReactActivity() {
     // coloring the background, status bar, and navigation bar.
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
+    routeAssistantIntentToDeepLink()
     super.onCreate(null)
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    routeAssistantIntentToDeepLink()
   }
 
   /**
@@ -38,6 +47,20 @@ class MainActivity : ReactActivity() {
               mainComponentName,
               fabricEnabled
           ){})
+  }
+
+  private fun routeAssistantIntentToDeepLink() {
+    val currentIntent = intent ?: return
+    val source = when (currentIntent.action) {
+      Intent.ACTION_ASSIST -> "assist"
+      "android.intent.action.VOICE_ASSIST" -> "voice"
+      else -> return
+    }
+
+    currentIntent.action = Intent.ACTION_VIEW
+    currentIntent.data = Uri.parse("nativenotes://assistant?source=$source")
+    currentIntent.addCategory(Intent.CATEGORY_BROWSABLE)
+    currentIntent.addCategory(Intent.CATEGORY_DEFAULT)
   }
 
   /**

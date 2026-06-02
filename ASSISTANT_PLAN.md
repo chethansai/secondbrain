@@ -371,9 +371,9 @@ This document outlines how to integrate Android Assistant capabilities into Nati
 - Modify system settings
 
 **Integration Checklist**:
-- [ ] `AssistantActivity` routes correctly from all gestures
-- [ ] Intent filters registered in manifest
-- [ ] Deep links unified with assistant routes
+- [x] `MainActivity` routes Android assistant gestures into the assistant panel
+- [x] Intent filters registered in manifest
+- [x] Deep links unified with assistant routes
 - [ ] Voice input → LLM → voice output (if enabled)
 - [ ] Overlay service starts/stops cleanly
 - [ ] Wake word service respects user prefs
@@ -420,7 +420,7 @@ src/features/assistant/
 
 ### Deep Link Routing
 - Existing: `nativenotes://add-note?category=SEEK`
-- New: `assistant://launch` or `nativenotes://assistant?action=chat`
+- New: `nativenotes://assistant?source=assist`
 - Reuse `src/features/automation/deepLinks.ts` handler
 
 ### Android Manifest Entries

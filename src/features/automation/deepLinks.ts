@@ -15,6 +15,11 @@ export type AutomationCommand = {
   type: 'openNoteEditor';
   key: string;
   rawUrl: string;
+} | {
+  type: 'openAssistant';
+  key: string;
+  rawUrl: string;
+  source?: string;
 };
 
 export type DeepLinkParseResult =
@@ -54,6 +59,18 @@ export function parseAutomationDeepLink(rawUrl: string): DeepLinkParseResult {
           type: 'openNoteEditor',
           key: rawUrl,
           rawUrl,
+        },
+      };
+    }
+
+    if (action === 'assistant') {
+      return {
+        ok: true,
+        command: {
+          type: 'openAssistant',
+          key: rawUrl,
+          rawUrl,
+          source: url.searchParams.get('source') ?? undefined,
         },
       };
     }
