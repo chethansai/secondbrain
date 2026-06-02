@@ -16,6 +16,10 @@ export type AutomationCommand = {
   key: string;
   rawUrl: string;
 } | {
+  type: 'openWorkspace';
+  key: string;
+  rawUrl: string;
+} | {
   type: 'openAssistant';
   key: string;
   rawUrl: string;
@@ -57,6 +61,17 @@ export function parseAutomationDeepLink(rawUrl: string): DeepLinkParseResult {
         ok: true,
         command: {
           type: 'openNoteEditor',
+          key: rawUrl,
+          rawUrl,
+        },
+      };
+    }
+
+    if (action === 'workspace' || action === 'open-workspace') {
+      return {
+        ok: true,
+        command: {
+          type: 'openWorkspace',
           key: rawUrl,
           rawUrl,
         },

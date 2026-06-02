@@ -12,6 +12,8 @@ This post-step Git workflow is mandatory and must not be skipped after any imple
 
 ## history
 
+- 2026-06-02: Routed Android home-button assistant and native overlay assistant action to the workspace/categories board instead of the Assistant tab/add-note editor. Added `nativenotes://workspace` deep-link parsing, reset app navigation to root workspace on that route, and changed the voice-interaction services plus overlay assistant action to use it. Decision: keep `nativenotes://assistant` for the in-app Assistant panel, but make home/overlay entry points open categories as the requested default landing screen.
+
 - 2026-06-02: Fixed Android home-button/default digital assistant eligibility. Root cause: `MainActivity` had `ASSIST`/`VOICE_ASSIST` filters, which made ADB assistant intents work, but Android/Samsung's Digital Assistant picker also requires a bound `VoiceInteractionService`. Added `NativeNotesVoiceInteractionService`, `NativeNotesVoiceInteractionSessionService`, and voice-interaction metadata that launches `nativenotes://assistant?source=home`; installed APK now advertises `android.service.voice.VoiceInteractionService`, while `cmd voiceinteraction show` remains shell-permission blocked on production devices.
 
 - 2026-06-02: Continued Android default assistant integration. Android `ASSIST` and `VOICE_ASSIST` launches now rewrite into `nativenotes://assistant?source=...`, the automation deep-link parser opens an Assistant tab, and workspace/category navigation includes visible Assistant entry points. Decision: reuse `MainActivity` plus the existing deep-link pipeline for the minimal text assistant route instead of adding a separate native `AssistantActivity` in this step.

@@ -7,17 +7,17 @@ import android.service.voice.VoiceInteractionService
 class NativeNotesVoiceInteractionService : VoiceInteractionService() {
   override fun onReady() {
     super.onReady()
-    launchAssistant("ready")
+    launchWorkspace("ready")
   }
 
   override fun onLaunchVoiceAssistFromKeyguard() {
     super.onLaunchVoiceAssistFromKeyguard()
-    launchAssistant("keyguard")
+    launchWorkspace("keyguard")
   }
 
-  private fun launchAssistant(source: String) {
+  private fun launchWorkspace(source: String) {
     val launchIntent = Intent(Intent.ACTION_VIEW).apply {
-      data = Uri.parse("nativenotes://assistant?source=$source")
+      data = Uri.parse("nativenotes://workspace?source=$source")
       setPackage(packageName)
       addCategory(Intent.CATEGORY_BROWSABLE)
       addCategory(Intent.CATEGORY_DEFAULT)

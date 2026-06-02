@@ -506,7 +506,7 @@ class OverlayService : Service() {
   }
 
   private fun openAppAssistant() {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("nativenotes://open-note-editor")).apply {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("nativenotes://workspace?source=overlay")).apply {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     }
     startActivity(intent)

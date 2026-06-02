@@ -16,13 +16,13 @@ class NativeNotesVoiceInteractionSessionService : VoiceInteractionSessionService
 class NativeNotesVoiceInteractionSession(context: Context) : VoiceInteractionSession(context) {
   override fun onShow(args: Bundle?, showFlags: Int) {
     super.onShow(args, showFlags)
-    launchAssistant("home")
+    launchWorkspace("home")
     finish()
   }
 
-  private fun launchAssistant(source: String) {
+  private fun launchWorkspace(source: String) {
     val launchIntent = Intent(Intent.ACTION_VIEW).apply {
-      data = Uri.parse("nativenotes://assistant?source=$source")
+      data = Uri.parse("nativenotes://workspace?source=$source")
       setPackage(context.packageName)
       addCategory(Intent.CATEGORY_BROWSABLE)
       addCategory(Intent.CATEGORY_DEFAULT)

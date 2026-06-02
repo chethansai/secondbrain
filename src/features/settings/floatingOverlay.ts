@@ -38,7 +38,7 @@ export const overlayActionLabels: Record<OverlayAction, string> = {
   none: 'Do nothing',
   openTextInput: 'Open text input',
   openApp: 'Open app',
-  openAppAssistant: 'Open app assistant',
+  openAppAssistant: 'Open categories',
   hideOverlay: 'Hide overlay',
 };
 

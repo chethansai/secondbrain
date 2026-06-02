@@ -116,6 +116,12 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         setTab('workspace');
         setEditorMode('add');
         setEditorPath(path.length ? path : null);
+      } else if (command.type === 'openWorkspace') {
+        setTab('workspace');
+        setPath([]);
+        setEditorMode(null);
+        setEditorPath(null);
+        setSelectedNote(null);
       } else if (command.type === 'openAssistant') {
         setTab('assistant');
       } else {
