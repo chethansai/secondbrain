@@ -412,11 +412,21 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-06-02: Routed Android home-button assistant and native overlay assistant action to the workspace/categories board instead of the Assistant tab/add-note editor. Added `nativenotes://workspace` deep-link parsing, reset app navigation to root workspace on that route, and changed the voice-interaction services plus overlay assistant action to use it. Decision: keep `nativenotes://assistant` for the in-app Assistant panel, but make home/overlay entry points open categories as the requested default landing screen.
+
+- 2026-06-02: Fixed Android home-button/default digital assistant eligibility. Root cause: `MainActivity` had `ASSIST`/`VOICE_ASSIST` filters, which made ADB assistant intents work, but Android/Samsung's Digital Assistant picker also requires a bound `VoiceInteractionService`. Added `NativeNotesVoiceInteractionService`, `NativeNotesVoiceInteractionSessionService`, and voice-interaction metadata that launches `nativenotes://assistant?source=home`; installed APK now advertises `android.service.voice.VoiceInteractionService`, while `cmd voiceinteraction show` remains shell-permission blocked on production devices.
+
+- 2026-06-02: Continued Android default assistant integration. Android `ASSIST` and `VOICE_ASSIST` launches now rewrite into `nativenotes://assistant?source=...`, the automation deep-link parser opens an Assistant tab, and workspace/category navigation includes visible Assistant entry points. Decision: reuse `MainActivity` plus the existing deep-link pipeline for the minimal text assistant route instead of adding a separate native `AssistantActivity` in this step.
+
 - 2026-06-01: Added a local Firestore REST fallback for the Django `/get/notetakingfeatures` bridge so it can run without a Firebase Admin service-account file when public Firestore reads are allowed. Decision: prefer Admin SDK when `FIREBASE_SERVICE_ACCOUNT_PATH`/`GOOGLE_APPLICATION_CREDENTIALS` is set, otherwise read `FIREBASE_PROJECT_ID`/`FIREBASE_API_KEY` from environment or Android local properties for local development.
 
 - 2026-06-01: Added a narrow unauthenticated Django GET bridge for `/get/notetakingfeatures` that reads Firestore `reactnativecollection/main`, extracts the exact root category `NOTETAKING FEATURES`, and returns it as JSON. Decision: keep this endpoint read-only and category-specific, use Firebase Admin server credentials from environment/local service account path, and avoid changing the React Native direct-Firebase sync architecture globally.
 
-- 2026-05-29: Fixed release APK startup crash after fork-safe Firebase config. Expo release bundles require direct `process.env.EXPO_PUBLIC_*` references for inlining, so Firebase config validation now captures direct env references instead of dynamically indexing `process.env` by variable name.
+- 2026-06-02: Began Android default digital assistant integration planning and scaffolding. Added `ASSISTANT_PLAN.md`, created the initial `src/features/assistant` feature boundary, and registered `MainActivity` for Android `ASSIST` and `VOICE_ASSIST` intents with optional microphone capability so the APK can be discovered as an assistant provider.
+
+- 2026-06-01: Fixed subcategory Disclose/Enclose actions on Workspace category cards. Toggle the subcategory itself when performing Disclose/Enclose on a subcategory row, and split the descendant path keys correctly.
+
+- 2026-05-29: Fixed release APK startup crash after fork-safe Firebase config. Expo release bundles require direct `process.env.EXPO_PUBLIC_*` references for inlining, so Firebase config validation now captures direct env references before building the config instead of dynamically indexing `process.env` by variable name.
 
 - 2026-05-29: Externalized Firebase project configuration for fork-safe setup. Expo Firebase config now reads local `EXPO_PUBLIC_FIREBASE_*` environment variables, Android native overlay/widgets read Firestore REST project/key values from Gradle/local environment config, `.firebaserc` is local-only with a committed example, and rules deployment uses the Firebase CLI selected project.
 

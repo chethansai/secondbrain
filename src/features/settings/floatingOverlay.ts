@@ -1,6 +1,6 @@
 import { NativeModules, Platform } from 'react-native';
 
-export type OverlayAction = 'none' | 'openTextInput' | 'openApp' | 'hideOverlay';
+export type OverlayAction = 'none' | 'openTextInput' | 'openApp' | 'openAppAssistant' | 'hideOverlay';
 
 export type FloatingOverlaySettings = {
   opacity: number;
@@ -38,8 +38,11 @@ export const overlayActionLabels: Record<OverlayAction, string> = {
   none: 'Do nothing',
   openTextInput: 'Open text input',
   openApp: 'Open app',
+  openAppAssistant: 'Open categories',
   hideOverlay: 'Hide overlay',
 };
+
+export const overlayTapActions: OverlayAction[] = ['openTextInput', 'openApp', 'openAppAssistant', 'none'];
 
 export const overlayActions = Object.keys(overlayActionLabels) as OverlayAction[];
 

@@ -11,6 +11,19 @@ export type AutomationCommand = {
   key: string;
   rawUrl: string;
   fileUri?: string;
+} | {
+  type: 'openNoteEditor';
+  key: string;
+  rawUrl: string;
+} | {
+  type: 'openWorkspace';
+  key: string;
+  rawUrl: string;
+} | {
+  type: 'openAssistant';
+  key: string;
+  rawUrl: string;
+  source?: string;
 };
 
 export type DeepLinkParseResult =
@@ -39,6 +52,40 @@ export function parseAutomationDeepLink(rawUrl: string): DeepLinkParseResult {
           key: rawUrl,
           rawUrl,
           fileUri,
+        },
+      };
+    }
+
+    if (action === 'open-note-editor') {
+      return {
+        ok: true,
+        command: {
+          type: 'openNoteEditor',
+          key: rawUrl,
+          rawUrl,
+        },
+      };
+    }
+
+    if (action === 'workspace' || action === 'open-workspace') {
+      return {
+        ok: true,
+        command: {
+          type: 'openWorkspace',
+          key: rawUrl,
+          rawUrl,
+        },
+      };
+    }
+
+    if (action === 'assistant') {
+      return {
+        ok: true,
+        command: {
+          type: 'openAssistant',
+          key: rawUrl,
+          rawUrl,
+          source: url.searchParams.get('source') ?? undefined,
         },
       };
     }

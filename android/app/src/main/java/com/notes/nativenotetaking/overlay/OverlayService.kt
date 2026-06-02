@@ -8,6 +8,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
@@ -492,12 +493,20 @@ class OverlayService : Service() {
     when (action) {
       OverlaySettings.ACTION_OPEN_TEXT_INPUT -> showInput()
       OverlaySettings.ACTION_OPEN_APP -> openApp()
+      OverlaySettings.ACTION_OPEN_APP_ASSISTANT -> openAppAssistant()
       OverlaySettings.ACTION_HIDE_OVERLAY -> stopSelf()
     }
   }
 
   private fun openApp() {
     val intent = Intent(this, MainActivity::class.java).apply {
+      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    }
+    startActivity(intent)
+  }
+
+  private fun openAppAssistant() {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("nativenotes://workspace?source=overlay")).apply {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     }
     startActivity(intent)

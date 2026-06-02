@@ -3,12 +3,14 @@ import { ActivityIndicator, Linking, NativeScrollEvent, NativeSyntheticEvent, Sa
 import { AutomationCommand, parseAutomationDeepLink } from './src/features/automation/deepLinks';
 import { clearAutomationFileQueue, ensureDefaultAutomationQueueFile, getDefaultAutomationQueueUri, readAutomationFileQueue, rewriteAutomationFileQueue } from './src/features/automation/fileQueue';
 import { AuthGate } from './src/features/auth/AuthGate';
+import { isFloatingOverlayAvailable, readFloatingOverlaySettings, requestFloatingOverlayPermission, startFloatingOverlay } from './src/features/settings/floatingOverlay';
 import { AiChatPanel } from './src/features/ai/AiChatPanel';
 import { AiNotificationsPanel } from './src/features/ai/AiNotificationsPanel';
 import { AiReviewPanel } from './src/features/ai/AiReviewPanel';
 import { createDecisionFromSuggestion, formatAiReviewRequestError, nextSimpleReviewId, noteFingerprint, requestAiReview } from './src/features/ai/aiReviewService';
 import { AiReviewLedger, SEEK_CATEGORY } from './src/features/ai/aiReviewTypes';
 import { AiWorkspacePanel } from './src/features/ai/AiWorkspacePanel';
+import { AssistantPanel } from './src/features/assistant/AssistantPanel';
 import { CategoryList } from './src/features/categories/CategoryList';
 import { categoryDeleteMessage, copyCategory, createRootCategory, createSubcategory, deleteCategory, getCategoryItems, listAllCategories, listChildCategories, renameCategory, setCategoryPriority, startsWithPath } from './src/features/categories/categoryTree';
 import { TextPromptModal } from './src/features/editor/TextPromptModal';
@@ -33,7 +35,7 @@ import { EmptyState } from './src/shared/ui/EmptyState';
 type ModalMode = 'root' | 'subcategory' | 'rename' | 'workspace' | 'renameWorkspace' | null;
 type MoveCopyAction = 'move' | 'copy';
 type MoveCopyTarget = { type: 'note'; note: FlatNote } | { type: 'category'; path: CategoryPath } | null;
-type Tab = 'workspace' | 'search' | 'settings' | 'aiChat' | 'ai' | 'aiWorkspace' | 'aiNotifications';
+type Tab = 'workspace' | 'search' | 'settings' | 'aiChat' | 'ai' | 'aiWorkspace' | 'aiNotifications' | 'assistant';
 type DeleteTarget = { type: 'category'; path: CategoryPath } | { type: 'note'; note: FlatNote } | null;
 
 export default function App() {
@@ -93,6 +95,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const runningAiReviewFingerprints = useRef(new Set<string>());
 
   const currentItems = path.length ? getCategoryItems(data, path) : null;
+  const overlayAvailable = isFloatingOverlayAvailable();
   const childCategories = useMemo(() => (currentItems ? listChildCategories(currentItems, path) : []), [currentItems, path]);
   const detailCategories = useMemo(() => listAllCategories(data).filter((category) => startsWithPath(category.path, path) && category.path.length > path.length), [data, path]);
   const expandableDetailKeys = useMemo(() => detailCategories.filter((category) => category.childCount > 0).map((category) => category.path.join('')), [detailCategories]);
@@ -109,6 +112,18 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     async function runAutomationCommand(command: AutomationCommand) {
       if (command.type === 'importFile') {
         await drainAutomationFileQueue(command.fileUri);
+      } else if (command.type === 'openNoteEditor') {
+        setTab('workspace');
+        setEditorMode('add');
+        setEditorPath(path.length ? path : null);
+      } else if (command.type === 'openWorkspace') {
+        setTab('workspace');
+        setPath([]);
+        setEditorMode(null);
+        setEditorPath(null);
+        setSelectedNote(null);
+      } else if (command.type === 'openAssistant') {
+        setTab('assistant');
       } else {
         const result = addNote(data, command.categoryPath, command.note);
         const historyText = formatAddedNoteHistory(command.note, command.categoryPath);
@@ -157,6 +172,28 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     const ok = await commit(appendHistoryNote(result.data, historyText));
     if (ok) await includeWorkspaceCategory(HISTORY_CATEGORY);
     return ok;
+  }
+
+  async function startFloatingIcon() {
+    try {
+      const settings = await readFloatingOverlaySettings();
+      if (!settings.permissionGranted) {
+        const granted = await requestFloatingOverlayPermission();
+        if (!granted) {
+          setError('Allow display over other apps, then return and start the floating icon.');
+          return false;
+        }
+      }
+      const started = await startFloatingOverlay();
+      if (!started) {
+        setError('Floating icon could not start.');
+        return false;
+      }
+      return true;
+    } catch (overlayError) {
+      setError(overlayError instanceof Error ? overlayError.message : 'Floating icon could not start.');
+      return false;
+    }
   }
 
   async function submitPrompt(value: string) {
@@ -546,11 +583,14 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onOpenSearch={() => setTab('search')}
                   onOpenSettings={() => setTab('settings')}
                   onOpenAiChat={() => setTab('aiChat')}
+                  onOpenAssistant={() => setTab('assistant')}
                   onOpenAiNotifications={() => setTab('aiNotifications')}
                   onOpenAi={() => setTab('ai')}
                   onOpenAiWorkspace={() => setTab('aiWorkspace')}
                   onAuthTimeoutChange={onAuthTimeoutChange}
                   onLogout={onLogout}
+                  onStartFloatingIcon={startFloatingIcon}
+                  overlayAvailable={overlayAvailable}
                   onOpenCategory={setPath}
                   onCreateRootCategory={() => setPromptMode('root')}
                   onToggleCategory={toggleWorkspaceCategory}
@@ -580,6 +620,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     onOpenSearch={() => setTab('search')}
                     onOpenSettings={() => setTab('settings')}
                     onOpenAiChat={() => setTab('aiChat')}
+                    onOpenAssistant={() => setTab('assistant')}
                     onOpenAiNotifications={() => setTab('aiNotifications')}
                     onOpenAi={() => setTab('ai')}
                     onOpenAiWorkspace={() => setTab('aiWorkspace')}
@@ -661,6 +702,12 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
             <View style={styles.sectionStack}>
               <PanelHeader title="AI WORKSPACE" onBack={() => setTab('workspace')} />
               <AiWorkspacePanel />
+            </View>
+          ) : null}
+          {!loading && tab === 'assistant' ? (
+            <View style={styles.sectionStack}>
+              <PanelHeader title="Assistant" onBack={() => setTab('workspace')} />
+              <AssistantPanel />
             </View>
           ) : null}
         </View>

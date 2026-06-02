@@ -10,7 +10,7 @@ import { authTimeoutOptions, formatAuthTimeout } from '../auth/authSession';
 import { cloneItems, isCategoryNode } from '../categories/categoryTree';
 import { validateNotesData } from '../sync/validation';
 import { copyText } from './clipboard';
-import { isFloatingOverlayAvailable, readFloatingOverlaySettings, requestFloatingOverlayPermission, resetFloatingOverlayPlacement, startFloatingOverlay, stopFloatingOverlay, updateFloatingOverlaySettings } from './floatingOverlay';
+import { overlayActionLabels, overlayTapActions, isFloatingOverlayAvailable, readFloatingOverlaySettings, requestFloatingOverlayPermission, resetFloatingOverlayPlacement, startFloatingOverlay, stopFloatingOverlay, updateFloatingOverlaySettings } from './floatingOverlay';
 
 type Props = {
   data: NotesData;
@@ -28,6 +28,8 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
   const [overlayPermissionGranted, setOverlayPermissionGranted] = useState(false);
   const [overlayOpacity, setOverlayOpacity] = useState(0.86);
   const [overlaySize, setOverlaySize] = useState(58);
+  const [overlayTapAction, setOverlayTapAction] = useState<keyof typeof overlayActionLabels>('openTextInput');
+  const [overlayTapMenuOpen, setOverlayTapMenuOpen] = useState(false);
   const [overlaySaving, setOverlaySaving] = useState(false);
   const overlayAvailable = isFloatingOverlayAvailable();
 
@@ -69,6 +71,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
     if (settings) {
       setOverlayOpacity(settings.opacity);
       setOverlaySize(settings.size);
+      setOverlayTapAction(settings.tapAction);
     }
   }
 
@@ -172,6 +175,37 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
           </View>
           <LineControl label="Transparency" value={overlayOpacity} min={0.25} max={1} formatter={(value) => `${Math.round(value * 100)}%`} disabled={!overlayAvailable} colors={colors} styles={styles} onChange={changeOverlayOpacity} />
           <LineControl label="Size" value={overlaySize} min={42} max={86} formatter={(value) => `${Math.round(value)}px`} disabled={!overlayAvailable} colors={colors} styles={styles} onChange={changeOverlaySize} />
+          <Text style={styles.settingLabel}>Tap action</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Choose floating icon tap action"
+            onPress={() => overlayAvailable && setOverlayTapMenuOpen((current) => !current)}
+            disabled={!overlayAvailable}
+            style={[styles.dropdownButton, !overlayAvailable && styles.dropdownButtonDisabled]}
+          >
+            <Text style={styles.dropdownValue}>{overlayActionLabels[overlayTapAction]}</Text>
+            <Icon name="chevron-down" size={16} color={colors.ink} />
+          </Pressable>
+          {overlayTapMenuOpen ? (
+            <View style={styles.dropdownMenu}>
+              {overlayTapActions.map((action) => (
+                <Pressable
+                  key={action}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Set floating icon tap action to ${overlayActionLabels[action]}`}
+                  onPress={async () => {
+                    setOverlayTapAction(action);
+                    setOverlayTapMenuOpen(false);
+                    await updateFloatingOverlaySettings({ tapAction: action }).catch(() => undefined);
+                  }}
+                  style={[styles.dropdownOption, action === overlayTapAction && styles.dropdownOptionSelected]}
+                >
+                  <Text style={[styles.dropdownOptionText, action === overlayTapAction && styles.dropdownOptionTextSelected]}>{overlayActionLabels[action]}</Text>
+                  {action === overlayTapAction ? <Icon name="checkmark" size={16} color={colors.onPrimary} /> : null}
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           <View style={styles.buttonRow}>
             <Button label={overlayPermissionGranted ? 'Start floating icon' : 'Allow permission'} icon="pin-outline" onPress={enableFloatingIcon} disabled={overlaySaving || !overlayAvailable} style={styles.rowButton} />
             <Button label="Stop" icon="close" variant="secondary" onPress={stopFloatingIcon} disabled={overlaySaving || !overlayAvailable} style={styles.rowButton} />
@@ -283,6 +317,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   rowButton: { flex: 1, minWidth: 130 },
   dropdownButton: { minHeight: 44, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  dropdownButtonDisabled: { opacity: 0.55 },
   dropdownValue: { ...typography.body, color: colors.ink, flex: 1 },
   dropdownMenu: { borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, overflow: 'hidden' },
   dropdownOption: { minHeight: 42, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft },

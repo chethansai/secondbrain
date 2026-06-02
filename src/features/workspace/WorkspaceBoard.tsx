@@ -31,11 +31,14 @@ type Props = {
   onOpenSearch: () => void;
   onOpenSettings: () => void;
   onOpenAiChat: () => void;
+  onOpenAssistant: () => void;
   onOpenAiNotifications: () => void;
   onOpenAi: () => void;
   onOpenAiWorkspace: () => void;
   onAuthTimeoutChange: (hours: number) => Promise<void> | void;
   onLogout: () => void;
+  onStartFloatingIcon: () => Promise<boolean> | boolean;
+  overlayAvailable: boolean;
   onOpenCategory: (path: CategoryPath) => void;
   onCreateRootCategory: () => void;
   onToggleCategory: (path: CategoryPath) => void;
@@ -74,11 +77,14 @@ export function WorkspaceBoard({
   onOpenSearch,
   onOpenSettings,
   onOpenAiChat,
+  onOpenAssistant,
   onOpenAiNotifications,
   onOpenAi,
   onOpenAiWorkspace,
   onAuthTimeoutChange,
   onLogout,
+  onStartFloatingIcon,
+  overlayAvailable,
   onOpenCategory,
   onCreateRootCategory,
   onToggleCategory,
@@ -201,6 +207,9 @@ export function WorkspaceBoard({
             </Pressable>
           </View>
           <View style={styles.floatingMenuWrap}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Start floating icon" onPress={onStartFloatingIcon} style={[styles.reloadButton, !overlayAvailable && styles.reloadButtonDisabled]} disabled={!overlayAvailable}>
+              <Icon name="pin-outline" size={17} color={overlayAvailable ? colors.ink : colors.stone} />
+            </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Reload recent data" disabled={refreshing} onPress={reloadRecentData} style={[styles.reloadButton, refreshing && styles.reloadButtonDisabled]}>
               <Icon name="reload-outline" size={17} color={refreshing ? colors.stone : colors.ink} />
             </Pressable>
@@ -238,6 +247,11 @@ export function WorkspaceBoard({
                 <Pressable accessibilityRole="button" accessibilityLabel="Open AI chat" onPress={() => { closeHeaderMenus(); onOpenAiChat(); }} style={styles.headerMenuRow}>
                   <View style={styles.headerMenuRowIcon}><Icon name="sparkles-outline" size={16} color={colors.ink} /></View>
                   <Text style={styles.headerMenuRowText} numberOfLines={1}>AI Chat</Text>
+                </Pressable>
+
+                <Pressable accessibilityRole="button" accessibilityLabel="Open Assistant" onPress={() => { closeHeaderMenus(); onOpenAssistant(); }} style={styles.headerMenuRow}>
+                  <View style={styles.headerMenuRowIcon}><Icon name="document-text-outline" size={16} color={colors.ink} /></View>
+                  <Text style={styles.headerMenuRowText} numberOfLines={1}>Assistant</Text>
                 </Pressable>
 
                 <Pressable accessibilityRole="button" accessibilityLabel="Open AI notifications" onPress={() => { closeHeaderMenus(); onOpenAiNotifications(); }} style={styles.headerMenuRow}>
