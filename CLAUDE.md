@@ -416,7 +416,11 @@ Minimum behavior matrix to consider when touching core flows:
 
 - 2026-06-01: Added a narrow unauthenticated Django GET bridge for `/get/notetakingfeatures` that reads Firestore `reactnativecollection/main`, extracts the exact root category `NOTETAKING FEATURES`, and returns it as JSON. Decision: keep this endpoint read-only and category-specific, use Firebase Admin server credentials from environment/local service account path, and avoid changing the React Native direct-Firebase sync architecture globally.
 
-- 2026-05-29: Fixed release APK startup crash after fork-safe Firebase config. Expo release bundles require direct `process.env.EXPO_PUBLIC_*` references for inlining, so Firebase config validation now captures direct env references instead of dynamically indexing `process.env` by variable name.
+- 2026-06-02: Began Android default digital assistant integration planning and scaffolding. Added `ASSISTANT_PLAN.md`, created the initial `src/features/assistant` feature boundary, and registered `MainActivity` for Android `ASSIST` and `VOICE_ASSIST` intents with optional microphone capability so the APK can be discovered as an assistant provider.
+
+- 2026-06-01: Fixed subcategory Disclose/Enclose actions on Workspace category cards. Toggle the subcategory itself when performing Disclose/Enclose on a subcategory row, and split the descendant path keys correctly.
+
+- 2026-05-29: Fixed release APK startup crash after fork-safe Firebase config. Expo release bundles require direct `process.env.EXPO_PUBLIC_*` references for inlining, so Firebase config validation now captures direct env references before building the config instead of dynamically indexing `process.env` by variable name.
 
 - 2026-05-29: Externalized Firebase project configuration for fork-safe setup. Expo Firebase config now reads local `EXPO_PUBLIC_FIREBASE_*` environment variables, Android native overlay/widgets read Firestore REST project/key values from Gradle/local environment config, `.firebaserc` is local-only with a committed example, and rules deployment uses the Firebase CLI selected project.
 

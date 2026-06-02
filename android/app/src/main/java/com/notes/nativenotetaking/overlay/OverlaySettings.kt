@@ -6,6 +6,7 @@ object OverlaySettings {
   const val ACTION_NONE = "none"
   const val ACTION_OPEN_TEXT_INPUT = "openTextInput"
   const val ACTION_OPEN_APP = "openApp"
+  const val ACTION_OPEN_APP_ASSISTANT = "openAppAssistant"
   const val ACTION_HIDE_OVERLAY = "hideOverlay"
 
   private const val prefsName = "rnnotetaking.overlay.settings"
@@ -69,7 +70,7 @@ object OverlaySettings {
 
   fun normalizeAction(value: String?): String {
     return when (value) {
-      ACTION_OPEN_TEXT_INPUT, ACTION_OPEN_APP, ACTION_HIDE_OVERLAY, ACTION_NONE -> value
+      ACTION_OPEN_TEXT_INPUT, ACTION_OPEN_APP, ACTION_OPEN_APP_ASSISTANT, ACTION_HIDE_OVERLAY, ACTION_NONE -> value
       else -> ACTION_NONE
     }
   }

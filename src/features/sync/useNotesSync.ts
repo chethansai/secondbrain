@@ -21,34 +21,79 @@ export function useNotesSync() {
   const activeWorkspace = workspaceIndex.workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaceIndex.workspaces[0] ?? null;
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapWorkspaceIndex() {
+      try {
+        const snapshot = await readLocalWorkspaceIndex();
+        if (cancelled) return;
+        setWorkspaceIndex(snapshot);
+        setWorkspaceLoading(false);
+        setLocalMode(true);
+        setError(null);
+      } catch {
+        if (cancelled) return;
+        setWorkspaceLoading(false);
+      }
+    }
+
+    bootstrapWorkspaceIndex();
+
     const unsubscribe = subscribeToWorkspaceIndex(
       (snapshot) => {
+        if (cancelled) return;
         setWorkspaceIndex(snapshot);
         setWorkspaceLoading(false);
         setError(null);
         writeLocalWorkspaceIndex(snapshot).catch(() => undefined);
+        setLocalMode(false);
       },
       async () => {
+        if (cancelled) return;
         const snapshot = await readLocalWorkspaceIndex();
         setWorkspaceIndex(snapshot);
         setWorkspaceLoading(false);
         setLocalMode(true);
       },
     );
-    return unsubscribe;
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
+
+    async function bootstrapWorkspaceNotes() {
+      try {
+        const snapshot = await readLocalWorkspaceNotes(defaultWorkspaceId);
+        if (cancelled) return;
+        setData(snapshot.data);
+        setLoading(false);
+        setError(null);
+        setLocalMode(true);
+      } catch {
+        if (cancelled) return;
+        setLoading(false);
+      }
+    }
+
+    bootstrapWorkspaceNotes();
+
     const unsubscribe = subscribeToWorkspaceNotes(
       defaultWorkspaceId,
       (snapshot) => {
+        if (cancelled) return;
         setData(snapshot.data);
         setLoading(false);
         setError(null);
         setLocalMode(false);
+        writeLocalWorkspaceNotes(defaultWorkspaceId, snapshot.data).catch(() => undefined);
       },
       async () => {
+        if (cancelled) return;
         const snapshot = await readLocalWorkspaceNotes(defaultWorkspaceId);
         setData(snapshot.data);
         setLocalMode(true);
@@ -56,7 +101,11 @@ export function useNotesSync() {
         setLoading(false);
       },
     );
-    return unsubscribe;
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   const persistWorkspaceIndex = useCallback(async (index: WorkspaceIndex) => {

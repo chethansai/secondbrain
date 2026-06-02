@@ -3,6 +3,7 @@ import { ActivityIndicator, Linking, NativeScrollEvent, NativeSyntheticEvent, Sa
 import { AutomationCommand, parseAutomationDeepLink } from './src/features/automation/deepLinks';
 import { clearAutomationFileQueue, ensureDefaultAutomationQueueFile, getDefaultAutomationQueueUri, readAutomationFileQueue, rewriteAutomationFileQueue } from './src/features/automation/fileQueue';
 import { AuthGate } from './src/features/auth/AuthGate';
+import { isFloatingOverlayAvailable, readFloatingOverlaySettings, requestFloatingOverlayPermission, startFloatingOverlay } from './src/features/settings/floatingOverlay';
 import { AiChatPanel } from './src/features/ai/AiChatPanel';
 import { AiNotificationsPanel } from './src/features/ai/AiNotificationsPanel';
 import { AiReviewPanel } from './src/features/ai/AiReviewPanel';
@@ -93,6 +94,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const runningAiReviewFingerprints = useRef(new Set<string>());
 
   const currentItems = path.length ? getCategoryItems(data, path) : null;
+  const overlayAvailable = isFloatingOverlayAvailable();
   const childCategories = useMemo(() => (currentItems ? listChildCategories(currentItems, path) : []), [currentItems, path]);
   const detailCategories = useMemo(() => listAllCategories(data).filter((category) => startsWithPath(category.path, path) && category.path.length > path.length), [data, path]);
   const expandableDetailKeys = useMemo(() => detailCategories.filter((category) => category.childCount > 0).map((category) => category.path.join('')), [detailCategories]);
@@ -109,6 +111,10 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     async function runAutomationCommand(command: AutomationCommand) {
       if (command.type === 'importFile') {
         await drainAutomationFileQueue(command.fileUri);
+      } else if (command.type === 'openNoteEditor') {
+        setTab('workspace');
+        setEditorMode('add');
+        setEditorPath(path.length ? path : null);
       } else {
         const result = addNote(data, command.categoryPath, command.note);
         const historyText = formatAddedNoteHistory(command.note, command.categoryPath);
@@ -157,6 +163,28 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     const ok = await commit(appendHistoryNote(result.data, historyText));
     if (ok) await includeWorkspaceCategory(HISTORY_CATEGORY);
     return ok;
+  }
+
+  async function startFloatingIcon() {
+    try {
+      const settings = await readFloatingOverlaySettings();
+      if (!settings.permissionGranted) {
+        const granted = await requestFloatingOverlayPermission();
+        if (!granted) {
+          setError('Allow display over other apps, then return and start the floating icon.');
+          return false;
+        }
+      }
+      const started = await startFloatingOverlay();
+      if (!started) {
+        setError('Floating icon could not start.');
+        return false;
+      }
+      return true;
+    } catch (overlayError) {
+      setError(overlayError instanceof Error ? overlayError.message : 'Floating icon could not start.');
+      return false;
+    }
   }
 
   async function submitPrompt(value: string) {
@@ -551,6 +579,8 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onOpenAiWorkspace={() => setTab('aiWorkspace')}
                   onAuthTimeoutChange={onAuthTimeoutChange}
                   onLogout={onLogout}
+                  onStartFloatingIcon={startFloatingIcon}
+                  overlayAvailable={overlayAvailable}
                   onOpenCategory={setPath}
                   onCreateRootCategory={() => setPromptMode('root')}
                   onToggleCategory={toggleWorkspaceCategory}

@@ -398,9 +398,14 @@ function WorkspaceSubcategoryRow({ category, depth, itemCount, currentOrder, sta
   }
 
   function setDescendantsExpanded(expanded: boolean) {
+    const selfKey = pathKey(category.path);
+    const selfExpanded = expandedCategoryKeys.has(selfKey);
+    if (expanded !== selfExpanded) {
+      onToggleCategory(category.path);
+    }
     expandableDescendantKeys.forEach((key) => {
       const isExpanded = expandedCategoryKeys.has(key);
-      if (expanded !== isExpanded) onToggleCategory(key.split(''));
+      if (expanded !== isExpanded) onToggleCategory(key.split('\u001f'));
     });
     setActionsOpen(false);
   }

@@ -314,6 +314,8 @@ export function AiWorkspacePanel() {
           onOpenAiWorkspace={() => undefined}
           onAuthTimeoutChange={() => undefined}
           onLogout={() => undefined}
+          onStartFloatingIcon={() => false}
+          overlayAvailable={false}
           onOpenCategory={setPath}
           onCreateRootCategory={() => setPromptMode('root')}
           onToggleCategory={toggleWorkspaceCategory}

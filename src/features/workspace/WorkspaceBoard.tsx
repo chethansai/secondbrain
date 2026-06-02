@@ -36,6 +36,8 @@ type Props = {
   onOpenAiWorkspace: () => void;
   onAuthTimeoutChange: (hours: number) => Promise<void> | void;
   onLogout: () => void;
+  onStartFloatingIcon: () => Promise<boolean> | boolean;
+  overlayAvailable: boolean;
   onOpenCategory: (path: CategoryPath) => void;
   onCreateRootCategory: () => void;
   onToggleCategory: (path: CategoryPath) => void;
@@ -79,6 +81,8 @@ export function WorkspaceBoard({
   onOpenAiWorkspace,
   onAuthTimeoutChange,
   onLogout,
+  onStartFloatingIcon,
+  overlayAvailable,
   onOpenCategory,
   onCreateRootCategory,
   onToggleCategory,
@@ -201,6 +205,9 @@ export function WorkspaceBoard({
             </Pressable>
           </View>
           <View style={styles.floatingMenuWrap}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Start floating icon" onPress={onStartFloatingIcon} style={[styles.reloadButton, !overlayAvailable && styles.reloadButtonDisabled]} disabled={!overlayAvailable}>
+              <Icon name="pin-outline" size={17} color={overlayAvailable ? colors.ink : colors.stone} />
+            </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Reload recent data" disabled={refreshing} onPress={reloadRecentData} style={[styles.reloadButton, refreshing && styles.reloadButtonDisabled]}>
               <Icon name="reload-outline" size={17} color={refreshing ? colors.stone : colors.ink} />
             </Pressable>

@@ -11,6 +11,10 @@ export type AutomationCommand = {
   key: string;
   rawUrl: string;
   fileUri?: string;
+} | {
+  type: 'openNoteEditor';
+  key: string;
+  rawUrl: string;
 };
 
 export type DeepLinkParseResult =
@@ -39,6 +43,17 @@ export function parseAutomationDeepLink(rawUrl: string): DeepLinkParseResult {
           key: rawUrl,
           rawUrl,
           fileUri,
+        },
+      };
+    }
+
+    if (action === 'open-note-editor') {
+      return {
+        ok: true,
+        command: {
+          type: 'openNoteEditor',
+          key: rawUrl,
+          rawUrl,
         },
       };
     }
