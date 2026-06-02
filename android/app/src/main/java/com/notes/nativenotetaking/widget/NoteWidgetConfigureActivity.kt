@@ -30,13 +30,15 @@ class NoteWidgetConfigureActivity : Activity() {
   private lateinit var categoryList: LinearLayout
   private var categories: List<OverlayNotesStore.CategoryPath> = emptyList()
   private var initialCategoryPath: List<String>? = null
+  private var quickNoteMode = false
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setResult(RESULT_CANCELED)
+    quickNoteMode = intent?.getBooleanExtra(quickNoteExtra, false) == true
     appWidgetId = intent?.extras?.getInt(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
       ?: AppWidgetManager.INVALID_APPWIDGET_ID
-    if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+    if (!quickNoteMode && appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
       finish()
       return
     }
@@ -86,7 +88,7 @@ class NoteWidgetConfigureActivity : Activity() {
       orientation = LinearLayout.VERTICAL
       setPadding(dp(16), dp(14), dp(16), dp(14))
       addView(TextView(this@NoteWidgetConfigureActivity).apply {
-        text = "Native Notes widget"
+        text = if (quickNoteMode) "Native Notes quick add" else "Native Notes widget"
         textSize = 18f
         setTextColor(0xff1a1a1a.toInt())
       }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
@@ -225,7 +227,9 @@ class NoteWidgetConfigureActivity : Activity() {
     Thread {
       try {
         notesStore.appendNote(path, note)
-        NoteWidgetProvider.saveCategory(this, appWidgetId, path)
+        if (!quickNoteMode && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+          NoteWidgetProvider.saveCategory(this, appWidgetId, path)
+        }
         Handler(Looper.getMainLooper()).post {
           copyNoteToClipboard(note)
           updateWidgetAndFinish()
@@ -241,6 +245,11 @@ class NoteWidgetConfigureActivity : Activity() {
   }
 
   private fun updateWidgetAndFinish() {
+    if (quickNoteMode || appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+      setResult(RESULT_OK)
+      finish()
+      return
+    }
     val appWidgetManager = AppWidgetManager.getInstance(this)
     if (intent?.getBooleanExtra(workspaceWidgetExtra, false) == true) {
       WorkspaceWidgetProvider.updateWidget(this, appWidgetManager, appWidgetId)
@@ -278,5 +287,6 @@ class NoteWidgetConfigureActivity : Activity() {
   companion object {
     const val initialPathExtra = "com.notes.nativenotetaking.widget.INITIAL_PATH"
     const val workspaceWidgetExtra = "com.notes.nativenotetaking.widget.WORKSPACE_WIDGET"
+    const val quickNoteExtra = "com.notes.nativenotetaking.widget.QUICK_NOTE"
   }
 }
