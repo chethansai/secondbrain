@@ -1,9 +1,9 @@
 package com.notes.nativenotetaking
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import com.notes.nativenotetaking.widget.NoteWidgetConfigureActivity
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -57,10 +57,12 @@ class MainActivity : ReactActivity() {
       else -> return
     }
 
-    currentIntent.action = Intent.ACTION_VIEW
-    currentIntent.data = Uri.parse("nativenotes://assistant?source=$source")
-    currentIntent.addCategory(Intent.CATEGORY_BROWSABLE)
-    currentIntent.addCategory(Intent.CATEGORY_DEFAULT)
+    val quickNoteIntent = Intent(this, NoteWidgetConfigureActivity::class.java).apply {
+      putExtra(NoteWidgetConfigureActivity.quickNoteExtra, true)
+      putExtra("source", source)
+      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    }
+    startActivity(quickNoteIntent)
   }
 
   /**

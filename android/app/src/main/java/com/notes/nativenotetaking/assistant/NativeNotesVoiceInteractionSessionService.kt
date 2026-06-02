@@ -2,10 +2,10 @@ package com.notes.nativenotetaking.assistant
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
 import android.service.voice.VoiceInteractionSessionService
+import com.notes.nativenotetaking.widget.NoteWidgetConfigureActivity
 
 class NativeNotesVoiceInteractionSessionService : VoiceInteractionSessionService() {
   override fun onNewSession(args: Bundle?): VoiceInteractionSession {
@@ -21,11 +21,9 @@ class NativeNotesVoiceInteractionSession(context: Context) : VoiceInteractionSes
   }
 
   private fun launchWorkspace(source: String) {
-    val launchIntent = Intent(Intent.ACTION_VIEW).apply {
-      data = Uri.parse("nativenotes://workspace?source=$source")
-      setPackage(context.packageName)
-      addCategory(Intent.CATEGORY_BROWSABLE)
-      addCategory(Intent.CATEGORY_DEFAULT)
+    val launchIntent = Intent(context, NoteWidgetConfigureActivity::class.java).apply {
+      putExtra(NoteWidgetConfigureActivity.quickNoteExtra, true)
+      putExtra("source", source)
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     }
     context.startActivity(launchIntent)

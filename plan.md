@@ -12,6 +12,8 @@ This post-step Git workflow is mandatory and must not be skipped after any imple
 
 ## history
 
+- 2026-06-02: Implemented permission-free Android home-gesture quick note entry. Reused `NoteWidgetConfigureActivity` in a new quick-note mode that does not require an app widget id, saves notes through the existing native Firestore append path, and closes after save. Routed `VoiceInteractionService`, `VoiceInteractionSessionService`, and fallback `ASSIST`/`VOICE_ASSIST` activity launches to this quick-note UI instead of relying on an over-other-apps floating overlay.
+
 - 2026-06-02: Routed Android home-button assistant and native overlay assistant action to the workspace/categories board instead of the Assistant tab/add-note editor. Added `nativenotes://workspace` deep-link parsing, reset app navigation to root workspace on that route, and changed the voice-interaction services plus overlay assistant action to use it. Decision: keep `nativenotes://assistant` for the in-app Assistant panel, but make home/overlay entry points open categories as the requested default landing screen.
 
 - 2026-06-02: Fixed Android home-button/default digital assistant eligibility. Root cause: `MainActivity` had `ASSIST`/`VOICE_ASSIST` filters, which made ADB assistant intents work, but Android/Samsung's Digital Assistant picker also requires a bound `VoiceInteractionService`. Added `NativeNotesVoiceInteractionService`, `NativeNotesVoiceInteractionSessionService`, and voice-interaction metadata that launches `nativenotes://assistant?source=home`; installed APK now advertises `android.service.voice.VoiceInteractionService`, while `cmd voiceinteraction show` remains shell-permission blocked on production devices.
