@@ -12,6 +12,8 @@ This post-step Git workflow is mandatory and must not be skipped after any imple
 
 ## history
 
+- 2026-06-02: Fixed Android home-button/default digital assistant eligibility. Root cause: `MainActivity` had `ASSIST`/`VOICE_ASSIST` filters, which made ADB assistant intents work, but Android/Samsung's Digital Assistant picker also requires a bound `VoiceInteractionService`. Added `NativeNotesVoiceInteractionService`, `NativeNotesVoiceInteractionSessionService`, and voice-interaction metadata that launches `nativenotes://assistant?source=home`; installed APK now advertises `android.service.voice.VoiceInteractionService`, while `cmd voiceinteraction show` remains shell-permission blocked on production devices.
+
 - 2026-06-02: Continued Android default assistant integration. Android `ASSIST` and `VOICE_ASSIST` launches now rewrite into `nativenotes://assistant?source=...`, the automation deep-link parser opens an Assistant tab, and workspace/category navigation includes visible Assistant entry points. Decision: reuse `MainActivity` plus the existing deep-link pipeline for the minimal text assistant route instead of adding a separate native `AssistantActivity` in this step.
 
 - 2026-06-02: Began Android default digital assistant integration planning and scaffolding. Added `ASSISTANT_PLAN.md`, created the initial `src/features/assistant` feature boundary, and registered `MainActivity` for Android `ASSIST` and `VOICE_ASSIST` intents with optional microphone capability so the APK can be discovered as an assistant provider.

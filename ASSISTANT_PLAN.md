@@ -373,6 +373,7 @@ This document outlines how to integrate Android Assistant capabilities into Nati
 **Integration Checklist**:
 - [x] `MainActivity` routes Android assistant gestures into the assistant panel
 - [x] Intent filters registered in manifest
+- [x] `VoiceInteractionService` registered for Android Digital Assistant picker/home button eligibility
 - [x] Deep links unified with assistant routes
 - [ ] Voice input → LLM → voice output (if enabled)
 - [ ] Overlay service starts/stops cleanly
@@ -426,7 +427,9 @@ src/features/assistant/
 ### Android Manifest Entries
 ```
 android/app/src/main/AndroidManifest.xml
-├── <activity android:name=".AssistantActivity" />        # Phase 2
+├── <activity android:name=".MainActivity" />             # Phase 2 assist/deep-link route
+├── <service android:name=".assistant.NativeNotesVoiceInteractionService" /> # Digital Assistant picker/home button
+├── <service android:name=".assistant.NativeNotesVoiceInteractionSessionService" />
 ├── <service android:name=".VoiceInputService" />         # Phase 3
 ├── <service android:name=".TextToSpeechService" />       # Phase 3
 ├── <service android:name=".OverlayService" />            # Phase 5

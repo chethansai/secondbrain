@@ -11,6 +11,9 @@
   <uses-feature android:name="android.hardware.microphone" android:required="false"/>
   <queries>
     <intent>
+      <action android:name="android.service.voice.VoiceInteractionService"/>
+    </intent>
+    <intent>
       <action android:name="android.intent.action.VIEW"/>
       <category android:name="android.intent.category.BROWSABLE"/>
       <data android:scheme="https"/>
@@ -41,6 +44,13 @@
         <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>
     </activity>
+    <service android:name=".assistant.NativeNotesVoiceInteractionService" android:permission="android.permission.BIND_VOICE_INTERACTION" android:exported="true">
+      <meta-data android:name="android.voice_interaction" android:resource="@xml/native_notes_voice_interaction_service"/>
+      <intent-filter>
+        <action android:name="android.service.voice.VoiceInteractionService"/>
+      </intent-filter>
+    </service>
+    <service android:name=".assistant.NativeNotesVoiceInteractionSessionService" android:permission="android.permission.BIND_VOICE_INTERACTION" android:exported="true"/>
     <service android:name=".ainotifications.AiNotificationHeadlessService" android:exported="false"/>
     <service android:name=".overlay.OverlayService" android:exported="false" android:foregroundServiceType="specialUse">
       <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Floating note icon"/>
