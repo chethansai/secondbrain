@@ -12,6 +12,8 @@ This post-step Git workflow is mandatory and must not be skipped after any imple
 
 ## history
 
+- 2026-06-03: Fixed purple note ordering behavior so tapping one purple note-order button selects the source note and tapping a second note-order button moves the first note directly below the second note. Kept drag-to-reorder available with shared displacement math for smoother neighboring note movement, applied the behavior to main notes, workspace preview notes, and expanded subcategory preview notes, and extracted `WorkspaceSubcategoryRow` so the touched workspace card file is back under the 600-line source limit.
+
 - 2026-06-03: Added an in-app notes teleprompter bar below the OS status bar so phone time and battery remain untouched. The app now flattens the main notes JSON, skips generated HISTORY notes, and automatically scrolls category-labeled note snippets across the top app bar using a feature-owned React Native animated component.
 
 - 2026-06-03: Reduced logged-in workspace startup loading by adding a combined AsyncStorage workspace snapshot cache containing the latest notes JSON and workspace metadata. Cached sessions now render the previous offline workspace immediately, then Firestore listener updates refresh the UI seamlessly through the existing reloading state while first installs without cache still wait for initial data.

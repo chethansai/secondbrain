@@ -412,6 +412,8 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-06-03: Fixed purple note ordering buttons. First tap selects the source note; second tap moves that note below the tapped target note. Kept drag reorder, shared the displacement/order math across main and workspace note previews, applied it to expanded subcategories, and extracted `WorkspaceSubcategoryRow` so touched source files stay under 600 lines.
+
 - 2026-06-03: Added an in-app notes teleprompter bar below the OS status bar. It flattens the notes JSON, skips generated HISTORY notes, and auto-scrolls category-labeled note snippets across the app top chrome without covering time or battery.
 
 - 2026-06-03: Reduced logged-in workspace startup loading with a combined AsyncStorage workspace snapshot cache for notes JSON plus workspace metadata. Cached sessions render immediately from the previous offline snapshot, then Firestore refreshes replace it through the existing reloading state; first installs without cache still wait for initial data.
