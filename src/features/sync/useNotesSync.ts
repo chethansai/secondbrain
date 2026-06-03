@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CategoryPath, NotesData, MutationResult, PinnedNoteRef, WorkspaceIndex } from '../../shared/types/notes';
-import { readLocalWorkspaceIndex, readLocalWorkspaceNotes, writeLocalWorkspaceIndex, writeLocalWorkspaceNotes } from './localNotesRepository';
+import { readLocalWorkspaceIndex, readLocalWorkspaceNotes, readLocalWorkspaceSnapshot, writeLocalWorkspaceIndex, writeLocalWorkspaceNotes, writeLocalWorkspaceSnapshot } from './localNotesRepository';
 import { createWorkspaceMeta, defaultWorkspaceId, readLatestWorkspaceIndex, readLatestWorkspaceNotes, subscribeToWorkspaceIndex, subscribeToWorkspaceNotes, writeWorkspaceIndex, writeWorkspaceNotes } from './notesRepository';
 
-export function useNotesSync() {
-  const [data, setData] = useState<NotesData>({});
-  const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndex>({
+function defaultWorkspaceIndex(): WorkspaceIndex {
+  return {
     workspaces: [createWorkspaceMeta(defaultWorkspaceId, defaultWorkspaceId)],
     activeWorkspaceId: defaultWorkspaceId,
     defaultWorkspaceId,
     version: 1,
-  });
+  };
+}
+
+export function useNotesSync() {
+  const [data, setData] = useState<NotesData>({});
+  const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndex>(() => defaultWorkspaceIndex());
   const [loading, setLoading] = useState(true);
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -23,21 +27,29 @@ export function useNotesSync() {
   useEffect(() => {
     let cancelled = false;
 
-    async function bootstrapWorkspaceIndex() {
+    async function bootstrapLocalSnapshot() {
       try {
-        const snapshot = await readLocalWorkspaceIndex();
+        const snapshot = await readLocalWorkspaceSnapshot();
         if (cancelled) return;
-        setWorkspaceIndex(snapshot);
-        setWorkspaceLoading(false);
-        setLocalMode(true);
-        setError(null);
+        if (snapshot) {
+          setWorkspaceIndex(snapshot.workspaceIndex);
+          setData(snapshot.data);
+          setWorkspaceLoading(false);
+          setLoading(false);
+          setRefreshing(true);
+          setLocalMode(true);
+          setError(null);
+        }
       } catch {
         if (cancelled) return;
-        setWorkspaceLoading(false);
       }
     }
 
-    bootstrapWorkspaceIndex();
+    bootstrapLocalSnapshot();
+
+    function cacheSnapshot(nextWorkspaceIndex: WorkspaceIndex, nextData: NotesData) {
+      writeLocalWorkspaceSnapshot(nextWorkspaceIndex, nextData).catch(() => undefined);
+    }
 
     const unsubscribe = subscribeToWorkspaceIndex(
       (snapshot) => {
@@ -46,43 +58,29 @@ export function useNotesSync() {
         setWorkspaceLoading(false);
         setError(null);
         writeLocalWorkspaceIndex(snapshot).catch(() => undefined);
+        setData((currentData) => {
+          cacheSnapshot(snapshot, currentData);
+          return currentData;
+        });
         setLocalMode(false);
+        setRefreshing(false);
       },
       async () => {
         if (cancelled) return;
-        const snapshot = await readLocalWorkspaceIndex();
-        setWorkspaceIndex(snapshot);
-        setWorkspaceLoading(false);
-        setLocalMode(true);
+        try {
+          const snapshot = await readLocalWorkspaceIndex();
+          setWorkspaceIndex(snapshot);
+          setWorkspaceLoading(false);
+          setLocalMode(true);
+        } catch {
+          setWorkspaceLoading(false);
+        } finally {
+          setRefreshing(false);
+        }
       },
     );
 
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function bootstrapWorkspaceNotes() {
-      try {
-        const snapshot = await readLocalWorkspaceNotes(defaultWorkspaceId);
-        if (cancelled) return;
-        setData(snapshot.data);
-        setLoading(false);
-        setError(null);
-        setLocalMode(true);
-      } catch {
-        if (cancelled) return;
-        setLoading(false);
-      }
-    }
-
-    bootstrapWorkspaceNotes();
-
-    const unsubscribe = subscribeToWorkspaceNotes(
+    const unsubscribeNotes = subscribeToWorkspaceNotes(
       defaultWorkspaceId,
       (snapshot) => {
         if (cancelled) return;
@@ -91,20 +89,32 @@ export function useNotesSync() {
         setError(null);
         setLocalMode(false);
         writeLocalWorkspaceNotes(defaultWorkspaceId, snapshot.data).catch(() => undefined);
+        setWorkspaceIndex((currentIndex) => {
+          cacheSnapshot(currentIndex, snapshot.data);
+          return currentIndex;
+        });
+        setRefreshing(false);
       },
       async () => {
         if (cancelled) return;
-        const snapshot = await readLocalWorkspaceNotes(defaultWorkspaceId);
-        setData(snapshot.data);
-        setLocalMode(true);
-        setError(null);
-        setLoading(false);
+        try {
+          const snapshot = await readLocalWorkspaceNotes(defaultWorkspaceId);
+          setData(snapshot.data);
+          setLocalMode(true);
+          setError(null);
+          setLoading(false);
+        } catch {
+          setLoading(false);
+        } finally {
+          setRefreshing(false);
+        }
       },
     );
 
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeNotes();
     };
   }, []);
 
@@ -113,14 +123,16 @@ export function useNotesSync() {
     try {
       await writeWorkspaceIndex(index);
       await writeLocalWorkspaceIndex(index);
+      await writeLocalWorkspaceSnapshot(index, data);
       setLocalMode(false);
       return true;
     } catch {
       await writeLocalWorkspaceIndex(index);
+      await writeLocalWorkspaceSnapshot(index, data);
       setLocalMode(true);
       return true;
     }
-  }, []);
+  }, [data]);
 
   const commit = useCallback(
     async (result: MutationResult) => {
@@ -134,10 +146,12 @@ export function useNotesSync() {
       try {
         await writeWorkspaceNotes(defaultWorkspaceId, result.data);
         await writeLocalWorkspaceNotes(defaultWorkspaceId, result.data);
+        await writeLocalWorkspaceSnapshot(workspaceIndex, result.data);
         setLocalMode(false);
         return true;
       } catch {
         await writeLocalWorkspaceNotes(defaultWorkspaceId, result.data);
+        await writeLocalWorkspaceSnapshot(workspaceIndex, result.data);
         setLocalMode(true);
         setError(null);
         return true;
@@ -145,7 +159,7 @@ export function useNotesSync() {
         setSaving(false);
       }
     },
-    [],
+    [workspaceIndex],
   );
 
   const createWorkspace = useCallback(async (name: string) => {
@@ -231,6 +245,7 @@ export function useNotesSync() {
       await Promise.all([
         writeLocalWorkspaceIndex(indexSnapshot),
         writeLocalWorkspaceNotes(defaultWorkspaceId, notesSnapshot.data),
+        writeLocalWorkspaceSnapshot(indexSnapshot, notesSnapshot.data),
       ]);
       setLocalMode(false);
       return true;

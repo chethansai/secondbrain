@@ -1,0 +1,100 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { formatPath } from '../categories/categoryTree';
+import { HISTORY_CATEGORY } from '../notes/noteMutations';
+import { useTheme } from '../../shared/design/ThemeProvider';
+import { rounded, spacing, typography } from '../../shared/design/tokens';
+import { FlatNote } from '../../shared/types/notes';
+
+type Props = {
+  notes: FlatNote[];
+};
+
+const MIN_SCROLL_DURATION_MS = 18000;
+const PIXELS_PER_SECOND = 34;
+
+export function NotesTeleprompterBar({ notes }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const translateX = useRef(new Animated.Value(0)).current;
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [contentWidth, setContentWidth] = useState(0);
+  const promptText = useMemo(() => formatTeleprompterNotes(notes), [notes]);
+
+  useEffect(() => {
+    translateX.stopAnimation();
+    translateX.setValue(containerWidth);
+
+    if (!containerWidth || !contentWidth) return undefined;
+
+    const distance = containerWidth + contentWidth;
+    const duration = Math.max(MIN_SCROLL_DURATION_MS, Math.round((distance / PIXELS_PER_SECOND) * 1000));
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(translateX, {
+          toValue: -contentWidth,
+          duration,
+          easing: Easing.linear,
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+        Animated.timing(translateX, {
+          toValue: containerWidth,
+          duration: 0,
+          easing: Easing.linear,
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [containerWidth, contentWidth, promptText, translateX]);
+
+  return (
+    <View style={styles.bar} onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}>
+      <View style={styles.viewport} accessibilityRole="text" accessibilityLabel="Scrolling notes teleprompter">
+        <Animated.Text
+          numberOfLines={1}
+          onLayout={(event) => setContentWidth(event.nativeEvent.layout.width)}
+          style={[styles.promptText, { transform: [{ translateX }] }]}
+        >
+          {promptText}
+        </Animated.Text>
+      </View>
+    </View>
+  );
+}
+
+function formatTeleprompterNotes(notes: FlatNote[]) {
+  const snippets = notes
+    .filter((note) => note.path[0] !== HISTORY_CATEGORY)
+    .map((note) => `${formatPath(note.path)}: ${note.note.replace(/\s+/g, ' ').trim()}`)
+    .filter(Boolean);
+
+  return snippets.length ? snippets.join('   |   ') : 'No notes yet';
+}
+
+function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
+  return StyleSheet.create({
+    bar: {
+      backgroundColor: colors.brandNavy,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.hairline,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+    },
+    viewport: {
+      height: 26,
+      justifyContent: 'center',
+      overflow: 'hidden',
+      borderRadius: rounded.sm,
+    },
+    promptText: {
+      ...typography.bodySmMedium,
+      color: colors.onDark,
+      minWidth: 1,
+      position: 'absolute',
+    },
+  });
+}

@@ -7,6 +7,64 @@ const localNotesKey = 'rnnotetaking.notes.main';
 const localWorkspaceNotesPrefix = 'rnnotetaking.notes.workspace.';
 const localWorkspaceListKey = 'rnnotetaking.workspaces.list';
 const legacyLocalWorkspaceIndexKey = 'rnnotetaking.workspaces.index';
+const localWorkspaceSnapshotKey = 'rnnotetaking.workspace.snapshot.v1';
+
+export type LocalWorkspaceSnapshot = {
+  workspaceIndex: WorkspaceIndex;
+  data: NotesData;
+  cachedAt: number;
+};
+
+export async function readLocalWorkspaceSnapshot(): Promise<LocalWorkspaceSnapshot | null> {
+  const raw = await AsyncStorage.getItem(localWorkspaceSnapshotKey);
+  if (raw) {
+    const snapshot = parseLocalWorkspaceSnapshot(raw);
+    if (snapshot) return snapshot;
+  }
+
+  const hasLegacyCache = Boolean(
+    await AsyncStorage.getItem(localWorkspaceListKey)
+    ?? await AsyncStorage.getItem(legacyLocalWorkspaceIndexKey)
+    ?? await AsyncStorage.getItem(localWorkspaceNotesKey(defaultWorkspaceId))
+    ?? await AsyncStorage.getItem(localNotesKey),
+  );
+  if (!hasLegacyCache) return null;
+
+  const [workspaceIndex, notesSnapshot] = await Promise.all([
+    readLocalWorkspaceIndex(),
+    readLocalWorkspaceNotes(defaultWorkspaceId),
+  ]);
+  const snapshot = { workspaceIndex, data: notesSnapshot.data, cachedAt: Date.now() };
+  await writeLocalWorkspaceSnapshot(workspaceIndex, notesSnapshot.data);
+  return snapshot;
+}
+
+export async function writeLocalWorkspaceSnapshot(workspaceIndex: WorkspaceIndex, data: NotesData): Promise<void> {
+  await AsyncStorage.setItem(localWorkspaceSnapshotKey, JSON.stringify({
+    workspaceIndex: serializeWorkspaceIndex(workspaceIndex),
+    notes: { data },
+    cachedAt: Date.now(),
+  }));
+}
+
+function parseLocalWorkspaceSnapshot(raw: string): LocalWorkspaceSnapshot | null {
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const rawWorkspaceIndex = parsed.workspaceIndex;
+    const rawNotes = parsed.notes;
+    if (!rawWorkspaceIndex || typeof rawWorkspaceIndex !== 'object' || Array.isArray(rawWorkspaceIndex)) return null;
+    const notesRecord = rawNotes && typeof rawNotes === 'object' && !Array.isArray(rawNotes) ? rawNotes as Record<string, unknown> : {};
+    const validation = validateNotesData(notesRecord.data ?? {});
+    if (!validation.ok) return null;
+    return {
+      workspaceIndex: parseLocalWorkspaceIndex(rawWorkspaceIndex as Record<string, unknown>),
+      data: validation.data,
+      cachedAt: typeof parsed.cachedAt === 'number' ? parsed.cachedAt : 0,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export async function readLocalNotes(): Promise<NotesSnapshot> {
   return readLocalWorkspaceNotes(defaultWorkspaceId);

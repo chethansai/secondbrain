@@ -17,7 +17,7 @@ import { TextPromptModal } from './src/features/editor/TextPromptModal';
 import { NoteEditorModal } from './src/features/editor/NoteEditorModal';
 import { MoveCopyModal } from './src/features/notes/MoveCopyModal';
 import { NoteList } from './src/features/notes/NoteList';
-import { addNote, appendHistoryNote, copyNote, deleteNote, editNote, formatAddedNoteHistory, formatHistoryPath, formatHistoryTime, HISTORY_CATEGORY, listNotesAtPath, moveNote, setNotePriority } from './src/features/notes/noteMutations';
+import { addNote, appendHistoryNote, copyNote, deleteNote, editNote, flattenNotes, formatAddedNoteHistory, formatHistoryPath, formatHistoryTime, HISTORY_CATEGORY, listNotesAtPath, moveNote, setNotePriority } from './src/features/notes/noteMutations';
 import { removePinnedNote, removePinnedNotesInPath, replacePinnedNote, replacePinnedNotesInPath, sortPinnedNotesFirst, togglePinnedNote } from './src/features/notes/pinnedNotes';
 import { SearchPanel } from './src/features/search/SearchPanel';
 import { copyText } from './src/features/settings/clipboard';
@@ -26,6 +26,7 @@ import { useNotesSync } from './src/features/sync/useNotesSync';
 import { useAiReviewSync } from './src/features/sync/useAiReviewSync';
 import { WorkspaceBoard } from './src/features/workspace/WorkspaceBoard';
 import { ActionGrid, ErrorBanner, PanelHeader, WorkspaceHeader } from './src/features/workspace/WorkspaceChrome';
+import { NotesTeleprompterBar } from './src/features/workspace/NotesTeleprompterBar';
 import { ThemeProvider, useTheme } from './src/shared/design/ThemeProvider';
 import { rounded, spacing, typography } from './src/shared/design/tokens';
 import { CategoryPath, FlatNote, NotesData } from './src/shared/types/notes';
@@ -102,6 +103,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const allDetailCategoriesExpanded = expandableDetailKeys.length > 0 && expandableDetailKeys.every((key) => expandedCategoryKeys.has(key));
   const pinnedNotes = activeWorkspace?.pinnedNotes ?? [];
   const notes = useMemo(() => (path.length ? sortPinnedNotesFirst(listNotesAtPath(data, path), pinnedNotes) : []), [data, path, pinnedNotes]);
+  const teleprompterNotes = useMemo(() => flattenNotes(data), [data]);
   const activeTitle = path.length ? path[path.length - 1] : activeWorkspace?.name ?? 'Workspace';
   const showingRootBoard = !loading && tab === 'workspace' && path.length === 0;
 
@@ -556,6 +558,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <NotesTeleprompterBar notes={teleprompterNotes} />
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" onScroll={handleScreenScroll} scrollEventThrottle={16}>
         <View style={[styles.workspaceCard, showingRootBoard && styles.workspaceCardBoard]}>
           {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}

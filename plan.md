@@ -12,6 +12,10 @@ This post-step Git workflow is mandatory and must not be skipped after any imple
 
 ## history
 
+- 2026-06-03: Added an in-app notes teleprompter bar below the OS status bar so phone time and battery remain untouched. The app now flattens the main notes JSON, skips generated HISTORY notes, and automatically scrolls category-labeled note snippets across the top app bar using a feature-owned React Native animated component.
+
+- 2026-06-03: Reduced logged-in workspace startup loading by adding a combined AsyncStorage workspace snapshot cache containing the latest notes JSON and workspace metadata. Cached sessions now render the previous offline workspace immediately, then Firestore listener updates refresh the UI seamlessly through the existing reloading state while first installs without cache still wait for initial data.
+
 - 2026-06-02: Implemented permission-free Android home-gesture quick note entry. Reused `NoteWidgetConfigureActivity` in a new quick-note mode that does not require an app widget id, saves notes through the existing native Firestore append path, and closes after save. Routed `VoiceInteractionService`, `VoiceInteractionSessionService`, and fallback `ASSIST`/`VOICE_ASSIST` activity launches to this quick-note UI instead of relying on an over-other-apps floating overlay.
 
 - 2026-06-02: Routed Android home-button assistant and native overlay assistant action to the workspace/categories board instead of the Assistant tab/add-note editor. Added `nativenotes://workspace` deep-link parsing, reset app navigation to root workspace on that route, and changed the voice-interaction services plus overlay assistant action to use it. Decision: keep `nativenotes://assistant` for the in-app Assistant panel, but make home/overlay entry points open categories as the requested default landing screen.

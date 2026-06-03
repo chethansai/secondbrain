@@ -412,6 +412,10 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-06-03: Added an in-app notes teleprompter bar below the OS status bar. It flattens the notes JSON, skips generated HISTORY notes, and auto-scrolls category-labeled note snippets across the app top chrome without covering time or battery.
+
+- 2026-06-03: Reduced logged-in workspace startup loading with a combined AsyncStorage workspace snapshot cache for notes JSON plus workspace metadata. Cached sessions render immediately from the previous offline snapshot, then Firestore refreshes replace it through the existing reloading state; first installs without cache still wait for initial data.
+
 - 2026-06-02: Implemented permission-free Android home-gesture quick note entry. `NoteWidgetConfigureActivity` now supports quick-note mode without a widget id, saving through the existing native Firestore path and finishing after save. Android voice interaction and fallback assistant intents now launch this quick-note UI instead of requiring overlay permission.
 
 - 2026-06-02: Routed Android home-button assistant and native overlay assistant action to the workspace/categories board instead of the Assistant tab/add-note editor. Added `nativenotes://workspace` deep-link parsing, reset app navigation to root workspace on that route, and changed the voice-interaction services plus overlay assistant action to use it. Decision: keep `nativenotes://assistant` for the in-app Assistant panel, but make home/overlay entry points open categories as the requested default landing screen.
