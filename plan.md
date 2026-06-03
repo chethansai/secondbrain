@@ -12,6 +12,8 @@ This post-step Git workflow is mandatory and must not be skipped after any imple
 
 ## history
 
+- 2026-06-03: Implemented Android system back alignment and native widget quick-add parity. Added a feature-owned React Native back handler so hardware/gesture back closes open modals, returns panels to the workspace, and pops category paths like the visible `<` button; enabled Android back invocation callbacks. Updated the home-screen widget launch path to pass its last category into the native quick-add Activity, added Enter/IME Done saves for widget note/category/subcategory inputs, and made widget category rows closer to the native floating popup with two-column multi-line chips while preserving clipboard copy after successful Firestore saves.
+
 - 2026-06-03: Tightened the logged-in workspace fast-start cache behavior. Cached workspace content still renders immediately, but the startup reloading indicator now stays active until both notes and workspace metadata listeners settle, and a late AsyncStorage cache read cannot overwrite already-arrived Firestore data.
 
 - 2026-06-03: Made the Android home-screen quick note widget look like the native floating icon while keeping it as a launcher-addable 1x1 widget that opens the existing rich quick-add window. Moved the native floating overlay default/reset placement from right-middle to bottom-center slightly above the bottom edge so users see the icon in a less confusing home-screen position; decision: Android launchers still require users to manually place widgets, so app code can style the widget and reposition the real overlay but cannot force launcher widget placement.
