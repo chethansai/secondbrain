@@ -12,6 +12,10 @@ This post-step Git workflow is mandatory and must not be skipped after any imple
 
 ## history
 
+- 2026-06-03: Tightened the logged-in workspace fast-start cache behavior. Cached workspace content still renders immediately, but the startup reloading indicator now stays active until both notes and workspace metadata listeners settle, and a late AsyncStorage cache read cannot overwrite already-arrived Firestore data.
+
+- 2026-06-03: Made the Android home-screen quick note widget look like the native floating icon while keeping it as a launcher-addable 1x1 widget that opens the existing rich quick-add window. Moved the native floating overlay default/reset placement from right-middle to bottom-center slightly above the bottom edge so users see the icon in a less confusing home-screen position; decision: Android launchers still require users to manually place widgets, so app code can style the widget and reposition the real overlay but cannot force launcher widget placement.
+
 - 2026-06-03: Fixed purple note ordering behavior so tapping one purple note-order button selects the source note and tapping a second note-order button moves the first note directly below the second note. Kept drag-to-reorder available with shared displacement math for smoother neighboring note movement, applied the behavior to main notes, workspace preview notes, and expanded subcategory preview notes, and extracted `WorkspaceSubcategoryRow` so the touched workspace card file is back under the 600-line source limit.
 
 - 2026-06-03: Added an in-app notes teleprompter bar below the OS status bar so phone time and battery remain untouched. The app now flattens the main notes JSON, skips generated HISTORY notes, and automatically scrolls category-labeled note snippets across the top app bar using a feature-owned React Native animated component.

@@ -412,6 +412,10 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-06-03: Tightened the logged-in workspace fast-start cache refresh handoff. Cached workspace content still renders immediately, but startup reloading now clears only after both notes and workspace metadata listeners settle, and late AsyncStorage cache hydration cannot override already-arrived Firestore data.
+
+- 2026-06-03: Made the Android home-screen quick note widget resemble the native floating icon and continue opening the rich quick-add window. Changed the native floating overlay default/reset position to bottom-center slightly above the bottom edge. Decision: launcher widget placement remains user-controlled by Android, so the app styles the widget and repositions only the real overlay.
+
 - 2026-06-03: Fixed purple note ordering buttons. First tap selects the source note; second tap moves that note below the tapped target note. Kept drag reorder, shared the displacement/order math across main and workspace note previews, applied it to expanded subcategories, and extracted `WorkspaceSubcategoryRow` so touched source files stay under 600 lines.
 
 - 2026-06-03: Added an in-app notes teleprompter bar below the OS status bar. It flattens the notes JSON, skips generated HISTORY notes, and auto-scrolls category-labeled note snippets across the app top chrome without covering time or battery.

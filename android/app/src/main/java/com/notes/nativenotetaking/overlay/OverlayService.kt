@@ -127,9 +127,9 @@ class OverlayService : Service() {
       PixelFormat.TRANSLUCENT,
     ).apply {
       gravity = Gravity.TOP or Gravity.START
-      val bounds = displayBounds()
-      x = if (settings.x == Int.MIN_VALUE) bounds.width() - buttonSize - dp(18) else settings.x
-      y = if (settings.y == Int.MIN_VALUE) bounds.height() / 2 else settings.y
+      val defaultPosition = defaultButtonPosition(buttonSize)
+      x = if (settings.x == Int.MIN_VALUE) defaultPosition.first else settings.x
+      y = if (settings.y == Int.MIN_VALUE) defaultPosition.second else settings.y
       clampParams(this, buttonSize, buttonSize)
     }
 
@@ -170,13 +170,21 @@ class OverlayService : Service() {
   private fun moveButtonToDefault() {
     buttonParams?.let {
       val buttonSize = dp(settings.size)
-      val bounds = displayBounds()
-      it.x = bounds.width() - buttonSize - dp(18)
-      it.y = bounds.height() / 2
+      val defaultPosition = defaultButtonPosition(buttonSize)
+      it.x = defaultPosition.first
+      it.y = defaultPosition.second
       clampParams(it, buttonSize, buttonSize)
       OverlaySettings.savePosition(this, it.x, it.y)
       updateView(buttonView, it)
     }
+  }
+
+  private fun defaultButtonPosition(buttonSize: Int): Pair<Int, Int> {
+    val bounds = displayBounds()
+    return Pair(
+      bounds.left + (bounds.width() - buttonSize) / 2,
+      bounds.bottom - buttonSize - dp(96),
+    )
   }
 
   private fun showInput() {

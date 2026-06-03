@@ -88,7 +88,7 @@ class NoteWidgetConfigureActivity : Activity() {
       orientation = LinearLayout.VERTICAL
       setPadding(dp(16), dp(14), dp(16), dp(14))
       addView(TextView(this@NoteWidgetConfigureActivity).apply {
-        text = if (quickNoteMode) "Native Notes quick add" else "Native Notes widget"
+        text = "Floating quick add"
         textSize = 18f
         setTextColor(0xff1a1a1a.toInt())
       }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
@@ -100,9 +100,17 @@ class NoteWidgetConfigureActivity : Activity() {
           setOnClickListener { submitNote(path) }
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       }
-      addView(Button(this@NoteWidgetConfigureActivity).apply {
-        text = "Add to SEEK"
-        setOnClickListener { submitNote(listOf(OverlayNotesStore.seekCategoryName)) }
+      addView(LinearLayout(this@NoteWidgetConfigureActivity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        addView(Button(this@NoteWidgetConfigureActivity).apply {
+          text = "SEEK"
+          setOnClickListener { submitNote(listOf(OverlayNotesStore.seekCategoryName)) }
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(Button(this@NoteWidgetConfigureActivity).apply {
+          text = "Cancel"
+          setAllCaps(false)
+          setOnClickListener { finish() }
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
       }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(categoryInput, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(Button(this@NoteWidgetConfigureActivity).apply {

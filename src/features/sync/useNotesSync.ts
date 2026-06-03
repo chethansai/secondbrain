@@ -26,12 +26,26 @@ export function useNotesSync() {
 
   useEffect(() => {
     let cancelled = false;
+    let hydratedFromSnapshot = false;
+    let remoteWorkspaceSettled = false;
+    let remoteNotesSettled = false;
+
+    function markRemoteWorkspaceSettled() {
+      remoteWorkspaceSettled = true;
+      if (!hydratedFromSnapshot || remoteNotesSettled) setRefreshing(false);
+    }
+
+    function markRemoteNotesSettled() {
+      remoteNotesSettled = true;
+      if (!hydratedFromSnapshot || remoteWorkspaceSettled) setRefreshing(false);
+    }
 
     async function bootstrapLocalSnapshot() {
       try {
         const snapshot = await readLocalWorkspaceSnapshot();
         if (cancelled) return;
-        if (snapshot) {
+        if (snapshot && !remoteWorkspaceSettled && !remoteNotesSettled) {
+          hydratedFromSnapshot = true;
           setWorkspaceIndex(snapshot.workspaceIndex);
           setData(snapshot.data);
           setWorkspaceLoading(false);
@@ -63,7 +77,7 @@ export function useNotesSync() {
           return currentData;
         });
         setLocalMode(false);
-        setRefreshing(false);
+        markRemoteWorkspaceSettled();
       },
       async () => {
         if (cancelled) return;
@@ -75,7 +89,7 @@ export function useNotesSync() {
         } catch {
           setWorkspaceLoading(false);
         } finally {
-          setRefreshing(false);
+          markRemoteWorkspaceSettled();
         }
       },
     );
@@ -93,7 +107,7 @@ export function useNotesSync() {
           cacheSnapshot(currentIndex, snapshot.data);
           return currentIndex;
         });
-        setRefreshing(false);
+        markRemoteNotesSettled();
       },
       async () => {
         if (cancelled) return;
@@ -106,7 +120,7 @@ export function useNotesSync() {
         } catch {
           setLoading(false);
         } finally {
-          setRefreshing(false);
+          markRemoteNotesSettled();
         }
       },
     );
