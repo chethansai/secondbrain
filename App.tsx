@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, NativeScrollEvent, NativeSyntheticEvent, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AutomationCommand, parseAutomationDeepLink } from './src/features/automation/deepLinks';
 import { clearAutomationFileQueue, ensureDefaultAutomationQueueFile, getDefaultAutomationQueueUri, readAutomationFileQueue, rewriteAutomationFileQueue } from './src/features/automation/fileQueue';
@@ -27,6 +27,7 @@ import { useAiReviewSync } from './src/features/sync/useAiReviewSync';
 import { WorkspaceBoard } from './src/features/workspace/WorkspaceBoard';
 import { ActionGrid, ErrorBanner, PanelHeader, WorkspaceHeader } from './src/features/workspace/WorkspaceChrome';
 import { NotesTeleprompterBar } from './src/features/workspace/NotesTeleprompterBar';
+import { useWorkspaceBackHandler } from './src/features/workspace/useWorkspaceBackHandler';
 import { ThemeProvider, useTheme } from './src/shared/design/ThemeProvider';
 import { rounded, spacing, typography } from './src/shared/design/tokens';
 import { CategoryPath, FlatNote, NotesData } from './src/shared/types/notes';
@@ -95,6 +96,13 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const fileAutomationRunKey = useRef<string | null>(null);
   const runningAiReviewFingerprints = useRef(new Set<string>());
 
+  const closePrompt = useCallback(() => { setPromptMode(null); setPromptPath(null); }, []);
+  const closeEditor = useCallback(() => { setEditorMode(null); setEditorPath(null); setSelectedNote(null); }, []);
+  const closeMoveCopy = useCallback(() => { setMoveVisible(false); setSelectedNote(null); setMoveCopyTarget(null); }, []);
+  const closeDelete = useCallback(() => setDeleteTarget(null), []);
+  const backToWorkspace = useCallback(() => setTab('workspace'), []);
+  const backPath = useCallback(() => setPath((currentPath) => currentPath.slice(0, -1)), []);
+
   const currentItems = path.length ? getCategoryItems(data, path) : null;
   const overlayAvailable = isFloatingOverlayAvailable();
   const childCategories = useMemo(() => (currentItems ? listChildCategories(currentItems, path) : []), [currentItems, path]);
@@ -106,6 +114,21 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const teleprompterNotes = useMemo(() => flattenNotes(data), [data]);
   const activeTitle = path.length ? path[path.length - 1] : activeWorkspace?.name ?? 'Workspace';
   const showingRootBoard = !loading && tab === 'workspace' && path.length === 0;
+
+  useWorkspaceBackHandler({
+    tab,
+    pathLength: path.length,
+    promptOpen: promptMode !== null,
+    editorOpen: editorMode !== null,
+    moveOpen: moveVisible,
+    deleteOpen: deleteTarget !== null,
+    onClosePrompt: closePrompt,
+    onCloseEditor: closeEditor,
+    onCloseMove: closeMoveCopy,
+    onCloseDelete: closeDelete,
+    onBackToWorkspace: backToWorkspace,
+    onBackPath: backPath,
+  });
 
   useEffect(() => {
     if (!automationCommand || loading || aiReviewLoading || runningAutomationKey.current === automationCommand.key) return;
@@ -619,7 +642,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     title={activeTitle}
                     path={path}
                     workspaceName={activeWorkspace?.name ?? 'Workspace'}
-                    onBack={() => setPath(path.slice(0, -1))}
+                    onBack={backPath}
                     onOpenSearch={() => setTab('search')}
                     onOpenSettings={() => setTab('settings')}
                     onOpenAiChat={() => setTab('aiChat')}
@@ -657,19 +680,19 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           ) : null}
           {!loading && tab === 'search' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="Search" onBack={() => setTab('workspace')} />
+              <PanelHeader title="Search" onBack={backToWorkspace} />
               <SearchPanel data={data} onSelect={(note) => { setPath(note.path); setTab('workspace'); }} />
             </View>
           ) : null}
           {!loading && tab === 'settings' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="Settings" onBack={() => setTab('workspace')} />
+              <PanelHeader title="Settings" onBack={backToWorkspace} />
               <SettingsPanel data={data} authTimeoutHours={authTimeoutHours} onAuthTimeoutChange={onAuthTimeoutChange} onImport={importData} />
             </View>
           ) : null}
           {!loading && tab === 'aiChat' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="AI Chat" onBack={() => setTab('workspace')} />
+              <PanelHeader title="AI Chat" onBack={backToWorkspace} />
               <AiChatPanel
                 data={data}
                 pinnedNotes={pinnedNotes}
@@ -691,25 +714,25 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           ) : null}
           {!loading && tab === 'aiNotifications' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="AI Notifications" onBack={() => setTab('workspace')} />
+              <PanelHeader title="AI Notifications" onBack={backToWorkspace} />
               <AiNotificationsPanel data={data} />
             </View>
           ) : null}
           {!loading && tab === 'ai' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="AI Review" onBack={() => setTab('workspace')} />
+              <PanelHeader title="AI Review" onBack={backToWorkspace} />
               <AiReviewPanel data={data} commit={commit} onIncludeCategory={includeWorkspaceCategory} />
             </View>
           ) : null}
           {!loading && tab === 'aiWorkspace' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="AI WORKSPACE" onBack={() => setTab('workspace')} />
+              <PanelHeader title="AI WORKSPACE" onBack={backToWorkspace} />
               <AiWorkspacePanel />
             </View>
           ) : null}
           {!loading && tab === 'assistant' ? (
             <View style={styles.sectionStack}>
-              <PanelHeader title="Assistant" onBack={() => setTab('workspace')} />
+              <PanelHeader title="Assistant" onBack={backToWorkspace} />
               <AssistantPanel />
             </View>
           ) : null}
@@ -722,7 +745,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         label={promptMode === 'workspace' || promptMode === 'renameWorkspace' ? 'Workspace name' : 'Category name'}
         initialValue={promptMode === 'rename' ? activeTitle : promptMode === 'renameWorkspace' ? activeWorkspace?.name ?? '' : ''}
         submitLabel={promptMode === 'workspace' || promptMode === 'renameWorkspace' ? 'Save workspace' : 'Save category'}
-        onClose={() => { setPromptMode(null); setPromptPath(null); }}
+        onClose={closePrompt}
         onSubmit={submitPrompt}
       />
       <NoteEditorModal
@@ -731,7 +754,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         initialText={editorMode === 'edit' ? selectedNote?.note ?? '' : ''}
         categoryData={editorMode === 'add' ? data : undefined}
         selectedPath={editorMode === 'add' ? editorPath ?? path : null}
-        onClose={() => { setEditorMode(null); setEditorPath(null); setSelectedNote(null); }}
+        onClose={closeEditor}
         onSubmit={async (text) => {
           if (editorMode !== 'edit' || !selectedNote) return addSeekNote(text);
           const ok = await commitWithHistory(editNote(data, selectedNote.path, selectedNote.note, text, selectedNote.index), `${selectedNote.note} edited to ${text.trim()} - ${formatHistoryPath(selectedNote.path)} - ${formatHistoryTime()} - Event: NOTE_EDITED`);
@@ -749,7 +772,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         itemType={moveCopyTarget?.type ?? 'note'}
         data={data}
         pinnedPaths={activeWorkspace?.pinnedCategoryPaths ?? []}
-        onClose={() => { setMoveVisible(false); setSelectedNote(null); setMoveCopyTarget(null); }}
+        onClose={closeMoveCopy}
         onTogglePin={togglePinnedMoveCopyCategory}
         onResetPins={() => updatePinnedCategoryPaths([])}
         onMove={async (destination) => {
@@ -777,7 +800,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         visible={deleteTarget !== null}
         title={deleteTarget?.type === 'category' ? 'Delete category?' : 'Delete note?'}
         message={deleteTarget?.type === 'category' ? categoryDeleteMessage(data, deleteTarget.path) : 'This note will be removed from this category.'}
-        onClose={() => setDeleteTarget(null)}
+        onClose={closeDelete}
         onConfirm={runDelete}
       />
     </SafeAreaView>
