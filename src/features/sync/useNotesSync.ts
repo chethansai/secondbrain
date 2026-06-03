@@ -44,9 +44,9 @@ export function useNotesSync() {
       try {
         const snapshot = await readLocalWorkspaceSnapshot();
         if (cancelled) return;
-        if (snapshot && !remoteWorkspaceSettled && !remoteNotesSettled) {
+        if (snapshot && !remoteNotesSettled) {
           hydratedFromSnapshot = true;
-          setWorkspaceIndex(snapshot.workspaceIndex);
+          if (!remoteWorkspaceSettled) setWorkspaceIndex(snapshot.workspaceIndex);
           setData(snapshot.data);
           setWorkspaceLoading(false);
           setLoading(false);

@@ -412,6 +412,8 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-06-03: Updated native quick-entry branding and workspace startup handoff. Android floating overlay and 1x1 widget now show a bold `P`; overlay notification creation is extracted so `OverlayService.kt` stays under 600 lines; cached notes can hydrate immediately even if workspace metadata settled first, while remote notes still win over late cache. Decision: attached logo asset could not be applied because it was not available as a workspace PNG file to the tools.
+
 - 2026-06-03: Implemented Android back and widget quick-add parity. System/gesture back now reuses app navigation state to close modals, return panels to workspace, or pop category paths like `<`; Android back invocation callbacks are enabled. The home-screen widget passes its last category into the native quick-add Activity, which now supports Enter/IME Done saves for note/category/subcategory inputs and renders two-column multi-line category chips while keeping clipboard copy after successful Firestore saves.
 
 - 2026-06-03: Tightened the logged-in workspace fast-start cache refresh handoff. Cached workspace content still renders immediately, but startup reloading now clears only after both notes and workspace metadata listeners settle, and late AsyncStorage cache hydration cannot override already-arrived Firestore data.

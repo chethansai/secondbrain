@@ -1,8 +1,5 @@
 package com.notes.nativenotetaking.overlay
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.Service
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -63,7 +60,7 @@ class OverlayService : Service() {
       stopSelf()
       return
     }
-    startForeground(NOTIFICATION_ID, createNotification())
+    startForeground(OverlayNotification.id, createOverlayNotification(this))
     showButton()
   }
 
@@ -104,10 +101,11 @@ class OverlayService : Service() {
         setColor(0xff5645d4.toInt())
       }
       addView(TextView(this@OverlayService).apply {
-        text = "+"
-        textSize = (settings.size * 0.48f).coerceIn(20f, 38f)
+        text = "P"
+        textSize = (settings.size * 0.46f).coerceIn(20f, 38f)
         gravity = Gravity.CENTER
         setTextColor(0xffffffff.toInt())
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
         includeFontPadding = false
       }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 0, 1f))
       addView(TextView(this@OverlayService).apply {
@@ -520,29 +518,6 @@ class OverlayService : Service() {
     startActivity(intent)
   }
 
-  private fun createNotification(): Notification {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      val channel = NotificationChannel(
-        NOTIFICATION_CHANNEL_ID,
-        "Floating note icon",
-        NotificationManager.IMPORTANCE_LOW,
-      )
-      getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
-    }
-    val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
-    } else {
-      @Suppress("DEPRECATION")
-      Notification.Builder(this)
-    }
-    return builder
-      .setSmallIcon(android.R.drawable.ic_dialog_info)
-      .setContentTitle("Native Note Taking")
-      .setContentText("Floating note icon is running")
-      .setOngoing(true)
-      .build()
-  }
-
   private fun canDrawOverlays(): Boolean {
     return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)
   }
@@ -607,8 +582,6 @@ class OverlayService : Service() {
 
 
   companion object {
-    private const val NOTIFICATION_CHANNEL_ID = "floating_note_icon"
-    private const val NOTIFICATION_ID = 1101
     private const val overlayPreferencesName = "floating_note_overlay"
     private const val recentCreatedCategoryKey = "recent_created_category_key"
     const val ACTION_STOP = "com.notes.nativenotetaking.overlay.STOP"

@@ -28,9 +28,9 @@
       android:layout_weight="1"
       android:gravity="center"
       android:includeFontPadding="false"
-      android:text="+"
+      android:text="P"
       android:textColor="#FFFFFF"
-      android:textSize="30sp"
+      android:textSize="28sp"
       android:textStyle="bold" />
 
     <TextView
