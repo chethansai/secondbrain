@@ -22,28 +22,38 @@ export function NotesTeleprompterBar({ notes }: Props) {
   const promptText = useMemo(() => formatTeleprompterNotes(notes), [notes]);
   const animationRef = useRef<any>(null);
 
-  // Restart animation when app becomes active again (background -> foreground)
+  const containerWidthRef = useRef(containerWidth);
+  const contentWidthRef = useRef(contentWidth);
+  const promptTextRef = useRef(promptText);
+
+  useEffect(() => {
+    containerWidthRef.current = containerWidth;
+    contentWidthRef.current = contentWidth;
+    promptTextRef.current = promptText;
+  }, [containerWidth, contentWidth, promptText]);
+
+  // Restart animation when app becomes active again (after background or close)
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active' && animationRef.current) {
-        // Restart the scrolling when app returns from background
-        animationRef.current.stop();
-        translateX.stopAnimation();
-        translateX.setValue(containerWidth);
-        if (containerWidth && contentWidth) {
-          const distance = containerWidth + contentWidth;
+      if (nextAppState === 'active') {
+        const cw = containerWidthRef.current;
+        const contW = contentWidthRef.current;
+        if (cw > 0 && contW > 0) {
+          translateX.stopAnimation();
+          translateX.setValue(cw);
+          const distance = cw + contW;
           const duration = Math.max(MIN_SCROLL_DURATION_MS, Math.round((distance / PIXELS_PER_SECOND) * 1000));
           const newAnimation = Animated.loop(
             Animated.sequence([
               Animated.timing(translateX, {
-                toValue: -contentWidth,
+                toValue: -contW,
                 duration,
                 easing: Easing.linear,
                 useNativeDriver: true,
                 isInteraction: false,
               }),
               Animated.timing(translateX, {
-                toValue: containerWidth,
+                toValue: cw,
                 duration: 0,
                 easing: Easing.linear,
                 useNativeDriver: true,
@@ -58,7 +68,7 @@ export function NotesTeleprompterBar({ notes }: Props) {
     });
 
     return () => subscription.remove();
-  }, [containerWidth, contentWidth]);
+  }, [translateX]);
 
   useEffect(() => {
     translateX.stopAnimation();
