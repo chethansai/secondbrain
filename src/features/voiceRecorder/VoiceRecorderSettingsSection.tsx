@@ -16,7 +16,12 @@ import {
   stopVoiceRecordingBackground,
   deleteVoiceRecording,
   playVoiceRecording,
+  transcribeVoiceRecording,
+  saveTranscription,
 } from './voiceRecorderService';
+import { addNote, appendHistoryNote } from '../notes/noteMutations';
+import { useNotesSync } from '../sync/useNotesSync';
+import { copyText } from '../settings/clipboard';
 
 type SortOrder = 'desc' | 'asc';
 
@@ -29,6 +34,9 @@ export function VoiceRecorderSettingsSection() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [transcribingId, setTranscribingId] = useState<string | null>(null);
+  const [transcriptionTexts, setTranscriptionTexts] = useState<Record<string, string>>({});
+  const { data, commit } = useNotesSync();
 
   useEffect(() => {
     refreshVoiceRecorder();
@@ -50,6 +58,35 @@ export function VoiceRecorderSettingsSection() {
     setSettings(stored);
     setDurationText(String(stored.durationSeconds));
     await refreshRecordings();
+  }
+
+  async function handleTranscribe(id: string, uri: string) {
+    setTranscribingId(id);
+    setStatus('Transcribing with Groq Whisper...');
+    try {
+      const text = await transcribeVoiceRecording(uri);
+      if (text) {
+        await saveTranscription(id, text);
+        setTranscriptionTexts(prev => ({ ...prev, [id]: text }));
+        setStatus('Transcription complete. Adding to VOICENOTES category...');
+
+        // Add the transcribed note to VOICENOTES category
+        const result = addNote(data, ['VOICENOTES'], text);
+        const historyText = `Voice transcription from recording ${id} - VOICENOTES - ${new Date().toISOString()}`;
+        const commitResult = await commit(appendHistoryNote(result.ok ? result.data : data, historyText));
+        if (commitResult && result.ok) {
+          setStatus('Transcription added to VOICENOTES category.');
+        }
+      } else {
+        setStatus('Transcription failed or returned no text.');
+      }
+    } catch (e) {
+      setStatus('Transcription error occurred.');
+      console.error(e);
+    } finally {
+      setTranscribingId(null);
+      await refreshRecordings();
+    }
   }
 
   async function refreshRecordings() {
@@ -84,6 +121,11 @@ export function VoiceRecorderSettingsSection() {
       const deleted = await deleteVoiceRecording(id);
       await refreshRecordings();
       setStatus(deleted ? 'Recording deleted.' : 'Recording could not be deleted.');
+      setTranscriptionTexts(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     } finally {
       setSaving(false);
     }
@@ -125,26 +167,69 @@ export function VoiceRecorderSettingsSection() {
       <View style={styles.recordingList}>
         {sortedRecordings.length === 0 ? (
           <Text style={styles.emptyText}>No recordings yet.</Text>
-        ) : sortedRecordings.map((recording) => (
-          <View key={recording.id} style={styles.recordingRow}>
-            <View style={styles.recordingTextWrap}>
-              <Text style={styles.recordingTitle} numberOfLines={1}>{recording.fileName ?? recording.id}</Text>
-              <Text style={styles.recordingMeta} numberOfLines={1}>{formatRecordingMeta(recording)}</Text>
+        ) : sortedRecordings.map((recording) => {
+          const currentTranscription = recording.transcribedText || transcriptionTexts[recording.id] || '';
+          return (
+            <View key={recording.id} style={styles.recordingRow}>
+              <View style={styles.recordingTextWrap}>
+                <Text style={styles.recordingTitle} numberOfLines={1}>{recording.fileName ?? recording.id}</Text>
+                <Text style={styles.recordingMeta} numberOfLines={1}>{formatRecordingMeta(recording)}</Text>
+                {currentTranscription ? (
+                  <View style={styles.transcriptionBox}>
+                    <Text style={styles.transcriptionLabel}>Transcription:</Text>
+                    <TextInputField
+                      value={currentTranscription}
+                      onChangeText={(newText) => setTranscriptionTexts(prev => ({ ...prev, [recording.id]: newText }))}
+                      multiline
+                      style={styles.transcriptionInput}
+                    />
+                    <View style={styles.transcriptionActions}>
+                      <Button 
+                        label="Copy" 
+                        icon="copy-outline" 
+                        variant="secondary" 
+                        onPress={() => copyText(currentTranscription).then(copied => setStatus(copied ? 'Copied to clipboard.' : 'Copy failed.'))} 
+                        style={styles.smallButton}
+                      />
+                      <Button 
+                        label="Save to Notes" 
+                        icon="add" 
+                        variant="primary" 
+                        onPress={async () => {
+                          const result = addNote(data, ['VOICENOTES'], currentTranscription);
+                          const historyText = `Edited voice transcription - VOICENOTES - ${new Date().toISOString()}`;
+                          const commitResult = await commit(appendHistoryNote(result.ok ? result.data : data, historyText));
+                          setStatus(commitResult ? 'Saved to VOICENOTES category.' : 'Save failed.');
+                        }} 
+                        style={styles.smallButton}
+                      />
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+              <Button 
+                label="Play" 
+                icon="play" 
+                variant="secondary" 
+                onPress={async () => {
+                  const played = await playVoiceRecording(recording.uri);
+                  setStatus(played ? 'Playing recording...' : 'Failed to play recording.');
+                }} 
+                disabled={saving} 
+                style={styles.playButton} 
+              />
+              <Button 
+                label={transcribingId === recording.id ? 'Transcribing...' : 'Transcribe'} 
+                icon="text-outline" 
+                variant="secondary" 
+                onPress={() => handleTranscribe(recording.id, recording.uri)} 
+                disabled={!!transcribingId || saving} 
+                style={styles.transcribeButton} 
+              />
+              <Button label="Delete" icon="trash-outline" variant="danger" onPress={() => removeRecording(recording.id)} disabled={saving} style={styles.deleteButton} />
             </View>
-            <Button 
-              label="Play" 
-              icon="play" 
-              variant="secondary" 
-              onPress={async () => {
-                const played = await playVoiceRecording(recording.uri);
-                setStatus(played ? 'Playing recording...' : 'Failed to play recording.');
-              }} 
-              disabled={saving} 
-              style={styles.playButton} 
-            />
-            <Button label="Delete" icon="trash-outline" variant="danger" onPress={() => removeRecording(recording.id)} disabled={saving} style={styles.deleteButton} />
-          </View>
-        ))}
+          );
+        })}
       </View>
       {status ? <Text style={styles.status}>{status}</Text> : null}
     </View>
@@ -195,8 +280,14 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     recordingTitle: { ...typography.bodySmMedium, color: colors.ink },
     recordingMeta: { ...typography.micro, color: colors.slate },
     playButton: { minWidth: 72 },
+    transcribeButton: { minWidth: 90 },
     deleteButton: { minWidth: 82 },
     emptyText: { ...typography.bodySmMedium, color: colors.slate },
     status: { ...typography.bodySmMedium, color: colors.slate },
+    transcriptionBox: { marginTop: spacing.xs, padding: spacing.xs, backgroundColor: colors.surfaceSoft, borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairlineStrong },
+    transcriptionLabel: { ...typography.micro, color: colors.slate, marginBottom: 2 },
+    transcriptionInput: { minHeight: 60, fontSize: 14, backgroundColor: colors.canvas },
+    transcriptionActions: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.xs },
+    smallButton: { flex: 1, minWidth: 0 },
   });
 }

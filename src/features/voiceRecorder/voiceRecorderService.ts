@@ -213,3 +213,63 @@ export async function playVoiceRecording(uri: string): Promise<boolean> {
     return false;
   }
 }
+
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
+const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+const GROQ_MODEL = process.env.EXPO_PUBLIC_GROQ_MODEL || 'whisper-large-v3-turbo';
+
+export async function transcribeVoiceRecording(uri: string): Promise<string | null> {
+  if (!GROQ_API_KEY) {
+    console.error('GROQ_API_KEY not set in environment');
+    return null;
+  }
+
+  try {
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    if (!fileInfo.exists || !('size' in fileInfo)) {
+      console.error('Recording file not found');
+      return null;
+    }
+
+    const formData = new FormData();
+    // @ts-ignore - RN FormData supports this
+    formData.append('file', {
+      uri,
+      type: 'audio/m4a',
+      name: 'recording.m4a',
+    } as any);
+    formData.append('model', GROQ_MODEL);
+    formData.append('response_format', 'json');
+    formData.append('language', 'en');
+
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+      },
+      body: formData as any,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Groq transcription error:', response.status, errorText);
+      return null;
+    }
+
+    const result = await response.json();
+    return result.text || null;
+  } catch (e) {
+    console.error('Failed to transcribe voice recording', e);
+    return null;
+  }
+}
+
+export async function saveTranscription(id: string, text: string): Promise<boolean> {
+  const recordings = await loadVoiceRecordings();
+  const recordingIndex = recordings.findIndex(r => r.id === id);
+  if (recordingIndex === -1) return false;
+
+  recordings[recordingIndex].transcribedText = text;
+  await saveVoiceRecordings(recordings);
+  return true;
+}

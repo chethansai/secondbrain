@@ -6,6 +6,7 @@ export type VoiceRecording = {
   completedAt?: string;
   fileName?: string;
   sizeBytes?: number;
+  transcribedText?: string;
 };
 
 export type VoiceRecorderSettings = {
