@@ -264,7 +264,8 @@ export async function stopVoiceRecordingPlayback(): Promise<boolean> {
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
-const GROQ_MODEL = process.env.EXPO_PUBLIC_GROQ_MODEL || 'whisper-large-v3-turbo';
+// Always use valid Whisper model for transcription (ignore LLM model from .env)
+const GROQ_TRANSCRIPTION_MODEL = 'whisper-large-v3-turbo';
 
 export async function transcribeVoiceRecording(uri: string): Promise<string | null> {
   if (!GROQ_API_KEY) {
@@ -286,7 +287,7 @@ export async function transcribeVoiceRecording(uri: string): Promise<string | nu
       type: 'audio/m4a',
       name: 'recording.m4a',
     } as any);
-    formData.append('model', GROQ_MODEL);
+    formData.append('model', GROQ_TRANSCRIPTION_MODEL);
     formData.append('response_format', 'json');
     formData.append('language', 'en');
 

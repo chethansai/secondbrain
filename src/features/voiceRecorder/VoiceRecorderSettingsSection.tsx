@@ -50,6 +50,17 @@ export function VoiceRecorderSettingsSection() {
     return () => subscription.remove();
   }, []);
 
+  // Auto-transcribe as soon as new untranscribed voice recordings appear in the section
+  useEffect(() => {
+    const untranscribed = recordings.filter(
+      (r) => !r.transcribedText && !transcriptionTexts[r.id]
+    );
+    if (untranscribed.length > 0 && transcribingId === null) {
+      const rec = untranscribed[0];
+      handleTranscribe(rec.id, rec.uri).catch(console.error);
+    }
+  }, [recordings, transcriptionTexts, transcribingId, handleTranscribe]);
+
   const sortedRecordings = useMemo(() => {
     return [...recordings].sort((left, right) => {
       const diff = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
