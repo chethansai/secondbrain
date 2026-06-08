@@ -430,7 +430,7 @@ Minimum behavior matrix to consider when touching core flows:
 
 - 2026-06-08: Per user request, added Pause/Stop buttons for each audio clip (shared global sound instance in voiceRecorderService.ts with dedicated pause/stop helpers that update playback state). Introduced bulk select (checkbox per row, Select All toggle), multi-delete with cautionary confirmation dialog. Added bulk action bar, selected row highlight, and modal overlay. Extended Icon.tsx with 'pause' symbol. Typecheck clean. Updated both histories.
 
-- 2026-06-08: Re-read plan.md and CLAUDE.md confirming voice recording already includes per-clip Pause/Stop buttons, bulk select-all/delete with cautionary modal. No additional changes required. Typecheck clean. Updated histories.
+- 2026-06-08: Re-read plan.md + CLAUDE.md for voice recorder (per user request). Confirmed Pause/Stop buttons per audio clip (global shared sound + helpers), bulk select-all checkboxes, multi-delete with cautionary modal. Matches requirements. No changes. Typecheck clean. Updated histories.
 
 - 2026-06-02: Implemented permission-free Android home-gesture quick note entry. `NoteWidgetConfigureActivity` now supports quick-note mode without a widget id, saving through the existing native Firestore path and finishing after save. Android voice interaction and fallback assistant intents now launch this quick-note UI instead of requiring overlay permission.
 
