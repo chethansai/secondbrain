@@ -110,7 +110,7 @@ class NoteWidgetConfigureActivity : Activity() {
       orientation = LinearLayout.VERTICAL
       setPadding(dp(16), dp(14), dp(16), dp(14))
       addView(TextView(this@NoteWidgetConfigureActivity).apply {
-        text = "Floating quick add"
+        text = if (quickNoteMode) "Native Notes quick add" else "Native Notes widget"
         textSize = 18f
         setTextColor(0xff1a1a1a.toInt())
       }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))

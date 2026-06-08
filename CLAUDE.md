@@ -412,20 +412,6 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
-- 2026-06-03: Updated native quick-entry branding and workspace startup handoff. Android floating overlay and 1x1 widget now show a bold `P`; overlay notification creation is extracted so `OverlayService.kt` stays under 600 lines; cached notes can hydrate immediately even if workspace metadata settled first, while remote notes still win over late cache. Decision: attached logo asset could not be applied because it was not available as a workspace PNG file to the tools.
-
-- 2026-06-03: Implemented Android back and widget quick-add parity. System/gesture back now reuses app navigation state to close modals, return panels to workspace, or pop category paths like `<`; Android back invocation callbacks are enabled. The home-screen widget passes its last category into the native quick-add Activity, which now supports Enter/IME Done saves for note/category/subcategory inputs and renders two-column multi-line category chips while keeping clipboard copy after successful Firestore saves.
-
-- 2026-06-03: Tightened the logged-in workspace fast-start cache refresh handoff. Cached workspace content still renders immediately, but startup reloading now clears only after both notes and workspace metadata listeners settle, and late AsyncStorage cache hydration cannot override already-arrived Firestore data.
-
-- 2026-06-03: Made the Android home-screen quick note widget resemble the native floating icon and continue opening the rich quick-add window. Changed the native floating overlay default/reset position to bottom-center slightly above the bottom edge. Decision: launcher widget placement remains user-controlled by Android, so the app styles the widget and repositions only the real overlay.
-
-- 2026-06-03: Fixed purple note ordering buttons. First tap selects the source note; second tap moves that note below the tapped target note. Kept drag reorder, shared the displacement/order math across main and workspace note previews, applied it to expanded subcategories, and extracted `WorkspaceSubcategoryRow` so touched source files stay under 600 lines.
-
-- 2026-06-03: Added an in-app notes teleprompter bar below the OS status bar. It flattens the notes JSON, skips generated HISTORY notes, and auto-scrolls category-labeled note snippets across the app top chrome without covering time or battery.
-
-- 2026-06-03: Reduced logged-in workspace startup loading with a combined AsyncStorage workspace snapshot cache for notes JSON plus workspace metadata. Cached sessions render immediately from the previous offline snapshot, then Firestore refreshes replace it through the existing reloading state; first installs without cache still wait for initial data.
-
 - 2026-06-02: Implemented permission-free Android home-gesture quick note entry. `NoteWidgetConfigureActivity` now supports quick-note mode without a widget id, saving through the existing native Firestore path and finishing after save. Android voice interaction and fallback assistant intents now launch this quick-note UI instead of requiring overlay permission.
 
 - 2026-06-02: Routed Android home-button assistant and native overlay assistant action to the workspace/categories board instead of the Assistant tab/add-note editor. Added `nativenotes://workspace` deep-link parsing, reset app navigation to root workspace on that route, and changed the voice-interaction services plus overlay assistant action to use it. Decision: keep `nativenotes://assistant` for the in-app Assistant panel, but make home/overlay entry points open categories as the requested default landing screen.
