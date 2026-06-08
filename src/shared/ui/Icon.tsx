@@ -29,7 +29,8 @@ export type IconName =
   | 'chevron-up'
   | 'chevron-down'
   | 'chevron-forward'
-  | 'play';
+  | 'play'
+  | 'text-outline';
 
 type Props = {
   name: IconName;
@@ -48,6 +49,7 @@ const labels: Record<IconName, string> = {
   'cloud-upload-outline': '^',
   'copy-outline': '□',
   'create-outline': '✎',
+  'text-outline': 'T',
   'document-text-outline': 'N',
   'ellipsis-vertical': '⋮',
   'folder-outline': 'F',

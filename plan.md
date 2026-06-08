@@ -12,6 +12,8 @@ This post-step Git workflow is mandatory and must not be skipped after any imple
 
 ## history
 
+- 2026-06-08: Executed mandatory git commit + push workflow for the completed voice recorder playback feature (no code changes; histories already updated, typecheck/build clean). `git status` clean, `git add .`, commit, and `git push -u origin main` completed successfully.
+
 - 2026-06-08: Completed voice recorder playback feature. The `src/features/voiceRecorder/` feature already supports listing, deleting, and playing audio recordings (via `playVoiceRecording` in service using expo-av Sound.createAsync with auto-unload). "Play" buttons appear in settings UI alongside delete. `npm run typecheck` passes. No additional changes needed as feature fulfills "get files, delete them, play the audio recording".
 
 - 2026-06-02: Implemented permission-free Android home-gesture quick note entry. Reused `NoteWidgetConfigureActivity` in a new quick-note mode that does not require an app widget id, saves notes through the existing native Firestore append path, and closes after save. Routed `VoiceInteractionService`, `VoiceInteractionSessionService`, and fallback `ASSIST`/`VOICE_ASSIST` activity launches to this quick-note UI instead of relying on an over-other-apps floating overlay.

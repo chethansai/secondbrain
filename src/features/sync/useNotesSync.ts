@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CategoryPath, NotesData, MutationResult, PinnedNoteRef, WorkspaceIndex } from '../../shared/types/notes';
+import { CategoryPath, NotesData, MutationResult, PinnedNoteRef, WorkspaceIndex, WorkspaceMeta } from '../../shared/types/notes';
 import { readLocalWorkspaceIndex, readLocalWorkspaceNotes, readLocalWorkspaceSnapshot, writeLocalWorkspaceIndex, writeLocalWorkspaceNotes, writeLocalWorkspaceSnapshot } from './localNotesRepository';
 import { createWorkspaceMeta, defaultWorkspaceId, readLatestWorkspaceIndex, readLatestWorkspaceNotes, subscribeToWorkspaceIndex, subscribeToWorkspaceNotes, writeWorkspaceIndex, writeWorkspaceNotes } from './notesRepository';
 
@@ -22,7 +22,7 @@ export function useNotesSync() {
   const [error, setError] = useState<string | null>(null);
   const [localMode, setLocalMode] = useState(false);
   const activeWorkspaceId = workspaceIndex.activeWorkspaceId;
-  const activeWorkspace = workspaceIndex.workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaceIndex.workspaces[0] ?? null;
+  const activeWorkspace = (workspaceIndex.workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaceIndex.workspaces[0] ?? null) as WorkspaceMeta | null;
 
   useEffect(() => {
     let cancelled = false;
@@ -245,6 +245,16 @@ export function useNotesSync() {
     return persistWorkspaceIndex({ ...workspaceIndex, workspaces: nextWorkspaces, version: workspaceIndex.version + 1 });
   }, [activeWorkspaceId, persistWorkspaceIndex, workspaceIndex]);
 
+  const updateTeleprompterSettings = useCallback(async (enabled: boolean, selectedCategories: string[] = []) => {
+    const validCategories = selectedCategories.filter(c => c.trim().length > 0);
+    const nextWorkspaces = workspaceIndex.workspaces.map((workspace) => 
+      workspace.id === activeWorkspaceId 
+        ? { ...workspace, teleprompterEnabled: enabled, teleprompterCategories: validCategories } 
+        : workspace
+    );
+    return persistWorkspaceIndex({ ...workspaceIndex, workspaces: nextWorkspaces, version: workspaceIndex.version + 1 });
+  }, [activeWorkspaceId, persistWorkspaceIndex, workspaceIndex]);
+
   const refresh = useCallback(async () => {
     if (refreshing) return false;
     setRefreshing(true);
@@ -292,6 +302,7 @@ export function useNotesSync() {
     updateSelectedCategoryPaths,
     updatePinnedCategoryPaths,
     updatePinnedNotes,
+    updateTeleprompterSettings,
     refresh,
   };
 }

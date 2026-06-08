@@ -33,6 +33,8 @@ export type WorkspaceMeta = {
   selectedCategoryPaths: CategoryPath[];
   pinnedCategoryPaths: CategoryPath[];
   pinnedNotes: PinnedNoteRef[];
+  teleprompterEnabled: boolean;
+  teleprompterCategories: string[]; // root category names for persistent status bar scrolling notes
 };
 
 export type WorkspaceIndex = {

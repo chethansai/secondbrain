@@ -134,6 +134,8 @@ function parseLegacyWorkspaceIndex(parsed: Partial<WorkspaceIndex>): WorkspaceIn
       selectedCategoryPaths: Array.isArray(workspace.selectedCategoryPaths) ? workspace.selectedCategoryPaths : [],
       pinnedCategoryPaths: Array.isArray(workspace.pinnedCategoryPaths) ? workspace.pinnedCategoryPaths : [],
       pinnedNotes: Array.isArray(workspace.pinnedNotes) ? workspace.pinnedNotes : [],
+      teleprompterEnabled: typeof workspace.teleprompterEnabled === 'boolean' ? workspace.teleprompterEnabled : true,
+      teleprompterCategories: Array.isArray(workspace.teleprompterCategories) ? workspace.teleprompterCategories : [],
     }];
   }) : [];
   const activeWorkspace = workspaces.find((workspace) => workspace.id === parsed.activeWorkspaceId || workspace.name === parsed.activeWorkspaceId) ?? workspaces[0];
@@ -143,6 +145,6 @@ function parseLegacyWorkspaceIndex(parsed: Partial<WorkspaceIndex>): WorkspaceIn
 }
 
 function defaultLocalWorkspaceIndex(): WorkspaceIndex {
-  const workspace = createWorkspaceMeta(defaultWorkspaceId, defaultWorkspaceId);
+  const workspace = createWorkspaceMeta(defaultWorkspaceId, defaultWorkspaceId, [], [], [], true, []);
   return { workspaces: [workspace], activeWorkspaceId: workspace.id, defaultWorkspaceId: workspace.id, version: 1 };
 }
