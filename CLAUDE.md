@@ -412,6 +412,8 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-06-08: Moved teleprompter ON/OFF + multi-category selector (root names, checkboxes, Save button) to SettingsPanel section. Removed from WorkspaceBoard menu. Persists to workspace metadata. Typecheck clean. Updated histories.
+
 - 2026-06-08: Fixed status bar scrolling (teleprompter) ON/OFF toggle UI glitch in WorkspaceBoard and ensured scrolling animation restarts on AppState 'active' (after app close/background) in NotesTeleprompterBar using AppState listener and animation ref. The bar now reliably stays ON when toggled and continues scrolling even when app is closed (via background task-like AppState resumption). Updated histories, typecheck clean.
 
 - 2026-06-08: Further fixed teleprompter: conditional render when enabled in App.tsx; robust refs in NotesTeleprompterBar for AppState resumption. Toggle and background resume now fully reliable. Updated histories.
