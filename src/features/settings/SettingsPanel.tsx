@@ -298,6 +298,8 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
       {status ? <Text style={styles.status}>{status}</Text> : null}
     </View>
   );
+}
+
 
 
 function parseImportNotesData(value: unknown) {

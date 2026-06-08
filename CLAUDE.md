@@ -426,6 +426,8 @@ Minimum behavior matrix to consider when touching core flows:
 
 - 2026-06-08: Enhanced voice recorder: auto-transcribes immediately when new files appear in settings (useEffect on recordings list for untranscribed). Hardcoded whisper-large-v3-turbo model (ignores llama LLM in .env). Groq key from EXPO_PUBLIC_GROQ_API_KEY. Explicit per-recording Transcribe button, editable text box below audio row, Copy button, Save-to-Notes button (adds edited transcription to VOICENOTES via deterministic addNote + commit). Persists transcription in metadata. Typecheck clean. Updated histories.
 
+- 2026-06-08: Re-read plan.md + CLAUDE.md for voice recorder per user request. Confirmed that recordings are transcribed as soon as they appear, explicit Transcribe button per audio, result populates editable text dialog below the recording (editable, with Copy and Save-to-Notes buttons that add to VOICENOTES). Uses the provided Groq key. Matches request exactly. No further changes needed. Typecheck clean. Updated both histories.
+
 - 2026-06-08: Executed mandatory git commit + push workflow for voice recorder transcription improvements. `git status` clean, `git add .`, commit, and `git push -u origin main` completed successfully.
 
 - 2026-06-08: Completed voice recorder playback feature per user request. Recordings can be listed, deleted, and played directly from Settings > Voice recorder section using expo-av for audio. Native Android foreground service integration for recording is in place. Updated history in both plan.md and CLAUDE.md. `npm run typecheck` clean.

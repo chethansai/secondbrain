@@ -31,7 +31,9 @@ export type IconName =
   | 'chevron-forward'
   | 'play'
   | 'pause'
-  | 'text-outline';
+  | 'text-outline'
+  | 'checkmark-square'
+  | 'square';
 
 type Props = {
   name: IconName;
@@ -71,6 +73,8 @@ const labels: Record<IconName, string> = {
   'chevron-forward': '>',
   play: '▶',
   pause: '❚❚',
+  'checkmark-square': '☑',
+  square: '☐',
 };
 
 export function Icon({ name, size = 18, color }: Props) {
