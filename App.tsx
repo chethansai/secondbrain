@@ -668,7 +668,6 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onSetNotePriority={setNoteOrderPriority}
                   onToggleNotePin={toggleNotePin}
                   onDeleteNote={confirmDeleteNote}
-                  onUpdateTeleprompterSettings={updateTeleprompterSettings}
                 />
               ) : (
                 <View style={styles.sectionStack}>
@@ -721,7 +720,15 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           {!loading && tab === 'settings' ? (
             <View style={styles.sectionStack}>
               <PanelHeader title="Settings" onBack={backToWorkspace} />
-              <SettingsPanel data={data} authTimeoutHours={authTimeoutHours} onAuthTimeoutChange={onAuthTimeoutChange} onImport={importData} />
+              <SettingsPanel 
+                data={data} 
+                authTimeoutHours={authTimeoutHours} 
+                onAuthTimeoutChange={onAuthTimeoutChange} 
+                onImport={importData}
+                teleprompterEnabled={teleprompterEnabled}
+                teleprompterCategories={teleprompterCategoryNames}
+                onUpdateTeleprompterSettings={updateTeleprompterSettings}
+              />
             </View>
           ) : null}
           {!loading && tab === 'aiChat' ? (

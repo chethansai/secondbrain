@@ -57,7 +57,6 @@ type Props = {
   onSetNotePriority: (note: FlatNote, priority: number) => void;
   onToggleNotePin: (note: FlatNote) => void;
   onDeleteNote: (note: FlatNote) => void;
-  onUpdateTeleprompterSettings?: (enabled: boolean, categories?: string[]) => void;
 };
 
 export function WorkspaceBoard({
@@ -104,7 +103,6 @@ export function WorkspaceBoard({
   onSetNotePriority,
   onToggleNotePin,
   onDeleteNote,
-  onUpdateTeleprompterSettings = () => {},
 }: Props) {
   const { colors, isDark, toggleTheme } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -244,11 +242,6 @@ export function WorkspaceBoard({
                 <Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={() => { closeHeaderMenus(); onOpenSettings(); }} style={styles.headerMenuRow}>
                   <View style={styles.headerMenuRowIcon}><Icon name="settings-outline" size={16} color={colors.ink} /></View>
                   <Text style={styles.headerMenuRowText} numberOfLines={1}>Settings</Text>
-                </Pressable>
-
-                <Pressable accessibilityRole="button" accessibilityLabel="Status bar scrolling notes" onPress={() => { closeHeaderMenus(); onUpdateTeleprompterSettings(!activeWorkspace?.teleprompterEnabled, activeWorkspace?.teleprompterCategories || []); }} style={styles.headerMenuRow}>
-                  <View style={styles.headerMenuRowIcon}><Icon name="text-outline" size={16} color={colors.ink} /></View>
-                  <Text style={styles.headerMenuRowText} numberOfLines={1}>Status bar scrolling {activeWorkspace?.teleprompterEnabled ? 'ON' : 'OFF'}</Text>
                 </Pressable>
 
                 <Pressable accessibilityRole="button" accessibilityLabel="Open search" onPress={() => { closeHeaderMenus(); onOpenSearch(); }} style={styles.headerMenuRow}>
