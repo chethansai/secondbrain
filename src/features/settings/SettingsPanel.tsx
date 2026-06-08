@@ -9,6 +9,7 @@ import { NotesData, NoteItem } from '../../shared/types/notes';
 import { authTimeoutOptions, formatAuthTimeout } from '../auth/authSession';
 import { cloneItems, isCategoryNode } from '../categories/categoryTree';
 import { validateNotesData } from '../sync/validation';
+import { VoiceRecorderSettingsSection } from '../voiceRecorder/VoiceRecorderSettingsSection';
 import { copyText } from './clipboard';
 import { overlayActionLabels, overlayTapActions, isFloatingOverlayAvailable, readFloatingOverlaySettings, requestFloatingOverlayPermission, resetFloatingOverlayPlacement, startFloatingOverlay, stopFloatingOverlay, updateFloatingOverlaySettings } from './floatingOverlay';
 
@@ -212,6 +213,9 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
           </View>
           <Button label="Reset floating icon position" icon="reload-outline" variant="secondary" onPress={resetFloatingIcon} disabled={overlaySaving || !overlayAvailable} />
         </View>
+      </View>
+      <View style={styles.settingGroup}>
+        <VoiceRecorderSettingsSection />
       </View>
       <Button label="Copy export JSON" icon="copy-outline" onPress={exportJson} />
       <TextInputField value={importText} onChangeText={setImportText} multiline placeholder="Paste simple nested JSON" accessibilityLabel="Import JSON" autoCapitalize="none" autoCorrect={false} />

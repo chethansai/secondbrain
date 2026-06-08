@@ -1,12 +1,49 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
-import { Platform } from 'react-native';
-import { VoiceRecording, VoiceRecorderSettings, VOICE_RECORDINGS_STORAGE_KEY, VOICE_RECORDER_SETTINGS_KEY, DEFAULT_VOICE_RECORDER_SETTINGS } from './voiceRecorderTypes';
+import { Audio } from 'expo-av';
+import { NativeModules, Platform } from 'react-native';
+import {
+  VoiceRecording,
+  VoiceRecorderSettings,
+  VOICE_RECORDINGS_STORAGE_KEY,
+  VOICE_RECORDER_SETTINGS_KEY,
+  DEFAULT_VOICE_RECORDER_SETTINGS,
+  MIN_VOICE_RECORDER_DURATION_SECONDS,
+  MAX_VOICE_RECORDER_DURATION_SECONDS,
+} from './voiceRecorderTypes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const VOICE_RECORDING_TASK = 'voice-recording-task';
 const RECORDINGS_DIR = FileSystem.documentDirectory + 'voice-recordings/';
+
+type NativeVoiceRecorderModule = {
+  startRecording(settings: VoiceRecorderSettings): Promise<boolean>;
+  stopRecording(): Promise<boolean>;
+  listRecordings(): Promise<VoiceRecording[]>;
+  deleteRecording(id: string): Promise<boolean>;
+};
+
+const NativeVoiceRecorder = Platform.OS === 'android'
+  ? NativeModules.VoiceRecorderModule as NativeVoiceRecorderModule | undefined
+  : undefined;
+
+export function normalizeVoiceRecorderSettings(value: Partial<VoiceRecorderSettings> & { durationHours?: number } | null | undefined): VoiceRecorderSettings {
+  const legacyDurationSeconds = typeof value?.durationHours === 'number' ? value.durationHours * 60 * 60 : undefined;
+  return {
+    enabled: Boolean(value?.enabled),
+    durationSeconds: clampDurationSeconds(value?.durationSeconds ?? legacyDurationSeconds ?? DEFAULT_VOICE_RECORDER_SETTINGS.durationSeconds),
+  };
+}
+
+export function clampDurationSeconds(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_VOICE_RECORDER_SETTINGS.durationSeconds;
+  return Math.max(MIN_VOICE_RECORDER_DURATION_SECONDS, Math.min(MAX_VOICE_RECORDER_DURATION_SECONDS, Math.round(value)));
+}
+
+export function isNativeVoiceRecorderAvailable() {
+  return Boolean(NativeVoiceRecorder);
+}
 
 export async function ensureRecordingsDir() {
   const info = await FileSystem.getInfoAsync(RECORDINGS_DIR);
@@ -19,7 +56,7 @@ export async function loadVoiceRecorderSettings(): Promise<VoiceRecorderSettings
   try {
     const json = await AsyncStorage.getItem(VOICE_RECORDER_SETTINGS_KEY);
     if (json) {
-      return { ...DEFAULT_VOICE_RECORDER_SETTINGS, ...JSON.parse(json) };
+      return normalizeVoiceRecorderSettings(JSON.parse(json));
     }
   } catch (e) {
     console.warn('Failed to load voice settings', e);
@@ -29,13 +66,16 @@ export async function loadVoiceRecorderSettings(): Promise<VoiceRecorderSettings
 
 export async function saveVoiceRecorderSettings(settings: VoiceRecorderSettings) {
   try {
-    await AsyncStorage.setItem(VOICE_RECORDER_SETTINGS_KEY, JSON.stringify(settings));
+    await AsyncStorage.setItem(VOICE_RECORDER_SETTINGS_KEY, JSON.stringify(normalizeVoiceRecorderSettings(settings)));
   } catch (e) {
     console.warn('Failed to save voice settings', e);
   }
 }
 
 export async function loadVoiceRecordings(): Promise<VoiceRecording[]> {
+  if (NativeVoiceRecorder) {
+    return NativeVoiceRecorder.listRecordings();
+  }
   try {
     const json = await AsyncStorage.getItem(VOICE_RECORDINGS_STORAGE_KEY);
     if (json) {
@@ -72,6 +112,9 @@ export async function addVoiceRecording(recording: Omit<VoiceRecording, 'id' | '
 }
 
 export async function deleteVoiceRecording(id: string): Promise<boolean> {
+  if (NativeVoiceRecorder) {
+    return NativeVoiceRecorder.deleteRecording(id);
+  }
   const recordings = await loadVoiceRecordings();
   const recording = recordings.find(r => r.id === id);
   if (!recording) return false;
@@ -109,14 +152,26 @@ export function registerVoiceRecordingTask() {
 }
 
 export async function startVoiceRecordingBackground(settings: VoiceRecorderSettings) {
-  if (!settings.enabled) return false;
+  const normalized = normalizeVoiceRecorderSettings(settings);
+  if (!normalized.enabled) return false;
+
+  const permission = await Audio.requestPermissionsAsync();
+  if (!permission.granted) {
+    return false;
+  }
+
+  await saveVoiceRecorderSettings(normalized);
+
+  if (NativeVoiceRecorder) {
+    return NativeVoiceRecorder.startRecording(normalized);
+  }
 
   await registerVoiceRecordingTask();
   try {
     await BackgroundTask.registerTaskAsync(VOICE_RECORDING_TASK, {
-      minimumInterval: settings.durationHours * 3600, // in seconds
+      minimumInterval: normalized.durationSeconds,
     });
-    console.log('Voice recording background task registered for duration', settings.durationHours, 'hours');
+    console.log('Voice recording background task registered for duration', normalized.durationSeconds, 'seconds');
     return true;
   } catch (e) {
     console.warn('Failed to register voice background task', e);
@@ -125,12 +180,36 @@ export async function startVoiceRecordingBackground(settings: VoiceRecorderSetti
 }
 
 export async function stopVoiceRecordingBackground() {
+  if (NativeVoiceRecorder) {
+    await saveVoiceRecorderSettings({ ...DEFAULT_VOICE_RECORDER_SETTINGS, enabled: false });
+    return NativeVoiceRecorder.stopRecording();
+  }
   try {
     await BackgroundTask.unregisterTaskAsync(VOICE_RECORDING_TASK);
     console.log('Voice recording background task stopped');
     return true;
   } catch (e) {
     console.warn('Failed to stop voice background task', e);
+    return false;
+  }
+}
+
+export async function playVoiceRecording(uri: string): Promise<boolean> {
+  if (!uri) return false;
+  try {
+    const { sound } = await Audio.Sound.createAsync(
+      { uri },
+      { shouldPlay: true, volume: 1.0 }
+    );
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.isLoaded && 'didJustFinish' in status && status.didJustFinish) {
+        sound.unloadAsync().catch(console.warn);
+      }
+    });
+    console.log('Started playing recording from', uri);
+    return true;
+  } catch (e) {
+    console.error('Failed to play voice recording', e);
     return false;
   }
 }

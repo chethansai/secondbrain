@@ -39,6 +39,7 @@ type MoveCopyAction = 'move' | 'copy';
 type MoveCopyTarget = { type: 'note'; note: FlatNote } | { type: 'category'; path: CategoryPath } | null;
 type Tab = 'workspace' | 'search' | 'settings' | 'aiChat' | 'ai' | 'aiWorkspace' | 'aiNotifications' | 'assistant';
 type DeleteTarget = { type: 'category'; path: CategoryPath } | { type: 'note'; note: FlatNote } | null;
+const DEFAULT_NOTE_CATEGORY = 'No TS';
 
 export default function App() {
   return <ThemeProvider><AppContent /></ThemeProvider>;
@@ -313,14 +314,36 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     return addWorkspaceNote(notePath, text);
   }
 
-  async function addWorkspaceNote(notePath: CategoryPath, text: string) {
-    const result = addNote(data, notePath, text);
+  async function addWorkspaceNote(notePath: CategoryPath, text: string, sourceData: NotesData = data) {
+    const result = addNote(sourceData, notePath, text);
     const historyText = formatAddedNoteHistory(text, notePath);
     const ok = await commitWithHistory(result, historyText);
     if (ok && result.ok) {
       const reviewData = appendHistoryNote(result.data, historyText);
       const reviewNote = getInsertedFlatNote(result.data, notePath, text);
       if (reviewData.ok && reviewNote) await reviewIncomingSeekNotes(reviewData.data, [reviewNote]);
+    }
+    return ok;
+  }
+
+  async function addEditorDefaultNote(text: string) {
+    const targetPath = editorPath?.length ? editorPath : path.length ? path : [DEFAULT_NOTE_CATEGORY];
+    let sourceData = data;
+
+    if (!getCategoryItems(sourceData, targetPath)) {
+      if (targetPath.length !== 1 || targetPath[0] !== DEFAULT_NOTE_CATEGORY) {
+        setError('The selected category no longer exists.');
+        return false;
+      }
+      const categoryResult = createRootCategory(sourceData, DEFAULT_NOTE_CATEGORY);
+      if (!categoryResult.ok) return commit(categoryResult);
+      sourceData = categoryResult.data;
+    }
+
+    const ok = await addWorkspaceNote(targetPath, text, sourceData);
+    if (ok) {
+      await includeWorkspaceCategory(targetPath[0]);
+      setPath(targetPath);
     }
     return ok;
   }
@@ -762,6 +785,8 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           return ok;
         }}
         onSubmitToCategory={editorMode === 'add' ? addWorkspaceNote : undefined}
+        onSubmitDefaultCategory={editorMode === 'add' ? addEditorDefaultNote : undefined}
+        defaultCategoryLabel={(editorPath?.length ? editorPath : path.length ? path : [DEFAULT_NOTE_CATEGORY]).join(' > ')}
         onCreateSubcategory={editorMode === 'add' ? createEditorSubcategory : undefined}
         pinnedPaths={activeWorkspace?.pinnedCategoryPaths ?? []}
         onToggleCategoryPin={togglePinnedMoveCopyCategory}

@@ -17,6 +17,7 @@ export type IconName =
   | 'git-branch-outline'
   | 'log-out-outline'
   | 'lock-open-outline'
+  | 'mic-outline'
   | 'notifications-outline'
   | 'pin-outline'
   | 'reload-outline'
@@ -27,7 +28,8 @@ export type IconName =
   | 'trash-outline'
   | 'chevron-up'
   | 'chevron-down'
-  | 'chevron-forward';
+  | 'chevron-forward'
+  | 'play';
 
 type Props = {
   name: IconName;
@@ -52,6 +54,7 @@ const labels: Record<IconName, string> = {
   'git-branch-outline': '↗',
   'log-out-outline': 'L',
   'lock-open-outline': 'U',
+  'mic-outline': 'M',
   'notifications-outline': 'N',
   'pin-outline': 'P',
   'reload-outline': 'R',
@@ -63,6 +66,7 @@ const labels: Record<IconName, string> = {
   'chevron-up': '^',
   'chevron-down': 'v',
   'chevron-forward': '>',
+  play: '▶',
 };
 
 export function Icon({ name, size = 18, color }: Props) {
