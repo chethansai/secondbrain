@@ -614,7 +614,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <NotesTeleprompterBar notes={teleprompterNotes} />
+      {teleprompterEnabled && <NotesTeleprompterBar notes={teleprompterNotes} />}
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" onScroll={handleScreenScroll} scrollEventThrottle={16}>
         <View style={[styles.workspaceCard, showingRootBoard && styles.workspaceCardBoard]}>
           {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}

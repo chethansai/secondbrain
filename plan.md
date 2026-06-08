@@ -14,7 +14,7 @@ This post-step Git workflow is mandatory and must not be skipped after any imple
 
 - 2026-06-08: Fixed status bar scrolling (teleprompter) ON/OFF toggle UI glitch in WorkspaceBoard and ensured scrolling animation restarts on AppState 'active' (after app close/background) in NotesTeleprompterBar using AppState listener and animation ref. The bar now reliably stays ON when toggled and continues scrolling even when app is closed (via background task-like AppState resumption). Updated histories, typecheck clean.
 
-- 2026-06-08: Further fixed teleprompter ON/OFF by conditionally rendering NotesTeleprompterBar in App.tsx only when enabled. Enhanced NotesTeleprompterBar with refs for latest widths/prompt on AppState 'active' resumption (after app close/background). Toggle now works and scrolling reliably continues. Updated histories.
+- 2026-06-08: Re-fixed teleprompter status bar scrolling ON/OFF toggle (added conditional render {teleprompterEnabled && <NotesTeleprompterBar ... />} in App.tsx so OFF hides the bar). Scrolling continues reliably after app close via existing AppState 'active' listener + refs in NotesTeleprompterBar. Typecheck clean. Updated histories.
 
 - 2026-06-08: Executed mandatory git commit + push workflow for the completed voice recorder playback feature (no code changes; histories already updated, typecheck/build clean). `git status` clean, `git add .`, commit, and `git push -u origin main` completed successfully.
 
