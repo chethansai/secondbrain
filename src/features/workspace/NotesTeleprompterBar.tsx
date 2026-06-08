@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, AppState, Easing, StyleSheet, Text, View } from 'react-native';
 import { formatPath } from '../categories/categoryTree';
 import { HISTORY_CATEGORY } from '../notes/noteMutations';
 import { useTheme } from '../../shared/design/ThemeProvider';

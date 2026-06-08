@@ -25,3 +25,7 @@ export const DEFAULT_VOICE_RECORDER_SETTINGS: VoiceRecorderSettings = {
 };
 
 export type VoiceRecorderPlaybackStatus = 'idle' | 'playing' | 'paused' | 'error';
+
+export type VoiceRecordingWithPlayback = VoiceRecording & {
+  playbackStatus?: VoiceRecorderPlaybackStatus;
+};

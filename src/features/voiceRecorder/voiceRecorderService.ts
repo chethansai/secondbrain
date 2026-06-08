@@ -17,6 +17,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const VOICE_RECORDING_TASK = 'voice-recording-task';
 const RECORDINGS_DIR = FileSystem.documentDirectory + 'voice-recordings/';
 
+let currentSound: Audio.Sound | null = null;
+
 type NativeVoiceRecorderModule = {
   startRecording(settings: VoiceRecorderSettings): Promise<boolean>;
   stopRecording(): Promise<boolean>;
@@ -196,20 +198,66 @@ export async function stopVoiceRecordingBackground() {
 
 export async function playVoiceRecording(uri: string): Promise<boolean> {
   if (!uri) return false;
+
+  // Stop any currently playing sound
+  if (currentSound) {
+    try {
+      await currentSound.stopAsync();
+      await currentSound.unloadAsync();
+    } catch (e) {
+      console.warn('Failed to stop previous sound', e);
+    }
+    currentSound = null;
+  }
+
   try {
     const { sound } = await Audio.Sound.createAsync(
       { uri },
-      { shouldPlay: true, volume: 1.0 }
+      { shouldPlay: true, volume: 1.0, isLooping: false }
     );
+    currentSound = sound;
+
     sound.setOnPlaybackStatusUpdate((status) => {
-      if (status.isLoaded && 'didJustFinish' in status && status.didJustFinish) {
-        sound.unloadAsync().catch(console.warn);
+      if (status.isLoaded) {
+        if (status.didJustFinish) {
+          sound.unloadAsync().catch(console.warn);
+          currentSound = null;
+        }
       }
     });
+
     console.log('Started playing recording from', uri);
     return true;
   } catch (e) {
     console.error('Failed to play voice recording', e);
+    currentSound = null;
+    return false;
+  }
+}
+
+export async function pauseVoiceRecording(): Promise<boolean> {
+  if (!currentSound) return false;
+  try {
+    await currentSound.pauseAsync();
+    console.log('Paused current recording');
+    return true;
+  } catch (e) {
+    console.error('Failed to pause voice recording', e);
+    return false;
+  }
+}
+
+export async function stopVoiceRecordingPlayback(): Promise<boolean> {
+  if (!currentSound) return false;
+  try {
+    await currentSound.stopAsync();
+    await currentSound.unloadAsync();
+    currentSound = null;
+    console.log('Stopped current recording playback');
+    return true;
+  } catch (e) {
+    console.error('Failed to stop voice recording playback', e);
+    currentSound = null;
     return false;
   }
 }
