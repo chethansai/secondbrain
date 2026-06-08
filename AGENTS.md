@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working in this repository. It is the operational version of `plan.md`: preserve the same constraints, decisions, and workflow, but phrase them as direct instructions for future coding sessions.
+This file provides guidance to Codex (Codex.ai/code) when working in this repository. It is the operational version of `plan.md`: preserve the same constraints, decisions, and workflow, but phrase them as direct instructions for future coding sessions.
 
 ## Commands
 - `npm install` - install dependencies from `package-lock.json`.
@@ -19,7 +19,7 @@ There is no test script in `package.json`; use `npm run typecheck` as the availa
 After every implemented chat step or redirection/decision that changes the repo:
 
 1. Update `plan.md` under `## history` with a dated summary of the completed step and any decision/redirection.
-2. Update this file under `## history` with the same dated summary in concise Claude-readable form.
+2. Update this file under `## history` with the same dated summary in concise Codex-readable form.
 3. Run `git status`.
 4. Run `git add .`.
 5. Run `git commit -m "<proper message>"`.
@@ -439,7 +439,7 @@ Minimum behavior matrix to consider when touching core flows:
 - 2026-05-23: Fixed scrolling for long notes inside expanded nested subcategories on workspace category cards by changing workspace preview notes to use a non-pressable outer layout, allowing the inner note text scroller to receive vertical gestures while preserving actions and drag sorting.
 - 2026-05-23: Updated the AI chat/review Tailnet endpoint to `https://vmi3321442.tailb6229f.ts.net/v1/responses` in the runtime fetch call sites.
 - 2026-05-22: Changed category Copy semantics to create same-name synchronized category branches instead of unique `copy` branches. Copying a category into a selected parent now keeps the original category name, rejects duplicate same-name siblings under that parent, and relies on deterministic category-tree synchronization so changes in one same-name branch reflect in the others while hidden mirror IDs remain excluded.
-- 2026-05-14: Expanded `CLAUDE.md` from the compact summary into a full Claude-readable project contract based on `plan.md`, `design.md`, and prior decisions. Decision: future implemented chat steps must update both `plan.md` and `CLAUDE.md` history before the mandatory git status/add/commit/push workflow.
+- 2026-05-14: Expanded `AGENTS.md` from the compact summary into a full Codex-readable project contract based on `plan.md`, `design.md`, and prior decisions. Decision: future implemented chat steps must update both `plan.md` and `AGENTS.md` history before the mandatory git status/add/commit/push workflow.
 - 2026-05-15: Implemented long-press note ordering controls. Long-pressing notes in the main note list or workspace preview reveals Up/Down controls below the options button, reusing the existing deterministic note priority mutation and disabling invalid edge moves.
 - 2026-05-21: Fixed overflowing category labels in native floating/add-note category chips. Category picker labels now wrap across multiple lines and chips can grow taller so long category paths remain visible and understandable when selecting a category.
 - 2026-05-21: Refined nested category path chips so labels such as `notetaking > featuresimplmentedfull` receive the full chip width instead of collapsing to only the parent category when wrapping.
