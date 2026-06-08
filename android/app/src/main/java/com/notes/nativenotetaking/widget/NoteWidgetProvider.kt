@@ -47,6 +47,7 @@ class NoteWidgetProvider : AppWidgetProvider() {
       val intent = Intent(context, NoteWidgetConfigureActivity::class.java).apply {
         action = AppWidgetManager.ACTION_APPWIDGET_CONFIGURE
         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+        putExtra(NoteWidgetConfigureActivity.initialPathExtra, readCategoryPath(context, appWidgetId).toTypedArray())
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       }
       val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

@@ -23,14 +23,15 @@ type Props = {
   onPressNote?: (note: FlatNote) => void;
   dragKey?: string;
   dragging?: boolean;
+  selectedForOrdering?: boolean;
   dragOffset?: number;
   onDragStart?: (key: string, note: FlatNote, order: number) => void;
   onDragMove?: (event: GestureResponderEvent, gesture: PanResponderGestureState) => void;
-  onDragRelease?: () => void;
+  onDragRelease?: (event: GestureResponderEvent, gesture: PanResponderGestureState) => void;
   onLayoutNote?: (key: string, y: number, height: number) => void;
 };
 
-export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinned, colors, styles, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete, onPressNote, dragKey, dragging = false, dragOffset = 0, onDragStart, onDragMove, onDragRelease, onLayoutNote }: Props) {
+export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder, pinned, colors, styles, onEdit, onMove, onCopy, onCopyText, onSetPriority, onTogglePin, onDelete, onPressNote, dragKey, dragging = false, selectedForOrdering = false, dragOffset = 0, onDragStart, onDragMove, onDragRelease, onLayoutNote }: Props) {
   const [open, setOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState('');
@@ -43,8 +44,8 @@ export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder
     onMoveShouldSetPanResponder: () => Boolean(dragKey && onDragStart && onDragMove && onDragRelease),
     onPanResponderGrant: () => { if (dragKey) onDragStart?.(dragKey, note, currentOrder); },
     onPanResponderMove: (event, gesture) => onDragMove?.(event, gesture),
-    onPanResponderRelease: () => onDragRelease?.(),
-    onPanResponderTerminate: () => onDragRelease?.(),
+    onPanResponderRelease: (event, gesture) => onDragRelease?.(event, gesture),
+    onPanResponderTerminate: (event, gesture) => onDragRelease?.(event, gesture),
   });
 
   useEffect(() => {
@@ -57,7 +58,7 @@ export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder
   return (
     <View
       onLayout={(event) => { if (dragKey) onLayoutNote?.(dragKey, event.nativeEvent.layout.y, event.nativeEvent.layout.height); }}
-      style={[styles.previewNote, open && styles.previewNoteMenuOpen, dragging && styles.previewNoteDragging, dragging && { transform: [{ translateY: dragOffset }] }, { zIndex: open || dragging ? 1000 : stackOrder }]}
+      style={[styles.previewNote, open && styles.previewNoteMenuOpen, selectedForOrdering && styles.previewNoteOrderingSelected, dragging && styles.previewNoteDragging, dragging && { transform: [{ translateY: dragOffset }] }, { zIndex: open || dragging ? 1000 : stackOrder }]}
     >
       {historyNote ? (
         <View style={styles.previewHistoryBlock}>
@@ -71,7 +72,7 @@ export function WorkspacePreviewNote({ note, itemCount, currentOrder, stackOrder
           </ScrollView>
         </View>
       )}
-      <View accessibilityRole="adjustable" accessibilityLabel="Drag note to reorder" style={[styles.previewSortButton, dragging && styles.previewSortButtonActive]} {...sortResponder.panHandlers}>
+      <View accessibilityRole="adjustable" accessibilityLabel={selectedForOrdering ? 'Selected note. Tap another note order button to place this note below it.' : 'Drag note to reorder, or tap to select then tap another note to place below it'} style={[styles.previewSortButton, (dragging || selectedForOrdering) && styles.previewSortButtonActive]} {...sortResponder.panHandlers}>
         <View style={styles.previewSortButtonLine} />
         <View style={styles.previewSortButtonLine} />
         <View style={styles.previewSortButtonLine} />

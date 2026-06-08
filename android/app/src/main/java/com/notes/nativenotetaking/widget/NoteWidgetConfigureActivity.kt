@@ -4,13 +4,16 @@ import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
@@ -43,6 +46,7 @@ class NoteWidgetConfigureActivity : Activity() {
       return
     }
     initialCategoryPath = intent?.getStringArrayExtra(initialPathExtra)?.toList()?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }
+      ?: if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) NoteWidgetProvider.readCategoryPath(this, appWidgetId) else null
     buildContent()
     loadCategories()
   }
@@ -56,6 +60,15 @@ class NoteWidgetConfigureActivity : Activity() {
       setTextColor(0xff1a1a1a.toInt())
       setHintTextColor(0xff787671.toInt())
       setSingleLine(false)
+      imeOptions = EditorInfo.IME_ACTION_DONE
+      setOnEditorActionListener { _, actionId, event ->
+        if (isDoneAction(actionId, event)) {
+          submitNote(defaultSubmitPath())
+          true
+        } else {
+          false
+        }
+      }
     }
     categoryInput = EditText(this).apply {
       hint = "New category name"
@@ -64,6 +77,15 @@ class NoteWidgetConfigureActivity : Activity() {
       setTextColor(0xff1a1a1a.toInt())
       setHintTextColor(0xff787671.toInt())
       setSingleLine(true)
+      imeOptions = EditorInfo.IME_ACTION_DONE
+      setOnEditorActionListener { _, actionId, event ->
+        if (isDoneAction(actionId, event)) {
+          submitNewCategory()
+          true
+        } else {
+          false
+        }
+      }
     }
     categorySearchInput = EditText(this).apply {
       hint = "Search categories"
@@ -100,9 +122,17 @@ class NoteWidgetConfigureActivity : Activity() {
           setOnClickListener { submitNote(path) }
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       }
-      addView(Button(this@NoteWidgetConfigureActivity).apply {
-        text = "Add to SEEK"
-        setOnClickListener { submitNote(listOf(OverlayNotesStore.seekCategoryName)) }
+      addView(LinearLayout(this@NoteWidgetConfigureActivity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        addView(Button(this@NoteWidgetConfigureActivity).apply {
+          text = "SEEK"
+          setOnClickListener { submitNote(listOf(OverlayNotesStore.seekCategoryName)) }
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(Button(this@NoteWidgetConfigureActivity).apply {
+          text = "Cancel"
+          setAllCaps(false)
+          setOnClickListener { finish() }
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
       }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(categoryInput, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(Button(this@NoteWidgetConfigureActivity).apply {
@@ -154,7 +184,22 @@ class NoteWidgetConfigureActivity : Activity() {
       categoryList.addView(statusText(if (cleanQuery.isBlank()) "No other categories." else "No matching categories."))
       return
     }
-    visibleCategories.forEach { category -> categoryList.addView(categoryRow(category)) }
+    visibleCategories.chunked(2).forEach { pair ->
+      val row = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(0, 0, 0, dp(8))
+      }
+      pair.forEachIndexed { index, category ->
+        val params = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+          if (index == 0) marginEnd = dp(6) else marginStart = dp(6)
+        }
+        row.addView(categoryRow(category), params)
+      }
+      if (pair.size == 1) {
+        row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(6) })
+      }
+      categoryList.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    }
   }
 
   private fun categoryRow(category: OverlayNotesStore.CategoryPath): View {
@@ -162,10 +207,23 @@ class NoteWidgetConfigureActivity : Activity() {
       orientation = LinearLayout.VERTICAL
       setPadding(0, 0, 0, dp(8))
     }
-    val button = Button(this).apply {
-      text = category.label
+    val chip = LinearLayout(this).apply {
+      orientation = LinearLayout.HORIZONTAL
       gravity = Gravity.CENTER_VERTICAL
-      setAllCaps(false)
+      background = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = dp(18).toFloat()
+        setColor(0xfffafaf9.toInt())
+        setStroke(dp(1), 0xffc8c4be.toInt())
+      }
+    }
+    val label = TextView(this).apply {
+      text = category.label
+      textSize = 12f
+      setTextColor(0xff37352f.toInt())
+      setSingleLine(false)
+      includeFontPadding = false
+      setPadding(dp(12), dp(9), dp(8), dp(9))
       setOnClickListener { submitNote(category.path) }
     }
     val subcategoryInput = EditText(this).apply {
@@ -173,6 +231,15 @@ class NoteWidgetConfigureActivity : Activity() {
       maxLines = 1
       setSingleLine(true)
       visibility = View.GONE
+      imeOptions = EditorInfo.IME_ACTION_DONE
+      setOnEditorActionListener { _, actionId, event ->
+        if (isDoneAction(actionId, event)) {
+          submitNewSubcategory(category.path, this)
+          true
+        } else {
+          false
+        }
+      }
     }
     val actions = LinearLayout(this).apply {
       orientation = LinearLayout.HORIZONTAL
@@ -183,20 +250,37 @@ class NoteWidgetConfigureActivity : Activity() {
         setOnClickListener { submitNewSubcategory(category.path, subcategoryInput) }
       }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
     }
-    row.addView(button, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-    row.addView(Button(this).apply {
-      text = "Create subcategory"
-      setAllCaps(false)
+    chip.addView(label, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+    chip.addView(TextView(this).apply {
+      text = "..."
+      textSize = 16f
+      gravity = Gravity.CENTER
+      minWidth = dp(40)
+      setTextColor(0xff787671.toInt())
+      setPadding(dp(8), dp(6), dp(10), dp(6))
       setOnClickListener {
         val show = subcategoryInput.visibility != View.VISIBLE
         subcategoryInput.visibility = if (show) View.VISIBLE else View.GONE
         actions.visibility = if (show) View.VISIBLE else View.GONE
-        if (show) subcategoryInput.requestFocus()
+        if (show) {
+          subcategoryInput.requestFocus()
+          ContextCompat.getSystemService(this@NoteWidgetConfigureActivity, InputMethodManager::class.java)?.showSoftInput(subcategoryInput, InputMethodManager.SHOW_IMPLICIT)
+        }
       }
-    }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT))
+    row.addView(chip, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     row.addView(subcategoryInput, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     row.addView(actions, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     return row
+  }
+
+  private fun defaultSubmitPath(): List<String> {
+    return initialCategoryPath ?: listOf(OverlayNotesStore.seekCategoryName)
+  }
+
+  private fun isDoneAction(actionId: Int, event: KeyEvent?): Boolean {
+    val enterPressed = event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP
+    return actionId == EditorInfo.IME_ACTION_DONE || enterPressed
   }
 
   private fun submitNewCategory() {

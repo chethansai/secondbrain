@@ -1,12 +1,30 @@
 import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
 import { ColorSchemeName, useColorScheme } from 'react-native';
-import { darkColors, lightColors } from './tokens';
+import {
+  darkColors,
+  lightColors,
+  typography,
+  spacing,
+  rounded,
+  shadows,
+  components,
+  type Colors,
+  type Typography,
+  type Spacing,
+  type Rounded,
+  type Shadows,
+  type Components
+} from './tokens';
 
 type ThemeMode = 'light' | 'dark';
-type ThemeColors = typeof lightColors;
 
 type ThemeContextValue = {
-  colors: ThemeColors;
+  colors: Colors;
+  typography: Typography;
+  spacing: Spacing;
+  rounded: Rounded;
+  shadows: Shadows;
+  components: Components;
   isDark: boolean;
   mode: ThemeMode;
   toggleTheme: () => void;
@@ -25,6 +43,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ThemeContextValue>(() => ({
     colors: mode === 'dark' ? darkColors : lightColors,
+    typography,
+    spacing,
+    rounded,
+    shadows,
+    components,
     isDark: mode === 'dark',
     mode,
     toggleTheme: () => setOverrideMode((current) => (current ?? deviceMode) === 'dark' ? 'light' : 'dark'),
