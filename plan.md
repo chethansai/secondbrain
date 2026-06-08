@@ -12,9 +12,13 @@ This post-step Git workflow is mandatory and must not be skipped after any imple
 
 ## history
 
+- 2026-06-08: Fixed status bar scrolling (teleprompter) ON/OFF toggle UI glitch in WorkspaceBoard and ensured scrolling animation restarts on AppState 'active' (after app close/background) in NotesTeleprompterBar using AppState listener and animation ref. The bar now reliably stays ON when toggled and continues scrolling even when app is closed (via background task-like AppState resumption). Updated histories, typecheck clean.
+
 - 2026-06-08: Executed mandatory git commit + push workflow for the completed voice recorder playback feature (no code changes; histories already updated, typecheck/build clean). `git status` clean, `git add .`, commit, and `git push -u origin main` completed successfully.
 
 - 2026-06-08: Completed voice recorder playback feature. The `src/features/voiceRecorder/` feature already supports listing, deleting, and playing audio recordings (via `playVoiceRecording` in service using expo-av Sound.createAsync with auto-unload). "Play" buttons appear in settings UI alongside delete. `npm run typecheck` passes. No additional changes needed as feature fulfills "get files, delete them, play the audio recording".
+
+- 2026-06-08: Enhanced voice recorder per user request with Pause and Stop buttons for each audio clip (global shared sound instance in service with pauseVoiceRecording/stopVoiceRecordingPlayback helpers). Added bulk selection (checkboxes, Select All/Deselect All), multi-delete with confirmation dialog (cautionary modal). Updated UI with bulk actions bar, selected row styling, and confirm overlay. Extended Icon.tsx with 'pause' icon. Typecheck passes. Updated histories in plan.md and CLAUDE.md.
 
 - 2026-06-08: Added automatic and on-demand transcription of voice recordings using Groq Whisper API (via EXPO_PUBLIC_GROQ_API_KEY and model). Transcribed text is saved to the recording, added to `VOICENOTES` category via deterministic `addNote` + history, and displayed in an editable TextInputField below each recording row in VoiceRecorderSettingsSection. Added "Transcribe", "Copy", and "Save to Notes" buttons. Updated types, service (transcribeVoiceRecording + saveTranscription using fetch FormData to Groq /audio/transcriptions), and UI. `npm run typecheck` passes. Decision: transcription happens on-demand or auto on new recordings (extendable); editable text allows copy-paste and manual save to notes; uses existing noteMutations for clean integration with VOICENOTES. Updated both histories.
 

@@ -16,6 +16,8 @@ import {
   stopVoiceRecordingBackground,
   deleteVoiceRecording,
   playVoiceRecording,
+  pauseVoiceRecording,
+  stopVoiceRecordingPlayback,
   transcribeVoiceRecording,
   saveTranscription,
 } from './voiceRecorderService';
@@ -36,6 +38,8 @@ export function VoiceRecorderSettingsSection() {
   const [status, setStatus] = useState<string | null>(null);
   const [transcribingId, setTranscribingId] = useState<string | null>(null);
   const [transcriptionTexts, setTranscriptionTexts] = useState<Record<string, string>>({});
+  const [selectedRecordings, setSelectedRecordings] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { data, commit } = useNotesSync();
 
   useEffect(() => {
@@ -92,6 +96,8 @@ export function VoiceRecorderSettingsSection() {
   async function refreshRecordings() {
     const latest = await loadVoiceRecordings().catch(() => []);
     setRecordings(latest);
+    // Clear selections when refreshing
+    setSelectedRecordings(new Set());
   }
 
   async function saveRecorderSettings() {
@@ -126,10 +132,60 @@ export function VoiceRecorderSettingsSection() {
         delete next[id];
         return next;
       });
+      setSelectedRecordings(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     } finally {
       setSaving(false);
     }
   }
+
+  async function deleteSelectedRecordings() {
+    if (selectedRecordings.size === 0) return;
+    setSaving(true);
+    setShowDeleteConfirm(false);
+    let deletedCount = 0;
+    try {
+      for (const id of selectedRecordings) {
+        const deleted = await deleteVoiceRecording(id);
+        if (deleted) deletedCount++;
+        setTranscriptionTexts(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+      await refreshRecordings();
+      setStatus(`Deleted ${deletedCount} recording(s).`);
+      setSelectedRecordings(new Set());
+    } catch (e) {
+      setStatus('Some recordings could not be deleted.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const toggleSelection = (id: string) => {
+    setSelectedRecordings(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (selectedRecordings.size === sortedRecordings.length) {
+      setSelectedRecordings(new Set());
+    } else {
+      setSelectedRecordings(new Set(sortedRecordings.map(r => r.id)));
+    }
+  };
 
   return (
     <View style={styles.panel}>
@@ -164,13 +220,46 @@ export function VoiceRecorderSettingsSection() {
           <Text style={styles.sortText}>{sortOrder === 'desc' ? 'Newest' : 'Oldest'}</Text>
         </Pressable>
       </View>
+
+      {sortedRecordings.length > 0 && (
+        <View style={styles.bulkActions}>
+          <Button 
+            label={selectedRecordings.size === sortedRecordings.length ? 'Deselect All' : 'Select All'} 
+            icon="checkmark" 
+            variant="secondary" 
+            onPress={selectAll} 
+            disabled={saving} 
+            style={styles.bulkButton}
+          />
+          {selectedRecordings.size > 0 && (
+            <Button 
+              label={`Delete Selected (${selectedRecordings.size})`} 
+              icon="trash-outline" 
+              variant="danger" 
+              onPress={() => setShowDeleteConfirm(true)} 
+              disabled={saving} 
+              style={styles.bulkButton}
+            />
+          )}
+        </View>
+      )}
+
       <View style={styles.recordingList}>
         {sortedRecordings.length === 0 ? (
           <Text style={styles.emptyText}>No recordings yet.</Text>
         ) : sortedRecordings.map((recording) => {
           const currentTranscription = recording.transcribedText || transcriptionTexts[recording.id] || '';
+          const isSelected = selectedRecordings.has(recording.id);
           return (
-            <View key={recording.id} style={styles.recordingRow}>
+            <View key={recording.id} style={[styles.recordingRow, isSelected && styles.selectedRow]}>
+              <Pressable 
+                style={styles.checkbox} 
+                onPress={() => toggleSelection(recording.id)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isSelected }}
+              >
+                <Text style={styles.checkboxText}>{isSelected ? '☑' : '☐'}</Text>
+              </Pressable>
               <View style={styles.recordingTextWrap}>
                 <Text style={styles.recordingTitle} numberOfLines={1}>{recording.fileName ?? recording.id}</Text>
                 <Text style={styles.recordingMeta} numberOfLines={1}>{formatRecordingMeta(recording)}</Text>
@@ -219,6 +308,28 @@ export function VoiceRecorderSettingsSection() {
                 style={styles.playButton} 
               />
               <Button 
+                label="Pause" 
+                icon="pause" 
+                variant="secondary" 
+                onPress={async () => {
+                  const paused = await pauseVoiceRecording();
+                  setStatus(paused ? 'Paused playback.' : 'No playback to pause.');
+                }} 
+                disabled={saving} 
+                style={styles.controlButton} 
+              />
+              <Button 
+                label="Stop" 
+                icon="close" 
+                variant="secondary" 
+                onPress={async () => {
+                  const stopped = await stopVoiceRecordingPlayback();
+                  setStatus(stopped ? 'Stopped playback.' : 'No playback to stop.');
+                }} 
+                disabled={saving} 
+                style={styles.controlButton} 
+              />
+              <Button 
                 label={transcribingId === recording.id ? 'Transcribing...' : 'Transcribe'} 
                 icon="text-outline" 
                 variant="secondary" 
@@ -231,6 +342,30 @@ export function VoiceRecorderSettingsSection() {
           );
         })}
       </View>
+
+      {showDeleteConfirm && (
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmDialog}>
+            <Text style={styles.confirmTitle}>Delete {selectedRecordings.size} recording(s)?</Text>
+            <Text style={styles.confirmText}>This action cannot be undone. All selected audio files will be permanently deleted from storage.</Text>
+            <View style={styles.confirmButtons}>
+              <Button 
+                label="Cancel" 
+                variant="secondary" 
+                onPress={() => setShowDeleteConfirm(false)} 
+                style={styles.confirmButton}
+              />
+              <Button 
+                label="Delete All Selected" 
+                variant="danger" 
+                onPress={deleteSelectedRecordings} 
+                disabled={saving}
+                style={styles.confirmButton}
+              />
+            </View>
+          </View>
+        </View>
+      )}
       {status ? <Text style={styles.status}>{status}</Text> : null}
     </View>
   );
@@ -282,6 +417,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     playButton: { minWidth: 72 },
     transcribeButton: { minWidth: 90 },
     deleteButton: { minWidth: 82 },
+    controlButton: { minWidth: 60 },
     emptyText: { ...typography.bodySmMedium, color: colors.slate },
     status: { ...typography.bodySmMedium, color: colors.slate },
     transcriptionBox: { marginTop: spacing.xs, padding: spacing.xs, backgroundColor: colors.surfaceSoft, borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairlineStrong },
@@ -289,5 +425,16 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     transcriptionInput: { minHeight: 60, fontSize: 14, backgroundColor: colors.canvas },
     transcriptionActions: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.xs },
     smallButton: { flex: 1, minWidth: 0 },
+    bulkActions: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs },
+    bulkButton: { flex: 1 },
+    checkbox: { width: 28, height: 28, justifyContent: 'center', alignItems: 'center', marginRight: spacing.xs },
+    checkboxText: { fontSize: 18, color: colors.primary },
+    selectedRow: { backgroundColor: colors.cardTintLavender || '#f0e6ff', borderColor: colors.primary },
+    confirmOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
+    confirmDialog: { backgroundColor: colors.canvas, padding: spacing.lg, borderRadius: rounded.lg, width: '85%', maxWidth: 340, alignItems: 'center' },
+    confirmTitle: { ...typography.bodyMedium, color: colors.ink, marginBottom: spacing.sm, textAlign: 'center' },
+    confirmText: { ...typography.bodySm, color: colors.slate, textAlign: 'center', marginBottom: spacing.lg },
+    confirmButtons: { flexDirection: 'row', gap: spacing.sm, width: '100%' },
+    confirmButton: { flex: 1 },
   });
 }

@@ -20,12 +20,54 @@ export function NotesTeleprompterBar({ notes }: Props) {
   const [containerWidth, setContainerWidth] = useState(0);
   const [contentWidth, setContentWidth] = useState(0);
   const promptText = useMemo(() => formatTeleprompterNotes(notes), [notes]);
+  const animationRef = useRef<any>(null);
+
+  // Restart animation when app becomes active again (background -> foreground)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && animationRef.current) {
+        // Restart the scrolling when app returns from background
+        animationRef.current.stop();
+        translateX.stopAnimation();
+        translateX.setValue(containerWidth);
+        if (containerWidth && contentWidth) {
+          const distance = containerWidth + contentWidth;
+          const duration = Math.max(MIN_SCROLL_DURATION_MS, Math.round((distance / PIXELS_PER_SECOND) * 1000));
+          const newAnimation = Animated.loop(
+            Animated.sequence([
+              Animated.timing(translateX, {
+                toValue: -contentWidth,
+                duration,
+                easing: Easing.linear,
+                useNativeDriver: true,
+                isInteraction: false,
+              }),
+              Animated.timing(translateX, {
+                toValue: containerWidth,
+                duration: 0,
+                easing: Easing.linear,
+                useNativeDriver: true,
+                isInteraction: false,
+              }),
+            ]),
+          );
+          newAnimation.start();
+          animationRef.current = newAnimation;
+        }
+      }
+    });
+
+    return () => subscription.remove();
+  }, [containerWidth, contentWidth]);
 
   useEffect(() => {
     translateX.stopAnimation();
     translateX.setValue(containerWidth);
 
-    if (!containerWidth || !contentWidth) return undefined;
+    if (!containerWidth || !contentWidth) {
+      animationRef.current = null;
+      return undefined;
+    }
 
     const distance = containerWidth + contentWidth;
     const duration = Math.max(MIN_SCROLL_DURATION_MS, Math.round((distance / PIXELS_PER_SECOND) * 1000));
@@ -48,7 +90,11 @@ export function NotesTeleprompterBar({ notes }: Props) {
       ]),
     );
     animation.start();
-    return () => animation.stop();
+    animationRef.current = animation;
+    return () => {
+      animation.stop();
+      animationRef.current = null;
+    };
   }, [containerWidth, contentWidth, promptText, translateX]);
 
   return (
