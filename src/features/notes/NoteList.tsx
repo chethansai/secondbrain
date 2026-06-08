@@ -5,6 +5,7 @@ import { colors, rounded, spacing, typography } from '../../shared/design/tokens
 import { FlatNote } from '../../shared/types/notes';
 import { Icon } from '../../shared/ui/Icon';
 import { isHistoryPath, parseHistoryNote } from './noteMutations';
+import { getDragDisplacement, getPriorityBelowTarget, isTapGesture, NoteOrderSelection } from './noteOrdering';
 import { isPinnedNote } from './pinnedNotes';
 
 type Props = {
@@ -38,6 +39,7 @@ export function NoteList({ notes, onEdit, onMove, onCopy, onCopyText, onSetPrior
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [dragState, setDragState] = useState<DragState | null>(null);
+  const [orderSelection, setOrderSelection] = useState<NoteOrderSelection<FlatNote> | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
   const layoutsRef = useRef<Record<string, NoteLayout>>({});
 
@@ -71,10 +73,26 @@ export function NoteList({ notes, onEdit, onMove, onCopy, onCopyText, onSetPrior
     updateDragState({ ...current, dy: gesture.dy, targetOrder: getTargetOrder(current.key, dragCenter) });
   }
 
-  function releaseDrag() {
+  function handleSortTap(key: string, note: FlatNote, order: number) {
+    if (!orderSelection) {
+      setOrderSelection({ key, note, order });
+      return;
+    }
+    setOrderSelection(null);
+    if (orderSelection.key === key) return;
+    onSetPriority(orderSelection.note, getPriorityBelowTarget(orderSelection.order, order));
+  }
+
+  function releaseDrag(_: GestureResponderEvent, gesture: PanResponderGestureState) {
     const current = dragStateRef.current;
     updateDragState(null);
-    if (!current || current.targetOrder === current.fromOrder) return;
+    if (!current) return;
+    if (isTapGesture(gesture.dy, gesture.dx)) {
+      handleSortTap(current.key, current.note, current.fromOrder);
+      return;
+    }
+    setOrderSelection(null);
+    if (current.targetOrder === current.fromOrder) return;
     onSetPriority(current.note, current.targetOrder);
   }
 
@@ -86,7 +104,8 @@ export function NoteList({ notes, onEdit, onMove, onCopy, onCopyText, onSetPrior
         const key = noteKey(note, index);
         const order = index + 1;
         const dragging = dragState?.key === key;
-        const displaced = getDragDisplacement(dragState, order, layoutsRef.current[key]?.height ?? 0);
+        const selectedForOrdering = orderSelection?.key === key;
+        const displaced = dragState ? getDragDisplacement(dragState.fromOrder, dragState.targetOrder, order, dragState.height) : 0;
         const sortResponder = PanResponder.create({
           onStartShouldSetPanResponder: () => true,
           onMoveShouldSetPanResponder: () => true,
@@ -99,10 +118,10 @@ export function NoteList({ notes, onEdit, onMove, onCopy, onCopyText, onSetPrior
           <View key={key} style={[{ zIndex: dragging ? notes.length + 1 : notes.length - index }, displaced ? { transform: [{ translateY: displaced }] } : null]}>
             <View
               onLayout={(event) => { layoutsRef.current[key] = event.nativeEvent.layout; }}
-              style={[styles.card, dragging && styles.cardDragging, dragging && { transform: [{ translateY: dragState.dy }] }]}
+              style={[styles.card, selectedForOrdering && styles.cardOrderingSelected, dragging && styles.cardDragging, dragging && { transform: [{ translateY: dragState.dy }] }]}
             >
               <NoteText note={note} styles={styles} />
-              <View accessibilityRole="adjustable" accessibilityLabel="Drag note to reorder" style={[styles.sortButton, dragging && styles.sortButtonActive]} {...sortResponder.panHandlers}>
+              <View accessibilityRole="adjustable" accessibilityLabel={selectedForOrdering ? 'Selected note. Tap another note order button to place this note below it.' : 'Drag note to reorder, or tap to select then tap another note to place below it'} style={[styles.sortButton, (dragging || selectedForOrdering) && styles.sortButtonActive]} {...sortResponder.panHandlers}>
                 <View style={styles.sortButtonLine} />
                 <View style={styles.sortButtonLine} />
                 <View style={styles.sortButtonLine} />
@@ -114,13 +133,6 @@ export function NoteList({ notes, onEdit, onMove, onCopy, onCopyText, onSetPrior
       })}
     </View>
   );
-}
-
-function getDragDisplacement(drag: DragState | null, order: number, itemHeight: number) {
-  if (!drag || !itemHeight || order === drag.fromOrder) return 0;
-  if (drag.targetOrder > drag.fromOrder && order > drag.fromOrder && order <= drag.targetOrder) return -itemHeight;
-  if (drag.targetOrder < drag.fromOrder && order >= drag.targetOrder && order < drag.fromOrder) return itemHeight;
-  return 0;
 }
 
 function NoteText({ note, styles }: { note: FlatNote; styles: ReturnType<typeof createStyles> }) {
@@ -230,6 +242,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   return StyleSheet.create({
   list: { gap: spacing.sm },
   card: { position: 'relative', minHeight: 76, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.hairline, borderRadius: rounded.lg, padding: spacing.lg, paddingRight: 104, gap: 1 },
+  cardOrderingSelected: { borderColor: colors.primary, borderWidth: 2 },
   cardDragging: { borderColor: colors.primary, shadowColor: colors.ink, shadowOpacity: 0.14, shadowRadius: 10, elevation: 8 },
   text: { ...typography.body, color: colors.charcoal },
   historyTextBlock: { gap: spacing.xs },
