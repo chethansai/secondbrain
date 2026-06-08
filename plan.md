@@ -377,6 +377,8 @@ Rebuild the notes app as React Native + Firebase only, with no Django dependency
 
 ## history
 
+- 2026-06-08: Completed full Notion design system implementation per design.md. Expanded tokens.ts with complete color palette (all brand colors, pastel card tints, surface hierarchy, semantic), mobile-scaled typography hierarchy (heroDisplay → buttonMd with correct weights/leading/letter-spacing), full spacing/rounded scales, enhanced shadows (mockup/deep levels), and component presets (buttonPrimary with 8px md rounded, cardFeature with 12px lg rounded, heroBand, workspaceMockup). Updated ThemeProvider to expose all tokens/types. This provides foundation for navy hero bands, purple rectangular CTAs, pastel feature cards, sober editorial geometry, and Notion-Sans aesthetic across workspace, notes, modals, and panels.
+
 - 2026-06-02: Began Android default digital assistant integration planning and scaffolding. Added `ASSISTANT_PLAN.md`, created the initial `src/features/assistant` feature boundary, and registered `MainActivity` for Android `ASSIST` and `VOICE_ASSIST` intents with optional microphone capability so the APK can be discovered as an assistant provider.
 
 - 2026-06-01: Added a local Firestore REST fallback for the Django `/get/notetakingfeatures` bridge so it can run without a Firebase Admin service-account file when public Firestore reads are allowed. Decision: prefer Admin SDK when `FIREBASE_SERVICE_ACCOUNT_PATH`/`GOOGLE_APPLICATION_CREDENTIALS` is set, otherwise read `FIREBASE_PROJECT_ID`/`FIREBASE_API_KEY` from environment or Android local properties for local development.
