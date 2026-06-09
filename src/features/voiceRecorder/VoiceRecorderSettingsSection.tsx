@@ -318,17 +318,12 @@ export function VoiceRecorderSettingsSection() {
               </View>
               <View style={styles.audioControlsRow}>
                 <Button
-                  label={isPlaying && currentlyPlayingId === recording.id ? 'Pause' : 'Play'}
-                  icon={isPlaying && currentlyPlayingId === recording.id ? 'pause' : 'play'}
+                  label={isPlaying ? 'Pause' : 'Play'}
+                  icon={isPlaying ? 'pause' : 'play'}
                   variant="secondary"
                   onPress={async () => {
                     if (!isPlaying) {
-                      // Stop any other playback first
-                      if (isPlaying) {
-                        await stopVoiceRecordingPlayback();
-                        setIsPlaying(false);
-                        setCurrentlyPlayingId(null);
-                      }
+                      // startPlayback - using the specific recording
                       const played = await playVoiceRecording(recording.uri, () => {
                         setIsPlaying(false);
                         setCurrentlyPlayingId(null);
@@ -338,10 +333,8 @@ export function VoiceRecorderSettingsSection() {
                         setIsPlaying(true);
                         setCurrentlyPlayingId(recording.id);
                         setStatus('Playing recording...');
-                      } else {
-                        setStatus('Failed to play recording.');
                       }
-                    } else if (currentlyPlayingId === recording.id) {
+                    } else {
                       const paused = await pauseVoiceRecording();
                       if (paused) {
                         setIsPlaying(false);
@@ -362,14 +355,6 @@ export function VoiceRecorderSettingsSection() {
                   style={styles.deleteButton}
                 />
               </View>
-              <Button
-                label={transcribingId === recording.id ? 'Transcribing...' : 'Transcribe'}
-                icon="text-outline"
-                variant="secondary"
-                onPress={() => handleTranscribe(recording.id, recording.uri)}
-                disabled={!!transcribingId || saving}
-                style={{ minWidth: 90, paddingHorizontal: 8 }}
-              />
             </View>
           );
         })}
