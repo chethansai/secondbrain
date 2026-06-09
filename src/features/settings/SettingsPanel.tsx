@@ -37,42 +37,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
   const [overlaySaving, setOverlaySaving] = useState(false);
   const overlayAvailable = isFloatingOverlayAvailable();
 
-<<<<<<< Updated upstream
-  const teleprompterEnabledProp = teleprompterEnabled ?? true;
-  const [teleEnabled, setTeleEnabled] = useState(teleprompterEnabledProp);
-  const [teleCategories, setTeleCategories] = useState(new Set(teleprompterCategories || []));
-
-  const rootCategories = useMemo(() => {
-    return listAllCategories(data)
-      .filter((c) => c.path.length === 1)
-      .map((c) => c.name);
-  }, [data]);
-
-  useEffect(() => {
-    setTeleEnabled(teleprompterEnabledProp);
-    setTeleCategories(new Set(teleprompterCategories || []));
-  }, [teleprompterEnabledProp, teleprompterCategories]);
-
-  const toggleTeleCategory = (name: string) => {
-    setTeleCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) {
-        next.delete(name);
-      } else {
-        next.add(name);
-      }
-      return next;
-    });
-  };
-
-  const saveTeleprompterSettings = async () => {
-    if (onUpdateTeleprompterSettings) {
-      const ok = await Promise.resolve(onUpdateTeleprompterSettings(teleEnabled, Array.from(teleCategories)));
-      setStatus(ok ? 'Teleprompter settings saved.' : 'Failed to save teleprompter settings.');
-    }
-  };
-=======
-  // Teleprompter state synced with native service
+  // Teleprompter state synced with native service (new implementation from pull)
   const [teleprompterState, setTeleprompterState] = useState<TeleprompterState>({
     isRunning: false,
     text: '',
@@ -84,7 +49,6 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
   });
   const [selectedDuration, setSelectedDuration] = useState(-1);
   const [teleSaving, setTeleSaving] = useState(false);
->>>>>>> Stashed changes
 
   useEffect(() => {
     refreshOverlayPermission();
@@ -287,40 +251,82 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
       </View>
 
       <View style={styles.settingGroup}>
-        <Text style={styles.settingLabel}>Status bar scrolling notes (teleprompter)</Text>
-        <View style={styles.toggleRow}>
-          <Text style={styles.dropdownValue}>Enabled</Text>
-          <Switch
-            value={teleEnabled}
-            onValueChange={setTeleEnabled}
-            trackColor={{ false: colors.hairlineStrong, true: colors.primary }}
-            thumbColor={teleEnabled ? colors.onPrimary : colors.canvas}
-          />
-        </View>
-        {teleEnabled && (
-          <View style={{ marginTop: spacing.sm }}>
-            <Text style={styles.settingLabel}>Root categories to include in scrolling</Text>
-            {rootCategories.length > 0 ? rootCategories.map((catName) => (
-              <Pressable
-                key={catName}
-                onPress={() => toggleTeleCategory(catName)}
-                style={styles.checkboxRow}
-              >
-                <Icon
-                  name={teleCategories.has(catName) ? 'checkmark-square' : 'square'}
-                  size={20}
-                  color={colors.ink}
-                />
-                <Text style={styles.checkboxLabel}>{catName}</Text>
-              </Pressable>
-            )) : <Text style={styles.status}>No root categories yet. Create some first.</Text>}
+        <Text style={styles.settingLabel}>Teleprompter Settings</Text>
+        <View style={styles.overlayPanel}>
+          <View style={styles.overlayStatusRow}>
+            <Icon name="play" size={16} color={colors.primary} />
+            <Text style={styles.overlayStatusText}>
+              Status: {teleprompterState.isRunning ? 'Running' : 'Stopped'}
+            </Text>
           </View>
-        )}
-        <Button
-          label="Save teleprompter settings"
-          onPress={saveTeleprompterSettings}
-          variant="secondary"
-        />
+          <Text style={styles.settingLabel}>Duration</Text>
+          <Pressable
+            onPress={() => { /* Picker logic can be expanded with modal if needed */ }}
+            style={styles.dropdownButton}
+          >
+            <Text style={styles.dropdownValue}>
+              {durationOptions.find(d => d.value === (selectedDuration || teleprompterState.durationMs))?.label || 'Unlimited'}
+            </Text>
+            <Icon name="chevron-down" size={16} color={colors.ink} />
+          </Pressable>
+          <Text style={styles.settingLabel}>Remaining: {teleprompterState.remaining}</Text>
+          <LineControl 
+            label="Scroll Speed" 
+            value={teleprompterState.speed} 
+            min={10} 
+            max={100} 
+            formatter={(v) => `${Math.round(v)} px/s`} 
+            colors={colors} 
+            styles={styles} 
+            onChange={async (v) => {
+              setTeleprompterState(s => ({...s, speed: v}));
+              await updateTeleprompterSettings({speed: v});
+            }} 
+          />
+          <LineControl 
+            label="Text Size" 
+            value={teleprompterState.textSize} 
+            min={10} 
+            max={24} 
+            formatter={(v) => `${Math.round(v)} sp`} 
+            colors={colors} 
+            styles={styles} 
+            onChange={async (v) => {
+              setTeleprompterState(s => ({...s, textSize: v}));
+              await updateTeleprompterSettings({textSize: v});
+            }} 
+          />
+          <View style={styles.buttonRow}>
+            <Button 
+              label="Start Teleprompter" 
+              icon="play" 
+              onPress={async () => {
+                setTeleSaving(true);
+                const text = 'Live notes from workspace...'; // or fetch from notes
+                await startTeleprompter(text, selectedDuration || -1, teleprompterState.speed, teleprompterState.textSize);
+                await refreshTeleprompterState();
+                setTeleSaving(false);
+                setStatus('Teleprompter started as system overlay.');
+              }} 
+              disabled={teleSaving || teleprompterState.isRunning} 
+              style={styles.rowButton} 
+            />
+            <Button 
+              label="Stop Teleprompter" 
+              icon="close" 
+              variant="secondary" 
+              onPress={async () => {
+                setTeleSaving(true);
+                await stopTeleprompter();
+                await refreshTeleprompterState();
+                setTeleSaving(false);
+                setStatus('Teleprompter stopped.');
+              }} 
+              disabled={teleSaving || !teleprompterState.isRunning} 
+              style={styles.rowButton} 
+            />
+          </View>
+        </View>
       </View>
 
       <Button label="Copy export JSON" icon="copy-outline" onPress={exportJson} />
@@ -412,7 +418,6 @@ function LineControl({ label, value, min, max, formatter, disabled, colors, styl
 
 function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
   return StyleSheet.create({
-<<<<<<< Updated upstream
     wrap: { gap: spacing.md },
     settingGroup: { gap: spacing.xs },
     settingLabel: { ...typography.bodySmMedium, color: colors.charcoal },
@@ -427,11 +432,11 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     sliderTrackDisabled: { opacity: 0.55 },
     sliderFill: { position: 'absolute', left: 0, height: 4, borderRadius: rounded.full },
     sliderThumb: { position: 'absolute', width: 18, height: 18, marginLeft: -9, borderRadius: 9, borderWidth: 2, borderColor: colors.canvas },
-    buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    rowButton: { flex: 1, minWidth: 130 },
+    buttonRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, width: '100%' },
+    rowButton: { flex: 1, minWidth: 90, flexShrink: 1 },
     dropdownButton: { minHeight: 44, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     dropdownButtonDisabled: { opacity: 0.55 },
-    dropdownValue: { ...typography.body, color: colors.ink, flex: 1 },
+    dropdownValue: { ...typography.bodySm, color: colors.ink, flex: 1 },
     dropdownMenu: { borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, overflow: 'hidden' },
     dropdownOption: { minHeight: 42, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft },
     dropdownOptionSelected: { backgroundColor: colors.primary },
@@ -464,32 +469,5 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
       color: colors.ink,
       flex: 1,
     },
-=======
-  wrap: { gap: spacing.md },
-  settingGroup: { gap: spacing.xs },
-  settingLabel: { ...typography.bodySmMedium, color: colors.charcoal },
-  overlayPanel: { gap: spacing.sm, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.surfaceSoft, padding: spacing.md },
-  overlayStatusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  overlayStatusText: { ...typography.bodySmMedium, color: colors.ink, flex: 1 },
-  lineControl: { gap: spacing.xs },
-  lineControlHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  lineControlLabel: { ...typography.micro, color: colors.slate },
-  lineControlValue: { ...typography.micro, color: colors.ink },
-  sliderTrack: { height: 32, borderRadius: rounded.full, backgroundColor: colors.hairline, justifyContent: 'center', overflow: 'visible' },
-  sliderTrackDisabled: { opacity: 0.55 },
-  sliderFill: { position: 'absolute', left: 0, height: 4, borderRadius: rounded.full },
-  sliderThumb: { position: 'absolute', width: 18, height: 18, marginLeft: -9, borderRadius: 9, borderWidth: 2, borderColor: colors.canvas },
-    buttonRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, width: '100%' },
-    rowButton: { flex: 1, minWidth: 90, flexShrink: 1 },
-  dropdownButton: { minHeight: 44, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  dropdownButtonDisabled: { opacity: 0.55 },
-  dropdownValue: { ...typography.body, color: colors.ink, flex: 1 },
-  dropdownMenu: { borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, overflow: 'hidden' },
-  dropdownOption: { minHeight: 42, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft },
-  dropdownOptionSelected: { backgroundColor: colors.primary },
-  dropdownOptionText: { ...typography.bodySmMedium, color: colors.ink },
-  dropdownOptionTextSelected: { color: colors.onPrimary },
-  status: { ...typography.bodySmMedium, color: colors.slate },
->>>>>>> Stashed changes
   });
 }

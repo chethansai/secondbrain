@@ -148,4 +148,5 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
   private fun canDrawOverlays(): Boolean {
     return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(reactContext)
   }
+}
 

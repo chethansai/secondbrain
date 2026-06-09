@@ -30,6 +30,10 @@ type OverlayNativeModule = {
   updateOverlaySettings: (settings: Partial<FloatingOverlaySettings>) => Promise<boolean>;
   resetOverlayPlacement: () => Promise<boolean>;
   readOverlaySettings: () => Promise<FloatingOverlayNativeSettings>;
+  startTeleprompter: (text: string, durationMs: number, speed: number, textSize: number) => Promise<boolean>;
+  stopTeleprompter: () => Promise<boolean>;
+  readTeleprompterState: () => Promise<TeleprompterState>;
+  updateTeleprompterSettings: (settings: any) => Promise<boolean>;
 };
 
 const overlayModule = NativeModules.OverlayModule as OverlayNativeModule | undefined;
