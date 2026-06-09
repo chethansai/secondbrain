@@ -86,6 +86,57 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
     promise.resolve(map)
   }
 
+  @ReactMethod
+  fun startTeleprompter(text: String, durationMs: Double, speed: Double, textSize: Double, promise: Promise) {
+    if (!canDrawOverlays()) {
+      promise.reject("overlay_permission_missing", "Display over other apps permission is not granted.")
+      return
+    }
+    val intent = Intent(reactContext, TeleprompterService::class.java).apply {
+      action = TeleprompterService.ACTION_START
+      putExtra("text", text)
+      putExtra("durationMs", durationMs.toLong())
+      putExtra("speed", speed.toFloat())
+      putExtra("textSize", textSize.toFloat())
+    }
+    startOverlayService(intent)
+    promise.resolve(true)
+  }
+
+  @ReactMethod
+  fun stopTeleprompter(promise: Promise) {
+    val intent = Intent(reactContext, TeleprompterService::class.java).apply { action = TeleprompterService.ACTION_STOP }
+    startOverlayService(intent)
+    promise.resolve(true)
+  }
+
+  @ReactMethod
+  fun readTeleprompterState(promise: Promise) {
+    val state = TeleprompterSettings.read(reactContext)
+    val remaining = TeleprompterSettings.getRemainingTime(state)
+    val map = Arguments.createMap().apply {
+      putBoolean("isRunning", state.isRunning)
+      putString("text", state.text)
+      putDouble("speed", state.speed.toDouble())
+      putDouble("textSize", state.textSize.toDouble())
+      putDouble("durationMs", state.durationMs.toDouble())
+      putString("remaining", if (remaining < 0) "Unlimited" else TeleprompterSettings.formatDuration(remaining))
+      putBoolean("permissionGranted", canDrawOverlays())
+    }
+    promise.resolve(map)
+  }
+
+  @ReactMethod
+  fun updateTeleprompterSettings(settingsMap: ReadableMap, promise: Promise) {
+    val speed = if (settingsMap.hasKey("speed")) settingsMap.getDouble("speed").toFloat() else null
+    val textSize = if (settingsMap.hasKey("textSize")) settingsMap.getDouble("textSize").toFloat() else null
+    val durationMs = if (settingsMap.hasKey("durationMs")) settingsMap.getDouble("durationMs").toLong() else null
+    TeleprompterSettings.update(reactContext, null, null, speed, textSize, durationMs)
+    val intent = Intent(reactContext, TeleprompterService::class.java).apply { action = TeleprompterService.ACTION_UPDATE }
+    startOverlayService(intent)
+    promise.resolve(true)
+  }
+
   private fun startOverlayService(intent: Intent) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       reactContext.startForegroundService(intent)
@@ -97,4 +148,4 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
   private fun canDrawOverlays(): Boolean {
     return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(reactContext)
   }
-}
+

@@ -107,3 +107,71 @@ function normalizeSettings(settings: Partial<FloatingOverlaySettings>): Partial<
 function normalizeAction(action: string): OverlayAction {
   return overlayActions.includes(action as OverlayAction) ? action as OverlayAction : 'none';
 }
+
+export type TeleprompterDuration = '1s' | '5s' | '10s' | '30s' | '1m' | '5m' | '10m' | '30m' | '1h' | '2h' | '4h' | '8h' | '12h' | '24h' | 'unlimited';
+
+export type TeleprompterState = {
+  isRunning: boolean;
+  text: string;
+  speed: number;
+  textSize: number;
+  durationMs: number;
+  remaining: string;
+  permissionGranted: boolean;
+};
+
+export const durationOptions: Array<{label: string; value: number}> = [
+  { label: '1 Second', value: 1000 },
+  { label: '5 Seconds', value: 5000 },
+  { label: '10 Seconds', value: 10000 },
+  { label: '30 Seconds', value: 30000 },
+  { label: '1 Minute', value: 60000 },
+  { label: '5 Minutes', value: 300000 },
+  { label: '10 Minutes', value: 600000 },
+  { label: '30 Minutes', value: 1800000 },
+  { label: '1 Hour', value: 3600000 },
+  { label: '2 Hours', value: 7200000 },
+  { label: '4 Hours', value: 14400000 },
+  { label: '8 Hours', value: 28800000 },
+  { label: '12 Hours', value: 43200000 },
+  { label: '24 Hours', value: 86400000 },
+  { label: 'Unlimited', value: -1 },
+];
+
+export async function startTeleprompter(text: string, durationMs: number, speed = 34, textSize = 14): Promise<boolean> {
+  if (!isFloatingOverlayAvailable() || !overlayModule) return false;
+  try {
+    return await overlayModule.startTeleprompter(text, durationMs, speed, textSize);
+  } catch {
+    return false;
+  }
+}
+
+export async function stopTeleprompter(): Promise<boolean> {
+  if (!isFloatingOverlayAvailable() || !overlayModule) return false;
+  try {
+    return await overlayModule.stopTeleprompter();
+  } catch {
+    return false;
+  }
+}
+
+export async function readTeleprompterState(): Promise<TeleprompterState> {
+  if (!isFloatingOverlayAvailable() || !overlayModule) {
+    return { isRunning: false, text: '', speed: 34, textSize: 14, durationMs: -1, remaining: '00:00:00', permissionGranted: false };
+  }
+  try {
+    return await overlayModule.readTeleprompterState();
+  } catch {
+    return { isRunning: false, text: '', speed: 34, textSize: 14, durationMs: -1, remaining: '00:00:00', permissionGranted: false };
+  }
+}
+
+export async function updateTeleprompterSettings(settings: {speed?: number; textSize?: number; durationMs?: number}): Promise<boolean> {
+  if (!isFloatingOverlayAvailable() || !overlayModule) return false;
+  try {
+    return await overlayModule.updateTeleprompterSettings(settings);
+  } catch {
+    return false;
+  }
+}

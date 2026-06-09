@@ -496,8 +496,8 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     headerText: { flex: 1, minWidth: 0 },
     eyebrow: { ...typography.captionBold, color: colors.primary },
     heading: { ...typography.heading2, color: colors.ink },
-    actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    gridButton: { flexGrow: 1, minWidth: 132 },
+    actionGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm },
+    gridButton: { flex: 1, minWidth: 80 },
     idMapList: { gap: spacing.xs, paddingVertical: spacing.xs },
     idMapChip: { ...typography.micro, color: colors.slate, borderWidth: 1, borderColor: colors.hairline, borderRadius: rounded.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, backgroundColor: colors.surface },
   });

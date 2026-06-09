@@ -9,6 +9,8 @@
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
   <uses-feature android:name="android.hardware.microphone" android:required="false"/>
   <queries>
     <intent>
@@ -57,6 +59,14 @@
       <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Floating note icon"/>
     </service>
     <service android:name=".voicerecorder.VoiceRecorderService" android:exported="false" android:foregroundServiceType="microphone"/>
+    <service android:name=".overlay.TeleprompterService" android:exported="false" android:foregroundServiceType="specialUse">
+      <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Teleprompter status bar"/>
+    </service>
+    <receiver android:name=".overlay.BootReceiver" android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED"/>
+      </intent-filter>
+    </receiver>
     <activity android:name=".widget.NoteWidgetConfigureActivity" android:exported="true" android:theme="@style/AppTheme"/>
     <receiver android:name=".widget.NoteWidgetProvider" android:exported="true">
       <intent-filter>

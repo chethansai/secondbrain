@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AppState, GestureResponderEvent, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useTheme } from '../../shared/design/ThemeProvider';
-import { colors, rounded, spacing, typography } from '../../shared/design/tokens';
+import { colors as tokenColors, rounded, spacing, typography } from '../../shared/design/tokens';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { TextInputField } from '../../shared/ui/TextInputField';
@@ -11,7 +11,7 @@ import { cloneItems, isCategoryNode, listAllCategories } from '../categories/cat
 import { validateNotesData } from '../sync/validation';
 import { VoiceRecorderSettingsSection } from '../voiceRecorder/VoiceRecorderSettingsSection';
 import { copyText } from './clipboard';
-import { overlayActionLabels, overlayTapActions, isFloatingOverlayAvailable, readFloatingOverlaySettings, requestFloatingOverlayPermission, resetFloatingOverlayPlacement, startFloatingOverlay, stopFloatingOverlay, updateFloatingOverlaySettings } from './floatingOverlay';
+import { overlayActionLabels, overlayTapActions, isFloatingOverlayAvailable, readFloatingOverlaySettings, requestFloatingOverlayPermission, resetFloatingOverlayPlacement, startFloatingOverlay, stopFloatingOverlay, updateFloatingOverlaySettings, startTeleprompter, stopTeleprompter, readTeleprompterState, updateTeleprompterSettings, durationOptions, TeleprompterState } from './floatingOverlay';
 
 type Props = {
   data: NotesData;
@@ -37,6 +37,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
   const [overlaySaving, setOverlaySaving] = useState(false);
   const overlayAvailable = isFloatingOverlayAvailable();
 
+<<<<<<< Updated upstream
   const teleprompterEnabledProp = teleprompterEnabled ?? true;
   const [teleEnabled, setTeleEnabled] = useState(teleprompterEnabledProp);
   const [teleCategories, setTeleCategories] = useState(new Set(teleprompterCategories || []));
@@ -70,14 +71,44 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
       setStatus(ok ? 'Teleprompter settings saved.' : 'Failed to save teleprompter settings.');
     }
   };
+=======
+  // Teleprompter state synced with native service
+  const [teleprompterState, setTeleprompterState] = useState<TeleprompterState>({
+    isRunning: false,
+    text: '',
+    speed: 34,
+    textSize: 14,
+    durationMs: -1,
+    remaining: '00:00:00',
+    permissionGranted: false,
+  });
+  const [selectedDuration, setSelectedDuration] = useState(-1);
+  const [teleSaving, setTeleSaving] = useState(false);
+>>>>>>> Stashed changes
 
   useEffect(() => {
     refreshOverlayPermission();
+    refreshTeleprompterState();
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') refreshOverlayPermission();
+      if (nextState === 'active') {
+        refreshOverlayPermission();
+        refreshTeleprompterState();
+      }
     });
-    return () => subscription.remove();
+    const interval = setInterval(refreshTeleprompterState, 2000); // live countdown update
+    return () => {
+      subscription.remove();
+      clearInterval(interval);
+    };
   }, []);
+
+  async function refreshTeleprompterState() {
+    const state = await readTeleprompterState().catch(() => null);
+    if (state) {
+      setTeleprompterState(state);
+      if (state.durationMs > 0) setSelectedDuration(state.durationMs);
+    }
+  }
 
   async function exportJson() {
     const copied = await copyText(JSON.stringify(data, null, 2));
@@ -245,7 +276,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
             </View>
           ) : null}
           <View style={styles.buttonRow}>
-            <Button label={overlayPermissionGranted ? 'Start floating icon' : 'Allow permission'} icon="pin-outline" onPress={enableFloatingIcon} disabled={overlaySaving || !overlayAvailable} style={styles.rowButton} />
+            <Button label={overlayPermissionGranted ? 'Start floating' : 'Allow permission'} icon="pin-outline" onPress={enableFloatingIcon} disabled={overlaySaving || !overlayAvailable} style={styles.rowButton} />
             <Button label="Stop" icon="close" variant="secondary" onPress={stopFloatingIcon} disabled={overlaySaving || !overlayAvailable} style={styles.rowButton} />
           </View>
           <Button label="Reset floating icon position" icon="reload-outline" variant="secondary" onPress={resetFloatingIcon} disabled={overlaySaving || !overlayAvailable} />
@@ -381,6 +412,7 @@ function LineControl({ label, value, min, max, formatter, disabled, colors, styl
 
 function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
   return StyleSheet.create({
+<<<<<<< Updated upstream
     wrap: { gap: spacing.md },
     settingGroup: { gap: spacing.xs },
     settingLabel: { ...typography.bodySmMedium, color: colors.charcoal },
@@ -432,5 +464,32 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
       color: colors.ink,
       flex: 1,
     },
+=======
+  wrap: { gap: spacing.md },
+  settingGroup: { gap: spacing.xs },
+  settingLabel: { ...typography.bodySmMedium, color: colors.charcoal },
+  overlayPanel: { gap: spacing.sm, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.surfaceSoft, padding: spacing.md },
+  overlayStatusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  overlayStatusText: { ...typography.bodySmMedium, color: colors.ink, flex: 1 },
+  lineControl: { gap: spacing.xs },
+  lineControlHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  lineControlLabel: { ...typography.micro, color: colors.slate },
+  lineControlValue: { ...typography.micro, color: colors.ink },
+  sliderTrack: { height: 32, borderRadius: rounded.full, backgroundColor: colors.hairline, justifyContent: 'center', overflow: 'visible' },
+  sliderTrackDisabled: { opacity: 0.55 },
+  sliderFill: { position: 'absolute', left: 0, height: 4, borderRadius: rounded.full },
+  sliderThumb: { position: 'absolute', width: 18, height: 18, marginLeft: -9, borderRadius: 9, borderWidth: 2, borderColor: colors.canvas },
+    buttonRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, width: '100%' },
+    rowButton: { flex: 1, minWidth: 90, flexShrink: 1 },
+  dropdownButton: { minHeight: 44, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  dropdownButtonDisabled: { opacity: 0.55 },
+  dropdownValue: { ...typography.body, color: colors.ink, flex: 1 },
+  dropdownMenu: { borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, overflow: 'hidden' },
+  dropdownOption: { minHeight: 42, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft },
+  dropdownOptionSelected: { backgroundColor: colors.primary },
+  dropdownOptionText: { ...typography.bodySmMedium, color: colors.ink },
+  dropdownOptionTextSelected: { color: colors.onPrimary },
+  status: { ...typography.bodySmMedium, color: colors.slate },
+>>>>>>> Stashed changes
   });
 }

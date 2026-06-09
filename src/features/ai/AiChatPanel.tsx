@@ -376,7 +376,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     promptHint: { ...typography.micro, color: colors.slate },
     promptEmptyText: { ...typography.micro, color: colors.slate },
     promptCardList: { gap: spacing.sm, paddingRight: spacing.sm },
-    promptCard: { width: 240, minHeight: 112, maxHeight: 180, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.surfaceSoft, padding: spacing.md, justifyContent: 'center' },
+    promptCard: { flex: 1, minWidth: 200, maxWidth: 240, minHeight: 112, maxHeight: 180, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.surfaceSoft, padding: spacing.md, justifyContent: 'center' },
     promptCardText: { ...typography.bodySmMedium, color: colors.charcoal },
   });
 }
