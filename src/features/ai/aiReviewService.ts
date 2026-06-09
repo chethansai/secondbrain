@@ -194,20 +194,10 @@ export function consumeAiResponseText(text: string, onToken?: (token: string) =>
 }
 
 function extractSseToken(parsed: Record<string, unknown>) {
-  const choices = parsed.choices;
-  if (Array.isArray(choices)) {
-    const first = choices[0] as { delta?: { content?: unknown }; message?: { content?: unknown }; text?: unknown } | undefined;
-    const choiceToken = first?.delta?.content ?? first?.message?.content ?? first?.text;
-    if (typeof choiceToken === 'string') return choiceToken;
-  }
-
-  const outputText = parsed.output_text ?? parsed.text ?? parsed.delta;
-  if (typeof outputText === 'string') return outputText;
-
-  if (parsed.type === 'response.output_text.delta' && typeof parsed.delta === 'string') return parsed.delta;
   if (parsed.type === 'content_block_delta' && isTextDelta(parsed.delta)) return parsed.delta.text;
   if (parsed.type === 'message_delta' && isTextDelta(parsed.delta)) return parsed.delta.text;
-
+  const outputText = parsed.output_text ?? parsed.text ?? parsed.delta;
+  if (typeof outputText === 'string') return outputText;
   return '';
 }
 

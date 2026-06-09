@@ -266,10 +266,10 @@ async function readAiChatConversations(): Promise<AiChatConversation[]> {
 }
 
 async function requestAiChat(data: NotesData, messages: AiChatMessage[], input: string, onToken: (token: string) => void) {
-  const response = await fetch('https://vmi3321442.tailb6229f.ts.net/v1/responses', {
+  const response = await fetch('https://vmi3321442.tailb6229f.ts.net/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer dummy' },
-    body: JSON.stringify({ model: 'oca/gpt-5.4', input: buildPrompt(data, messages, input) }),
+    headers: { 'Content-Type': 'application/json', 'x-api-key': 'dummy', 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'oca/grok4-3', max_tokens: 4096, messages: [{ role: 'user', content: buildPrompt(data, messages, input) }] }),
   });
   if (!response.ok) throw new Error(`AI request failed with ${response.status}.`);
   const text = await response.text();
