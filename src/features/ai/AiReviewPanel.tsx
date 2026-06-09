@@ -508,7 +508,6 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     promptPreview: { maxHeight: 180, borderWidth: 1, borderColor: colors.hairline, borderRadius: rounded.sm, padding: spacing.sm, color: colors.slate, backgroundColor: colors.canvas, ...typography.micro },
     tableWrap: { borderWidth: 1, borderColor: colors.hairline, borderRadius: rounded.md, overflow: 'hidden' },
     tableHeaderRow: { flexDirection: 'row', backgroundColor: colors.surfaceSoft, borderBottomWidth: 1, borderBottomColor: colors.hairline },
-    wrap: { gap: spacing.md, width: '100%' },
     tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft, minHeight: 54 },
     tableHeaderText: { ...typography.micro, color: colors.primary, padding: spacing.sm },
     tableText: { ...typography.bodySm, color: colors.charcoal, padding: spacing.sm },

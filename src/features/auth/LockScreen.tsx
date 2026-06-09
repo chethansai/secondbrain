@@ -58,7 +58,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   card: { backgroundColor: colors.canvas, borderRadius: rounded.lg, padding: spacing.xxl, gap: spacing.lg, ...shadows.mockup },
   badge: { alignSelf: 'flex-start', backgroundColor: colors.primary, borderRadius: rounded.full, paddingHorizontal: spacing.sm, paddingVertical: spacing.xxs },
   badgeText: { ...typography.captionBold, color: colors.onPrimary },
-  title: { ...typography.hero, color: colors.ink, letterSpacing: 0 },
+  title: { ...typography.heading1, color: colors.ink, letterSpacing: 0 },
   subtitle: { ...typography.subtitle, color: colors.slate },
   dotPink: { position: 'absolute', width: 28, height: 28, borderRadius: rounded.sm, backgroundColor: colors.brandPink, top: 96, left: 32, transform: [{ rotate: '-12deg' }] },
   dotYellow: { position: 'absolute', width: 42, height: 42, borderRadius: rounded.md, backgroundColor: colors.brandYellow, right: 42, top: 158, transform: [{ rotate: '9deg' }] },

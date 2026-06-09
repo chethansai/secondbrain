@@ -37,7 +37,7 @@ function createStyles(colors: typeof import('../design/tokens').colors) {
     color: colors.ink,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    ...typography.body,
+    ...typography.bodySm,
   },
   multiline: { minHeight: 132, textAlignVertical: 'top' },
   errorBorder: { borderColor: colors.semanticError },

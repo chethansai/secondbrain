@@ -6,6 +6,7 @@ import { NativeModules, Platform } from 'react-native';
 import {
   VoiceRecording,
   VoiceRecorderSettings,
+  VoiceRecorderPlaybackStatus,
   VOICE_RECORDINGS_STORAGE_KEY,
   VOICE_RECORDER_SETTINGS_KEY,
   DEFAULT_VOICE_RECORDER_SETTINGS,
@@ -18,6 +19,7 @@ const VOICE_RECORDING_TASK = 'voice-recording-task';
 const RECORDINGS_DIR = FileSystem.documentDirectory + 'voice-recordings/';
 
 let currentSound: Audio.Sound | null = null;
+let currentPlaybackStatus: VoiceRecorderPlaybackStatus = 'idle';
 
 type NativeVoiceRecorderModule = {
   startRecording(settings: VoiceRecorderSettings): Promise<boolean>;
@@ -196,7 +198,7 @@ export async function stopVoiceRecordingBackground() {
   }
 }
 
-export async function playVoiceRecording(uri: string): Promise<boolean> {
+export async function playVoiceRecording(uri: string, onComplete?: () => void): Promise<boolean> {
   if (!uri) return false;
 
   // Stop any currently playing sound
@@ -216,13 +218,22 @@ export async function playVoiceRecording(uri: string): Promise<boolean> {
       { shouldPlay: true, volume: 1.0, isLooping: false }
     );
     currentSound = sound;
+    currentPlaybackStatus = 'playing';
 
     sound.setOnPlaybackStatusUpdate((status) => {
       if (status.isLoaded) {
         if (status.didJustFinish) {
+          currentPlaybackStatus = 'idle';
+          onComplete?.();
           sound.unloadAsync().catch(console.warn);
           currentSound = null;
+        } else if (status.isPlaying) {
+          currentPlaybackStatus = 'playing';
+        } else {
+          currentPlaybackStatus = 'paused';
         }
+      } else {
+        currentPlaybackStatus = 'idle';
       }
     });
 
@@ -239,6 +250,7 @@ export async function pauseVoiceRecording(): Promise<boolean> {
   if (!currentSound) return false;
   try {
     await currentSound.pauseAsync();
+    currentPlaybackStatus = 'paused';
     console.log('Paused current recording');
     return true;
   } catch (e) {
@@ -248,16 +260,21 @@ export async function pauseVoiceRecording(): Promise<boolean> {
 }
 
 export async function stopVoiceRecordingPlayback(): Promise<boolean> {
-  if (!currentSound) return false;
+  if (!currentSound) {
+    currentPlaybackStatus = 'idle';
+    return false;
+  }
   try {
     await currentSound.stopAsync();
     await currentSound.unloadAsync();
     currentSound = null;
+    currentPlaybackStatus = 'idle';
     console.log('Stopped current recording playback');
     return true;
   } catch (e) {
     console.error('Failed to stop voice recording playback', e);
     currentSound = null;
+    currentPlaybackStatus = 'idle';
     return false;
   }
 }
@@ -322,3 +339,5 @@ export async function saveTranscription(id: string, text: string): Promise<boole
   await saveVoiceRecordings(recordings);
   return true;
 }
+
+export { currentPlaybackStatus };

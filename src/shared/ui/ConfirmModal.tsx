@@ -42,7 +42,7 @@ export function ConfirmModal({ visible, title, message, confirmLabel = 'Delete',
 function createStyles(colors: typeof import('../design/tokens').colors) {
   return StyleSheet.create({
   content: { gap: spacing.lg },
-  message: { ...typography.body, color: colors.charcoal },
+  message: { ...typography.bodySm, color: colors.charcoal },
   actions: { flexDirection: 'row', gap: spacing.sm },
   action: { flex: 1 },
   });

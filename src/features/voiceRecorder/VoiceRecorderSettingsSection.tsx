@@ -20,6 +20,7 @@ import {
   stopVoiceRecordingPlayback,
   transcribeVoiceRecording,
   saveTranscription,
+  currentPlaybackStatus,
 } from './voiceRecorderService';
 import { addNote, appendHistoryNote } from '../notes/noteMutations';
 import { useNotesSync } from '../sync/useNotesSync';
@@ -40,6 +41,8 @@ export function VoiceRecorderSettingsSection() {
   const [transcriptionTexts, setTranscriptionTexts] = useState<Record<string, string>>({});
   const [selectedRecordings, setSelectedRecordings] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const { data, commit } = useNotesSync();
 
   useEffect(() => {
@@ -50,6 +53,7 @@ export function VoiceRecorderSettingsSection() {
     return () => subscription.remove();
   }, []);
 
+  // Playback completion synchronized via onComplete callback to playVoiceRecording (removes polling, handles finish event to reset to Play state)
   // Auto-transcribe as soon as new untranscribed voice recordings appear in the section
   useEffect(() => {
     const untranscribed = recordings.filter(
@@ -263,6 +267,11 @@ export function VoiceRecorderSettingsSection() {
           const isSelected = selectedRecordings.has(recording.id);
           return (
             <View key={recording.id} style={[styles.recordingRow, isSelected && styles.selectedRow]}>
+              {/* Refactored per requirements: single Play/Pause toggle (dynamic icon+label) + separate Delete.
+                   When not playing: [▶ Play] [🗑 Delete]
+                   When playing:     [❚❚ Pause] [🗑 Delete]
+                   State auto-resets to Play on audio completion (via onComplete callback).
+                   Compact responsive row on mobile. */}
               <Pressable 
                 style={styles.checkbox} 
                 onPress={() => toggleSelection(recording.id)}
@@ -307,48 +316,52 @@ export function VoiceRecorderSettingsSection() {
                   </View>
                 ) : null}
               </View>
-              <Button 
-                label="Play" 
-                icon="play" 
-                variant="secondary" 
-                onPress={async () => {
-                  const played = await playVoiceRecording(recording.uri);
-                  setStatus(played ? 'Playing recording...' : 'Failed to play recording.');
-                }} 
-                disabled={saving} 
-                style={styles.playButton} 
-              />
-              <Button 
-                label="Pause" 
-                icon="pause" 
-                variant="secondary" 
-                onPress={async () => {
-                  const paused = await pauseVoiceRecording();
-                  setStatus(paused ? 'Paused playback.' : 'No playback to pause.');
-                }} 
-                disabled={saving} 
-                style={styles.controlButton} 
-              />
-              <Button 
-                label="Stop" 
-                icon="close" 
-                variant="secondary" 
-                onPress={async () => {
-                  const stopped = await stopVoiceRecordingPlayback();
-                  setStatus(stopped ? 'Stopped playback.' : 'No playback to stop.');
-                }} 
-                disabled={saving} 
-                style={styles.controlButton} 
-              />
-              <Button 
-                label={transcribingId === recording.id ? 'Transcribing...' : 'Transcribe'} 
-                icon="text-outline" 
-                variant="secondary" 
-                onPress={() => handleTranscribe(recording.id, recording.uri)} 
-                disabled={!!transcribingId || saving} 
-                style={styles.transcribeButton} 
-              />
-              <Button label="Delete" icon="trash-outline" variant="danger" onPress={() => removeRecording(recording.id)} disabled={saving} style={styles.deleteButton} />
+              <View style={styles.audioControlsRow}>
+                <Button
+                  label={isPlaying && currentlyPlayingId === recording.id ? 'Pause' : 'Play'}
+                  icon={isPlaying && currentlyPlayingId === recording.id ? 'pause' : 'play'}
+                  variant="secondary"
+                  onPress={async () => {
+                    if (isPlaying && currentlyPlayingId === recording.id) {
+                      const paused = await pauseVoiceRecording();
+                      if (paused) {
+                        setIsPlaying(false);
+                        setCurrentlyPlayingId(null);
+                        setStatus('Playback paused.');
+                      }
+                    } else {
+                      // Stop any other playback first to avoid overlapping sounds
+                      if (isPlaying && currentlyPlayingId !== recording.id) {
+                        await stopVoiceRecordingPlayback();
+                        setIsPlaying(false);
+                        setCurrentlyPlayingId(null);
+                      }
+                      const played = await playVoiceRecording(recording.uri, () => {
+                        setIsPlaying(false);
+                        setCurrentlyPlayingId(null);
+                        setStatus('Playback finished.');
+                      });
+                      if (played) {
+                        setIsPlaying(true);
+                        setCurrentlyPlayingId(recording.id);
+                        setStatus('Playing recording...');
+                      } else {
+                        setStatus('Failed to play recording.');
+                      }
+                    }
+                  }}
+                  disabled={saving || transcribingId !== null}
+                  style={styles.playPauseButton}
+                />
+                <Button
+                  label="Delete"
+                  icon="trash-outline"
+                  variant="danger"
+                  onPress={() => removeRecording(recording.id)}
+                  disabled={saving}
+                  style={styles.deleteButton}
+                />
+              </View>
             </View>
           );
         })}
@@ -411,7 +424,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flex: 1 },
     title: { ...typography.bodySmMedium, color: colors.ink },
     switchTrack: { minWidth: 82, minHeight: 36, borderRadius: rounded.full, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.canvas, padding: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs },
-    switchTrackOn: { borderColor: colors.primary, backgroundColor: colors.cardTintBlue },
+    switchTrackOn: { borderColor: colors.primary, backgroundColor: colors.cardTintLavender },
     switchThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.stone },
     switchThumbOn: { backgroundColor: colors.primary },
     switchText: { ...typography.micro, color: colors.slate, minWidth: 24, textAlign: 'center' },
@@ -421,14 +434,27 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     sortButton: { minHeight: 34, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.canvas },
     sortText: { ...typography.micro, color: colors.ink },
     recordingList: { gap: spacing.xs },
-    recordingRow: { borderWidth: 1, borderColor: colors.hairlineSoft, borderRadius: rounded.md, backgroundColor: colors.canvas, padding: spacing.sm, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: spacing.sm, minHeight: 72 },
-    recordingTextWrap: { flex: 1, minWidth: 0, gap: 2, maxWidth: '100%' },
+    recordingRow: { borderWidth: 1, borderColor: colors.hairlineSoft, borderRadius: rounded.md, backgroundColor: colors.canvas, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 64 },
+    selectedRow: { backgroundColor: colors.surfaceSoft, borderColor: colors.primary },
+    recordingTextWrap: { flex: 1, minWidth: 0, gap: 2 },
     recordingTitle: { ...typography.bodySmMedium, color: colors.ink },
     recordingMeta: { ...typography.micro, color: colors.slate },
-    playButton: { minWidth: 58, paddingHorizontal: 10 },
-    transcribeButton: { minWidth: 82, paddingHorizontal: 10 },
-    deleteButton: { minWidth: 68, paddingHorizontal: 10 },
-    controlButton: { minWidth: 50, paddingHorizontal: 8, paddingVertical: 6 },
+    audioControlsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      flexShrink: 0,
+    },
+    playPauseButton: {
+      minWidth: 92,
+      minHeight: 44,
+      paddingHorizontal: spacing.md,
+    },
+    deleteButton: {
+      minWidth: 52,
+      minHeight: 44,
+      paddingHorizontal: spacing.sm,
+    },
     emptyText: { ...typography.bodySmMedium, color: colors.slate },
     status: { ...typography.bodySmMedium, color: colors.slate },
     transcriptionBox: { marginTop: spacing.xs, padding: spacing.xs, backgroundColor: colors.surfaceSoft, borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairlineStrong, width: '100%' },
@@ -440,10 +466,9 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     bulkButton: { flex: 1, minWidth: 140 },
     checkbox: { width: 28, height: 28, justifyContent: 'center', alignItems: 'center', marginRight: spacing.xs },
     checkboxText: { fontSize: 18, color: colors.primary },
-    selectedRow: { backgroundColor: colors.cardTintLavender || '#f0e6ff', borderColor: colors.primary },
     confirmOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
     confirmDialog: { backgroundColor: colors.canvas, padding: spacing.lg, borderRadius: rounded.lg, width: '85%', maxWidth: 340, alignItems: 'center' },
-    confirmTitle: { ...typography.bodyMedium, color: colors.ink, marginBottom: spacing.sm, textAlign: 'center' },
+    confirmTitle: { ...typography.bodyMdMedium, color: colors.ink, marginBottom: spacing.sm, textAlign: 'center' },
     confirmText: { ...typography.bodySm, color: colors.slate, textAlign: 'center', marginBottom: spacing.lg },
     confirmButtons: { flexDirection: 'row', gap: spacing.sm, width: '100%' },
     confirmButton: { flex: 1 },

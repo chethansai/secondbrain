@@ -12,6 +12,7 @@ This post-step Git workflow is mandatory and must not be skipped after any imple
 
 ## history
 
+- 2026-06-09: **VOICE RECORDER CONTROLS REFACTORED**. Updated `VoiceRecorderSettingsSection.tsx` to single Play/Pause toggle button (dynamic icon/label via `isPlaying && currentlyPlayingId`) + separate Delete. Removed separate Pause. Playback state syncs on completion via `onComplete` callback (resets to Play). Updated styles for compact responsive mobile layout `[Play/Pause][Delete]`, tighter spacing, equal button heights. Comment and history updated. `npm run typecheck` passes. Final layout matches requirements exactly.
 - 2026-06-08: Completed teleprompter (status bar scrolling notes) settings by moving ON/OFF toggle + multi-root-category checkboxes + Save to dedicated section in SettingsPanel.tsx. Removed duplicate/glitchy toggle from WorkspaceBoard header menu. Updated App.tsx prop passing and SettingsPanel state/sync. Improved NotesTeleprompterBar restart reliability on AppState 'active' after background/close. Toggle now works reliably and scrolling resumes on app resume. Typecheck clean. Updated both histories.
 
 - 2026-06-08: Fixed status bar scrolling (teleprompter) ON/OFF toggle UI glitch in WorkspaceBoard and ensured scrolling animation restarts on AppState 'active' (after app close/background) in NotesTeleprompterBar using AppState listener and animation ref. The bar now reliably stays ON when toggled and continues scrolling even when app is closed (via background task-like AppState resumption). Updated histories, typecheck clean.
