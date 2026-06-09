@@ -13,7 +13,9 @@ import com.facebook.react.common.ReleaseLevel
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.notes.nativenotetaking.ainotifications.AiNotificationWorkerPackage
+import com.notes.nativenotetaking.assistant.AssistantPackage
 import com.notes.nativenotetaking.overlay.OverlayPackage
+import com.notes.nativenotetaking.voicerecorder.VoiceRecorderPackage
 
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
@@ -28,7 +30,9 @@ class MainApplication : Application(), ReactApplication {
               // Packages that cannot be autolinked yet can be added manually here, for example:
               // add(MyReactNativePackage())
               add(AiNotificationWorkerPackage())
+              add(AssistantPackage())
               add(OverlayPackage())
+              add(VoiceRecorderPackage())
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"

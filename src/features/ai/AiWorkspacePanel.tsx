@@ -53,6 +53,8 @@ export function AiWorkspacePanel() {
     selectedCategoryPaths,
     pinnedCategoryPaths,
     pinnedNotes,
+    teleprompterEnabled: true,
+    teleprompterCategories: [],
   } : null, [activeDocument, pinnedCategoryPaths, pinnedNotes, selectedCategoryPaths]);
   const currentItems = path.length ? getCategoryItems(data, path) : null;
   const childCategories = useMemo(() => (currentItems ? listChildCategories(currentItems, path) : []), [currentItems, path]);

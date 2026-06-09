@@ -121,13 +121,15 @@ export async function writeWorkspaceIndex(index: WorkspaceIndex): Promise<void> 
   await setDoc(workspaceListRef, serializeWorkspaceIndex(index), { merge: false });
 }
 
-export function createWorkspaceMeta(id: string, name: string, selectedCategoryNames: string[] = [], pinnedCategoryNames: string[] = [], pinnedNotes: PinnedNoteRef[] = []): WorkspaceMeta {
+export function createWorkspaceMeta(id: string, name: string, selectedCategoryNames: string[] = [], pinnedCategoryNames: string[] = [], pinnedNotes: PinnedNoteRef[] = [], teleprompterEnabled: boolean = true, teleprompterCategoryNames: string[] = []): WorkspaceMeta {
   return {
     id,
     name,
     selectedCategoryPaths: selectedCategoryNames.map((categoryName) => parseCategoryPath(categoryName)),
     pinnedCategoryPaths: pinnedCategoryNames.map((categoryName) => parseCategoryPath(categoryName)),
     pinnedNotes,
+    teleprompterEnabled,
+    teleprompterCategories: teleprompterCategoryNames,
   };
 }
 
@@ -146,12 +148,15 @@ export function parseWorkspaceIndex(raw: Record<string, unknown>): WorkspaceInde
   const uniqueWorkspaceNames = [...new Set(normalizedWorkspaceNames)];
   const pinnedCategoryNamesByWorkspace = parsePinnedCategoryNamesByWorkspace(raw.pinnedcategories);
   const pinnedNotesByWorkspace = parsePinnedNotesByWorkspace(raw.pinnednotes);
+  const teleprompterByWorkspace = parseTeleprompterSettings(raw.teleprompter);
   const workspaces = uniqueWorkspaceNames.map((workspaceName) => createWorkspaceMeta(
     workspaceName,
     workspaceName,
     parseSelectedCategoryNames(raw[workspaceName]),
     pinnedCategoryNamesByWorkspace.get(workspaceName) ?? [],
     pinnedNotesByWorkspace.get(workspaceName) ?? [],
+    teleprompterByWorkspace.get(workspaceName)?.enabled ?? true,
+    teleprompterByWorkspace.get(workspaceName)?.categories ?? [],
   ));
 
   return {
@@ -163,18 +168,26 @@ export function parseWorkspaceIndex(raw: Record<string, unknown>): WorkspaceInde
 }
 
 export function serializeWorkspaceIndex(index: WorkspaceIndex): WorkspaceListDocument {
-  const defaultWorkspace = index.workspaces.find((workspace) => workspace.id === index.defaultWorkspaceId) ?? index.workspaces.find((workspace) => workspace.id === index.activeWorkspaceId) ?? index.workspaces[0] ?? createWorkspaceMeta(defaultWorkspaceId, defaultWorkspaceId);
+  const defaultWorkspace = index.workspaces.find((workspace) => workspace.id === index.defaultWorkspaceId) ?? index.workspaces.find((workspace) => workspace.id === index.activeWorkspaceId) ?? index.workspaces[0] ?? createWorkspaceMeta(defaultWorkspaceId, defaultWorkspaceId, [], [], [], true, []);
   const document: WorkspaceListDocument = { defaultworkspace: defaultWorkspace.id };
   const pinnedCategories: Record<string, string[]> = {};
   const pinnedNotes: Record<string, unknown[]> = {};
+  const teleprompterSettings: Record<string, any> = {};
   for (const workspace of index.workspaces) {
     document[workspace.id] = selectedCategoryNamesFromPaths(workspace.selectedCategoryPaths);
     const pinnedNames = selectedCategoryNamesFromPaths(workspace.pinnedCategoryPaths);
     if (pinnedNames.length) pinnedCategories[workspace.id] = pinnedNames;
     if (workspace.pinnedNotes.length) pinnedNotes[workspace.id] = workspace.pinnedNotes.map(serializePinnedNoteRef);
+    if (!workspace.teleprompterEnabled || workspace.teleprompterCategories.length > 0) {
+      teleprompterSettings[workspace.id] = {
+        enabled: workspace.teleprompterEnabled,
+        categories: workspace.teleprompterCategories,
+      };
+    }
   }
   if (Object.keys(pinnedCategories).length) document.pinnedcategories = pinnedCategories;
   if (Object.keys(pinnedNotes).length) document.pinnednotes = pinnedNotes;
+  if (Object.keys(teleprompterSettings).length) document.teleprompter = teleprompterSettings;
   if (!Array.isArray(document[defaultWorkspace.id])) {
     document[defaultWorkspace.id] = [];
   }
@@ -204,7 +217,16 @@ function parsePinnedNotesByWorkspace(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return new Map<string, PinnedNoteRef[]>();
   return new Map(Object.entries(value).map(([workspaceName, notes]) => [workspaceName, parsePinnedNoteRefs(notes)]));
 }
-
+function parseTeleprompterSettings(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return new Map<string, {enabled: boolean; categories: string[] }>();
+  return new Map(Object.entries(value).map(([workspaceName, settings]) => {
+    const s = settings as any;
+    return [workspaceName, {
+      enabled: s?.enabled !== false,
+      categories: Array.isArray(s?.categories) ? s.categories.filter((c: any) => typeof c === 'string' && c.trim().length > 0).map((c: string) => c.trim()) : [],
+    }];
+  }));
+}
 function parsePinnedNoteRefs(value: unknown): PinnedNoteRef[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item): PinnedNoteRef[] => {

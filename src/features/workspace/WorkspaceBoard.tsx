@@ -213,7 +213,12 @@ export function WorkspaceBoard({
             <Pressable accessibilityRole="button" accessibilityLabel="Reload recent data" disabled={refreshing} onPress={reloadRecentData} style={[styles.reloadButton, refreshing && styles.reloadButtonDisabled]}>
               <Icon name="reload-outline" size={17} color={refreshing ? colors.stone : colors.ink} />
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={isDark ? 'Switch to light mode' : 'Switch to dark mode'} onPress={toggleTheme} style={[styles.reloadButton, isDark && styles.themeButtonActive]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              onPress={toggleTheme}
+              style={[styles.reloadButton, isDark && styles.themeButtonActive]}
+            >
               <Icon name="sunny-outline" size={18} color={isDark ? colors.onPrimary : colors.ink} />
             </Pressable>
             <Pressable

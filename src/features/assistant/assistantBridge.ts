@@ -1,8 +1,11 @@
-import { NativeModules } from 'react-native';
+import { NativeEventEmitter, NativeModules } from 'react-native';
 
 const { AssistantModule } = (NativeModules as any) || {};
+const assistantEvents = AssistantModule ? new NativeEventEmitter(AssistantModule) : null;
+type SpeechEventName = 'AssistantSpeechResult' | 'AssistantSpeechPartial' | 'AssistantSpeechError';
 
 export const assistantBridge = {
+  isSpeechRecognitionAvailable: () => Boolean(AssistantModule?.startListening),
   launchAssistant: async () => {
     if (AssistantModule && AssistantModule.launchAssistant) {
       return AssistantModule.launchAssistant();
@@ -20,6 +23,10 @@ export const assistantBridge = {
       return AssistantModule.stopListening();
     }
     return Promise.resolve();
+  },
+  onSpeechEvent: (eventName: SpeechEventName, listener: (text: string) => void) => {
+    if (!assistantEvents) return { remove: () => undefined };
+    return assistantEvents.addListener(eventName, listener);
   },
 };
 

@@ -39,6 +39,7 @@ type MoveCopyAction = 'move' | 'copy';
 type MoveCopyTarget = { type: 'note'; note: FlatNote } | { type: 'category'; path: CategoryPath } | null;
 type Tab = 'workspace' | 'search' | 'settings' | 'aiChat' | 'ai' | 'aiWorkspace' | 'aiNotifications' | 'assistant';
 type DeleteTarget = { type: 'category'; path: CategoryPath } | { type: 'note'; note: FlatNote } | null;
+const DEFAULT_NOTE_CATEGORY = 'No TS';
 
 export default function App() {
   return <ThemeProvider><AppContent /></ThemeProvider>;
@@ -77,7 +78,7 @@ function AppContent() {
 function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHours, onAuthTimeoutChange, onLogout }: { automationCommand: AutomationCommand | null; onAutomationComplete: (commandKey: string) => void; authTimeoutHours: number; onAuthTimeoutChange: (hours: number) => Promise<void>; onLogout: () => void }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { data, workspaces, activeWorkspace, activeWorkspaceId, defaultWorkspaceId, loading, saving, refreshing, error, setError, commit, createWorkspace, selectWorkspace, setDefaultWorkspace, renameWorkspace, updateSelectedCategoryPaths, updatePinnedCategoryPaths, updatePinnedNotes, refresh } = useNotesSync();
+  const { data, workspaces, activeWorkspace, activeWorkspaceId, defaultWorkspaceId, loading, saving, refreshing, error, setError, commit, createWorkspace, selectWorkspace, setDefaultWorkspace, renameWorkspace, updateSelectedCategoryPaths, updatePinnedCategoryPaths, updatePinnedNotes, updateTeleprompterSettings, refresh } = useNotesSync();
   const { ledger: aiReviewLedger, loading: aiReviewLoading, setError: setAiReviewError, upsertDecision } = useAiReviewSync();
   const [tab, setTab] = useState<Tab>('workspace');
   const [path, setPath] = useState<CategoryPath>([]);
@@ -110,8 +111,18 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const expandableDetailKeys = useMemo(() => detailCategories.filter((category) => category.childCount > 0).map((category) => category.path.join('')), [detailCategories]);
   const allDetailCategoriesExpanded = expandableDetailKeys.length > 0 && expandableDetailKeys.every((key) => expandedCategoryKeys.has(key));
   const pinnedNotes = activeWorkspace?.pinnedNotes ?? [];
+  const teleprompterEnabled = activeWorkspace?.teleprompterEnabled ?? true;
+  const teleprompterCategoryNames = activeWorkspace?.teleprompterCategories ?? [];
+  const filteredTeleprompterNotes = useMemo(() => {
+    if (!teleprompterEnabled || teleprompterCategoryNames.length === 0) return flattenNotes(data);
+    const categorySet = new Set(teleprompterCategoryNames.map(c => c.toLowerCase()));
+    return flattenNotes(data).filter(note => {
+      const root = note.path[0];
+      return root && categorySet.has(root.toLowerCase());
+    });
+  }, [data, teleprompterEnabled, teleprompterCategoryNames]);
   const notes = useMemo(() => (path.length ? sortPinnedNotesFirst(listNotesAtPath(data, path), pinnedNotes) : []), [data, path, pinnedNotes]);
-  const teleprompterNotes = useMemo(() => flattenNotes(data), [data]);
+  const teleprompterNotes = filteredTeleprompterNotes;
   const activeTitle = path.length ? path[path.length - 1] : activeWorkspace?.name ?? 'Workspace';
   const showingRootBoard = !loading && tab === 'workspace' && path.length === 0;
 
@@ -313,14 +324,36 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     return addWorkspaceNote(notePath, text);
   }
 
-  async function addWorkspaceNote(notePath: CategoryPath, text: string) {
-    const result = addNote(data, notePath, text);
+  async function addWorkspaceNote(notePath: CategoryPath, text: string, sourceData: NotesData = data) {
+    const result = addNote(sourceData, notePath, text);
     const historyText = formatAddedNoteHistory(text, notePath);
     const ok = await commitWithHistory(result, historyText);
     if (ok && result.ok) {
       const reviewData = appendHistoryNote(result.data, historyText);
       const reviewNote = getInsertedFlatNote(result.data, notePath, text);
       if (reviewData.ok && reviewNote) await reviewIncomingSeekNotes(reviewData.data, [reviewNote]);
+    }
+    return ok;
+  }
+
+  async function addEditorDefaultNote(text: string) {
+    const targetPath = editorPath?.length ? editorPath : path.length ? path : [DEFAULT_NOTE_CATEGORY];
+    let sourceData = data;
+
+    if (!getCategoryItems(sourceData, targetPath)) {
+      if (targetPath.length !== 1 || targetPath[0] !== DEFAULT_NOTE_CATEGORY) {
+        setError('The selected category no longer exists.');
+        return false;
+      }
+      const categoryResult = createRootCategory(sourceData, DEFAULT_NOTE_CATEGORY);
+      if (!categoryResult.ok) return commit(categoryResult);
+      sourceData = categoryResult.data;
+    }
+
+    const ok = await addWorkspaceNote(targetPath, text, sourceData);
+    if (ok) {
+      await includeWorkspaceCategory(targetPath[0]);
+      setPath(targetPath);
     }
     return ok;
   }
@@ -581,7 +614,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <NotesTeleprompterBar notes={teleprompterNotes} />
+      {teleprompterEnabled && <NotesTeleprompterBar notes={teleprompterNotes} />}
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" onScroll={handleScreenScroll} scrollEventThrottle={16}>
         <View style={[styles.workspaceCard, showingRootBoard && styles.workspaceCardBoard]}>
           {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}
@@ -687,7 +720,15 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           {!loading && tab === 'settings' ? (
             <View style={styles.sectionStack}>
               <PanelHeader title="Settings" onBack={backToWorkspace} />
-              <SettingsPanel data={data} authTimeoutHours={authTimeoutHours} onAuthTimeoutChange={onAuthTimeoutChange} onImport={importData} />
+              <SettingsPanel 
+                data={data} 
+                authTimeoutHours={authTimeoutHours} 
+                onAuthTimeoutChange={onAuthTimeoutChange} 
+                onImport={importData}
+                teleprompterEnabled={teleprompterEnabled}
+                teleprompterCategories={teleprompterCategoryNames}
+                onUpdateTeleprompterSettings={updateTeleprompterSettings}
+              />
             </View>
           ) : null}
           {!loading && tab === 'aiChat' ? (
@@ -762,6 +803,8 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           return ok;
         }}
         onSubmitToCategory={editorMode === 'add' ? addWorkspaceNote : undefined}
+        onSubmitDefaultCategory={editorMode === 'add' ? addEditorDefaultNote : undefined}
+        defaultCategoryLabel={(editorPath?.length ? editorPath : path.length ? path : [DEFAULT_NOTE_CATEGORY]).join(' > ')}
         onCreateSubcategory={editorMode === 'add' ? createEditorSubcategory : undefined}
         pinnedPaths={activeWorkspace?.pinnedCategoryPaths ?? []}
         onToggleCategoryPin={togglePinnedMoveCopyCategory}

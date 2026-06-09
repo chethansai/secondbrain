@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AppState, GestureResponderEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, GestureResponderEvent, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { colors, rounded, spacing, typography } from '../../shared/design/tokens';
 import { Button } from '../../shared/ui/Button';
@@ -7,8 +7,9 @@ import { Icon } from '../../shared/ui/Icon';
 import { TextInputField } from '../../shared/ui/TextInputField';
 import { NotesData, NoteItem } from '../../shared/types/notes';
 import { authTimeoutOptions, formatAuthTimeout } from '../auth/authSession';
-import { cloneItems, isCategoryNode } from '../categories/categoryTree';
+import { cloneItems, isCategoryNode, listAllCategories } from '../categories/categoryTree';
 import { validateNotesData } from '../sync/validation';
+import { VoiceRecorderSettingsSection } from '../voiceRecorder/VoiceRecorderSettingsSection';
 import { copyText } from './clipboard';
 import { overlayActionLabels, overlayTapActions, isFloatingOverlayAvailable, readFloatingOverlaySettings, requestFloatingOverlayPermission, resetFloatingOverlayPlacement, startFloatingOverlay, stopFloatingOverlay, updateFloatingOverlaySettings } from './floatingOverlay';
 
@@ -17,9 +18,12 @@ type Props = {
   authTimeoutHours: number;
   onAuthTimeoutChange: (hours: number) => Promise<void> | void;
   onImport: (data: NotesData) => Promise<boolean> | boolean;
+  teleprompterEnabled?: boolean;
+  teleprompterCategories?: string[];
+  onUpdateTeleprompterSettings?: (enabled: boolean, categories?: string[]) => Promise<boolean> | void;
 };
 
-export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onImport }: Props) {
+export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onImport, teleprompterEnabled, teleprompterCategories, onUpdateTeleprompterSettings }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [importText, setImportText] = useState('');
@@ -32,6 +36,40 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
   const [overlayTapMenuOpen, setOverlayTapMenuOpen] = useState(false);
   const [overlaySaving, setOverlaySaving] = useState(false);
   const overlayAvailable = isFloatingOverlayAvailable();
+
+  const teleprompterEnabledProp = teleprompterEnabled ?? true;
+  const [teleEnabled, setTeleEnabled] = useState(teleprompterEnabledProp);
+  const [teleCategories, setTeleCategories] = useState(new Set(teleprompterCategories || []));
+
+  const rootCategories = useMemo(() => {
+    return listAllCategories(data)
+      .filter((c) => c.path.length === 1)
+      .map((c) => c.name);
+  }, [data]);
+
+  useEffect(() => {
+    setTeleEnabled(teleprompterEnabledProp);
+    setTeleCategories(new Set(teleprompterCategories || []));
+  }, [teleprompterEnabledProp, teleprompterCategories]);
+
+  const toggleTeleCategory = (name: string) => {
+    setTeleCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  };
+
+  const saveTeleprompterSettings = async () => {
+    if (onUpdateTeleprompterSettings) {
+      const ok = await Promise.resolve(onUpdateTeleprompterSettings(teleEnabled, Array.from(teleCategories)));
+      setStatus(ok ? 'Teleprompter settings saved.' : 'Failed to save teleprompter settings.');
+    }
+  };
 
   useEffect(() => {
     refreshOverlayPermission();
@@ -213,6 +251,47 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
           <Button label="Reset floating icon position" icon="reload-outline" variant="secondary" onPress={resetFloatingIcon} disabled={overlaySaving || !overlayAvailable} />
         </View>
       </View>
+      <View style={styles.settingGroup}>
+        <VoiceRecorderSettingsSection />
+      </View>
+
+      <View style={styles.settingGroup}>
+        <Text style={styles.settingLabel}>Status bar scrolling notes (teleprompter)</Text>
+        <View style={styles.toggleRow}>
+          <Text style={styles.dropdownValue}>Enabled</Text>
+          <Switch
+            value={teleEnabled}
+            onValueChange={setTeleEnabled}
+            trackColor={{ false: colors.hairlineStrong, true: colors.primary }}
+            thumbColor={teleEnabled ? colors.onPrimary : colors.canvas}
+          />
+        </View>
+        {teleEnabled && (
+          <View style={{ marginTop: spacing.sm }}>
+            <Text style={styles.settingLabel}>Root categories to include in scrolling</Text>
+            {rootCategories.length > 0 ? rootCategories.map((catName) => (
+              <Pressable
+                key={catName}
+                onPress={() => toggleTeleCategory(catName)}
+                style={styles.checkboxRow}
+              >
+                <Icon
+                  name={teleCategories.has(catName) ? 'checkmark-square' : 'square'}
+                  size={20}
+                  color={colors.ink}
+                />
+                <Text style={styles.checkboxLabel}>{catName}</Text>
+              </Pressable>
+            )) : <Text style={styles.status}>No root categories yet. Create some first.</Text>}
+          </View>
+        )}
+        <Button
+          label="Save teleprompter settings"
+          onPress={saveTeleprompterSettings}
+          variant="secondary"
+        />
+      </View>
+
       <Button label="Copy export JSON" icon="copy-outline" onPress={exportJson} />
       <TextInputField value={importText} onChangeText={setImportText} multiline placeholder="Paste simple nested JSON" accessibilityLabel="Import JSON" autoCapitalize="none" autoCorrect={false} />
       <Button label="Import JSON" icon="cloud-upload-outline" variant="dark" onPress={importJson} disabled={!importText.trim()} />
@@ -220,6 +299,8 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
     </View>
   );
 }
+
+
 
 function parseImportNotesData(value: unknown) {
   const direct = validateNotesData(value);
@@ -300,30 +381,56 @@ function LineControl({ label, value, min, max, formatter, disabled, colors, styl
 
 function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
   return StyleSheet.create({
-  wrap: { gap: spacing.md },
-  settingGroup: { gap: spacing.xs },
-  settingLabel: { ...typography.bodySmMedium, color: colors.charcoal },
-  overlayPanel: { gap: spacing.sm, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.surfaceSoft, padding: spacing.md },
-  overlayStatusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  overlayStatusText: { ...typography.bodySmMedium, color: colors.ink, flex: 1 },
-  lineControl: { gap: spacing.xs },
-  lineControlHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  lineControlLabel: { ...typography.micro, color: colors.slate },
-  lineControlValue: { ...typography.micro, color: colors.ink },
-  sliderTrack: { height: 32, borderRadius: rounded.full, backgroundColor: colors.hairline, justifyContent: 'center', overflow: 'visible' },
-  sliderTrackDisabled: { opacity: 0.55 },
-  sliderFill: { position: 'absolute', left: 0, height: 4, borderRadius: rounded.full },
-  sliderThumb: { position: 'absolute', width: 18, height: 18, marginLeft: -9, borderRadius: 9, borderWidth: 2, borderColor: colors.canvas },
-  buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  rowButton: { flex: 1, minWidth: 130 },
-  dropdownButton: { minHeight: 44, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  dropdownButtonDisabled: { opacity: 0.55 },
-  dropdownValue: { ...typography.body, color: colors.ink, flex: 1 },
-  dropdownMenu: { borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, overflow: 'hidden' },
-  dropdownOption: { minHeight: 42, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft },
-  dropdownOptionSelected: { backgroundColor: colors.primary },
-  dropdownOptionText: { ...typography.bodySmMedium, color: colors.ink },
-  dropdownOptionTextSelected: { color: colors.onPrimary },
-  status: { ...typography.bodySmMedium, color: colors.slate },
+    wrap: { gap: spacing.md },
+    settingGroup: { gap: spacing.xs },
+    settingLabel: { ...typography.bodySmMedium, color: colors.charcoal },
+    overlayPanel: { gap: spacing.sm, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.surfaceSoft, padding: spacing.md },
+    overlayStatusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    overlayStatusText: { ...typography.bodySmMedium, color: colors.ink, flex: 1 },
+    lineControl: { gap: spacing.xs },
+    lineControlHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+    lineControlLabel: { ...typography.micro, color: colors.slate },
+    lineControlValue: { ...typography.micro, color: colors.ink },
+    sliderTrack: { height: 32, borderRadius: rounded.full, backgroundColor: colors.hairline, justifyContent: 'center', overflow: 'visible' },
+    sliderTrackDisabled: { opacity: 0.55 },
+    sliderFill: { position: 'absolute', left: 0, height: 4, borderRadius: rounded.full },
+    sliderThumb: { position: 'absolute', width: 18, height: 18, marginLeft: -9, borderRadius: 9, borderWidth: 2, borderColor: colors.canvas },
+    buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    rowButton: { flex: 1, minWidth: 130 },
+    dropdownButton: { minHeight: 44, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+    dropdownButtonDisabled: { opacity: 0.55 },
+    dropdownValue: { ...typography.body, color: colors.ink, flex: 1 },
+    dropdownMenu: { borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.canvas, overflow: 'hidden' },
+    dropdownOption: { minHeight: 42, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft },
+    dropdownOptionSelected: { backgroundColor: colors.primary },
+    dropdownOptionText: { ...typography.bodySmMedium, color: colors.ink },
+    dropdownOptionTextSelected: { color: colors.onPrimary },
+    status: { ...typography.bodySmMedium, color: colors.slate },
+    toggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+      backgroundColor: colors.surfaceSoft,
+      borderRadius: rounded.md,
+      borderWidth: 1,
+      borderColor: colors.hairline,
+    },
+    checkboxRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+      backgroundColor: colors.surfaceSoft,
+      borderRadius: rounded.sm,
+      marginVertical: 2,
+    },
+    checkboxLabel: {
+      ...typography.bodySmMedium,
+      color: colors.ink,
+      flex: 1,
+    },
   });
 }
