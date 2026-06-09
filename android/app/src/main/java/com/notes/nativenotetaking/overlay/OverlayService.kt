@@ -320,13 +320,13 @@ class OverlayService : Service() {
         val recentCategoryKey = readRecentCreatedCategoryKey()
         val categories = notesStore.readCategoryPaths()
           .filter { it.path != listOf(OverlayNotesStore.seekCategoryName) }
-          .sortedWith(compareBy<OverlayNotesStore.CategoryPath> { pathKey(it.path) != recentCategoryKey }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
+          .sortedWith(compareBy<OverlayNotesStore.CategoryPath> { if (it.pinned) it.pinIndex else Int.MAX_VALUE }.thenBy { pathKey(it.path) != recentCategoryKey }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
         Handler(Looper.getMainLooper()).post {
-          renderCategoryChips(chipWrap, editText, categories, searchInput.text?.toString().orEmpty())
+          renderCategoryChips(chipWrap, editText, searchInput, categories, searchInput.text?.toString().orEmpty())
           searchInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(text: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(text: CharSequence?, start: Int, before: Int, count: Int) {
-              renderCategoryChips(chipWrap, editText, categories, text?.toString().orEmpty())
+              renderCategoryChips(chipWrap, editText, searchInput, categories, text?.toString().orEmpty())
             }
             override fun afterTextChanged(text: Editable?) {}
           })
@@ -344,7 +344,7 @@ class OverlayService : Service() {
     }.start()
   }
 
-  private fun renderCategoryChips(chipWrap: LinearLayout, editText: EditText, categories: List<OverlayNotesStore.CategoryPath>, query: String = "") {
+  private fun renderCategoryChips(chipWrap: LinearLayout, editText: EditText, searchInput: EditText, categories: List<OverlayNotesStore.CategoryPath>, query: String = "") {
     chipWrap.removeAllViews()
     val cleanQuery = query.trim().lowercase()
     val visibleCategories = if (cleanQuery.isBlank()) categories else categories.filter { it.label.lowercase().contains(cleanQuery) }
@@ -366,7 +366,7 @@ class OverlayService : Service() {
         val params = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
           if (index == 0) marginEnd = dp(6) else marginStart = dp(6)
         }
-        row.addView(createCategoryChip(category, editText), params)
+        row.addView(createCategoryChip(category, editText) { loadCategoryChips(chipWrap, editText, searchInput) }, params)
       }
       if (pair.size == 1) {
         row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(6) })
@@ -375,12 +375,19 @@ class OverlayService : Service() {
     }
   }
 
-  private fun createCategoryChip(category: OverlayNotesStore.CategoryPath, editText: EditText): View {
+  private fun createCategoryChip(category: OverlayNotesStore.CategoryPath, editText: EditText, onPinnedChanged: () -> Unit): View {
     val wrap = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
     val chip = LinearLayout(this).apply {
       orientation = LinearLayout.HORIZONTAL
       gravity = Gravity.CENTER_VERTICAL
-      background = GradientDrawable().apply { shape = GradientDrawable.RECTANGLE; cornerRadius = dp(18).toFloat(); setColor(0xfffafaf9.toInt()); setStroke(dp(1), 0xffc8c4be.toInt()) }
+      background = GradientDrawable().apply { shape = GradientDrawable.RECTANGLE; cornerRadius = dp(18).toFloat(); setColor(if (category.pinned) 0xfff1efff.toInt() else 0xfffafaf9.toInt()); setStroke(dp(1), if (category.pinned) 0xff5645d4.toInt() else 0xffc8c4be.toInt()) }
+    }
+    val menuBox = LinearLayout(this).apply {
+      orientation = LinearLayout.VERTICAL; visibility = View.GONE; setPadding(dp(6), dp(6), dp(6), dp(4))
+    }
+    val pinButton = Button(this).apply {
+      text = if (category.pinned) "Unpin" else "Pin"
+      setOnClickListener { togglePinnedCategory(category, this, onPinnedChanged) }
     }
     val subcategoryInput = EditText(this).apply {
       hint = "Subcategory name"; minLines = 1; maxLines = 1; textSize = 13f
@@ -388,17 +395,20 @@ class OverlayService : Service() {
       imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
     }
     val subcategoryBox = LinearLayout(this).apply {
-      orientation = LinearLayout.VERTICAL; visibility = View.GONE; setPadding(dp(6), dp(6), dp(6), dp(4))
+      orientation = LinearLayout.VERTICAL; visibility = View.GONE; setPadding(0, dp(6), 0, 0)
       addView(subcategoryInput, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       addView(Button(this@OverlayService).apply { text = "Create as subcategory"; setOnClickListener { submitNewSubcategoryInput(editText, subcategoryInput, category.path) } }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     }
+    menuBox.addView(pinButton, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    menuBox.addView(Button(this).apply { text = "Create subcategory"; setOnClickListener { toggleSubcategoryBox(subcategoryBox, subcategoryInput) } }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    menuBox.addView(subcategoryBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     val label = TextView(this).apply {
       text = category.label; textSize = 12f; setTextColor(0xff37352f.toInt()); setSingleLine(false); ellipsize = null; includeFontPadding = false
       setPadding(dp(12), dp(9), dp(8), dp(9)); setOnClickListener { submitInput(editText, category.path) }
     }
     val overflow = TextView(this).apply {
       text = "⋮"; textSize = 18f; gravity = Gravity.CENTER; setTextColor(0xff787671.toInt()); minWidth = dp(40); setPadding(dp(8), dp(6), dp(10), dp(6))
-      setOnClickListener { toggleSubcategoryBox(subcategoryBox, subcategoryInput) }
+      setOnClickListener { toggleCategoryMenu(menuBox) }
     }
     subcategoryInput.setOnEditorActionListener { _, actionId, event ->
       val enterPressed = event?.keyCode == android.view.KeyEvent.KEYCODE_ENTER && event.action == android.view.KeyEvent.ACTION_UP
@@ -407,8 +417,30 @@ class OverlayService : Service() {
     chip.addView(label, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
     chip.addView(overflow, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT))
     wrap.addView(chip, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-    wrap.addView(subcategoryBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    wrap.addView(menuBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     return wrap
+  }
+
+  private fun toggleCategoryMenu(box: LinearLayout) {
+    box.visibility = if (box.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+  }
+
+  private fun togglePinnedCategory(category: OverlayNotesStore.CategoryPath, button: Button, onPinnedChanged: () -> Unit) {
+    button.isEnabled = false
+    Thread {
+      try {
+        val pinned = notesStore.togglePinnedCategory(category.path)
+        Handler(Looper.getMainLooper()).post {
+          Toast.makeText(this, if (pinned) "Pinned ${category.label}" else "Unpinned ${category.label}", Toast.LENGTH_SHORT).show()
+          onPinnedChanged()
+        }
+      } catch (_: Exception) {
+        Handler(Looper.getMainLooper()).post {
+          button.isEnabled = true
+          Toast.makeText(this, "Could not update pin.", Toast.LENGTH_LONG).show()
+        }
+      }
+    }.start()
   }
 
   private fun toggleSubcategoryBox(box: LinearLayout, input: EditText) {

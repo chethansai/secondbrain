@@ -7,21 +7,27 @@ export const lightColors = {
   brandNavyDeep: '#070f24',
   brandNavyMid: '#1a2a52',
   linkBlue: '#0075de',
+  linkBluePressed: '#005bab',
   brandOrange: '#dd5b00',
+  brandOrangeDeep: '#793400',
   brandPink: '#ff64c8',
+  brandPinkDeep: '#a02e6d',
   brandPurple: '#7b3ff2',
+  brandPurple300: '#d6b6f6',
+  brandPurple800: '#391c57',
   brandTeal: '#2a9d99',
   brandGreen: '#1aae39',
   brandYellow: '#f5d75e',
+  brandBrown: '#523410',
   cardTintPeach: '#ffe8d4',
   cardTintRose: '#fde0ec',
   cardTintMint: '#d9f3e1',
   cardTintLavender: '#e6e0f5',
   cardTintSky: '#dcecfa',
-  cardTintBlue: '#dfe8ff',
   cardTintYellow: '#fef7d6',
   cardTintYellowBold: '#f9e79f',
   cardTintCream: '#f8f5e8',
+  cardTintGray: '#f0eeec',
   canvas: '#ffffff',
   surface: '#f6f5f4',
   surfaceSoft: '#fafaf9',
@@ -64,10 +70,10 @@ export const darkColors: typeof lightColors = {
   cardTintMint: '#263f32',
   cardTintLavender: '#322d48',
   cardTintSky: '#273847',
-  cardTintBlue: '#253250',
   cardTintYellow: '#4a4022',
   cardTintYellowBold: '#7b6422',
   cardTintCream: '#302d25',
+  cardTintGray: '#2a2a2a',
 };
 
 export const colors = lightColors;
@@ -80,8 +86,11 @@ export const spacing = {
   lg: 20,
   xl: 24,
   xxl: 32,
+  xxxl: 40,
   sectionSm: 48,
   section: 64,
+  sectionLg: 96,
+  hero: 120,
 };
 
 export const rounded = {
@@ -90,22 +99,102 @@ export const rounded = {
   md: 8,
   lg: 12,
   xl: 16,
+  xxl: 20,
+  xxxl: 24,
   full: 9999,
 };
 
 export const typography = {
-  hero: { fontSize: 48, fontWeight: '600' as const, lineHeight: 52 },
-  heading1: { fontSize: 34, fontWeight: '600' as const, lineHeight: 40 },
-  heading2: { fontSize: 28, fontWeight: '600' as const, lineHeight: 34 },
-  heading3: { fontSize: 22, fontWeight: '600' as const, lineHeight: 29 },
-  heading5: { fontSize: 18, fontWeight: '600' as const, lineHeight: 25 },
-  subtitle: { fontSize: 18, fontWeight: '400' as const, lineHeight: 27 },
-  body: { fontSize: 16, fontWeight: '400' as const, lineHeight: 25 },
-  bodyMedium: { fontSize: 16, fontWeight: '500' as const, lineHeight: 25 },
-  bodySm: { fontSize: 14, fontWeight: '400' as const, lineHeight: 21 },
-  bodySmMedium: { fontSize: 14, fontWeight: '500' as const, lineHeight: 21 },
-  captionBold: { fontSize: 13, fontWeight: '600' as const, lineHeight: 18 },
-  micro: { fontSize: 12, fontWeight: '500' as const, lineHeight: 17 },
+  heroDisplay: {
+    fontSize: 42,
+    fontWeight: '600' as const,
+    lineHeight: 44,
+    letterSpacing: -1.5,
+  },
+  displayLg: {
+    fontSize: 32,
+    fontWeight: '600' as const,
+    lineHeight: 36,
+    letterSpacing: -0.8,
+  },
+  heading1: {
+    fontSize: 28,
+    fontWeight: '600' as const,
+    lineHeight: 32,
+    letterSpacing: -0.5,
+  },
+  heading2: {
+    fontSize: 24,
+    fontWeight: '600' as const,
+    lineHeight: 29,
+    letterSpacing: -0.3,
+  },
+  heading3: {
+    fontSize: 20,
+    fontWeight: '600' as const,
+    lineHeight: 26,
+  },
+  heading4: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    lineHeight: 24,
+  },
+  heading5: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    lineHeight: 22,
+  },
+  subtitle: {
+    fontSize: 17,
+    fontWeight: '400' as const,
+    lineHeight: 26,
+  },
+  bodyMd: {
+    fontSize: 16,
+    fontWeight: '400' as const,
+    lineHeight: 25,
+  },
+  bodyMdMedium: {
+    fontSize: 16,
+    fontWeight: '500' as const,
+    lineHeight: 25,
+  },
+  bodySm: {
+    fontSize: 14,
+    fontWeight: '400' as const,
+    lineHeight: 21,
+  },
+  bodySmMedium: {
+    fontSize: 14,
+    fontWeight: '500' as const,
+    lineHeight: 21,
+  },
+  caption: {
+    fontSize: 13,
+    fontWeight: '400' as const,
+    lineHeight: 18,
+  },
+  captionBold: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    lineHeight: 18,
+  },
+  micro: {
+    fontSize: 12,
+    fontWeight: '500' as const,
+    lineHeight: 16,
+  },
+  microUppercase: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    lineHeight: 16,
+    letterSpacing: 1,
+  },
+  buttonMd: {
+    fontSize: 14,
+    fontWeight: '500' as const,
+    lineHeight: 18,
+  },
 };
 
 export const shadows = {
@@ -114,13 +203,94 @@ export const shadows = {
     shadowOpacity: 0.08,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    elevation: 3,
+  },
+  feature: {
+    shadowColor: '#0f0f0f',
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
   mockup: {
     shadowColor: '#0f0f0f',
     shadowOpacity: 0.2,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
+    shadowRadius: 48,
+    shadowOffset: { width: 0, height: 24 },
+    elevation: 12,
+  },
+  deep: {
+    shadowColor: '#0f0f0f',
+    shadowOpacity: 0.25,
+    shadowRadius: 32,
+    shadowOffset: { width: 0, height: 16 },
     elevation: 8,
   },
 };
+
+// Component style presets based on design.md
+export const components = {
+  buttonPrimary: {
+    backgroundColor: colors.primary,
+    color: colors.onPrimary,
+    borderRadius: rounded.md,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    fontSize: 14,
+    fontWeight: '500' as const,
+  },
+  buttonSecondary: {
+    backgroundColor: 'transparent',
+    color: colors.ink,
+    borderRadius: rounded.md,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: colors.hairlineStrong,
+    fontSize: 14,
+    fontWeight: '500' as const,
+  },
+  cardBase: {
+    backgroundColor: colors.canvas,
+    borderRadius: rounded.lg,
+    padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
+  cardFeature: {
+    backgroundColor: colors.canvas,
+    borderRadius: rounded.lg,
+    padding: spacing.xxl,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
+  cardFeatureYellowBold: {
+    backgroundColor: colors.cardTintYellowBold,
+    color: colors.charcoal,
+    borderRadius: rounded.lg,
+    padding: spacing.xxl,
+  },
+  workspaceMockup: {
+    backgroundColor: colors.canvas,
+    borderRadius: rounded.lg,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    shadowColor: '#0f0f0f',
+    shadowOpacity: 0.2,
+    shadowRadius: 48,
+    shadowOffset: { width: 0, height: 24 },
+    elevation: 12,
+  },
+  heroBand: {
+    backgroundColor: colors.brandNavy,
+    color: colors.onDark,
+    padding: spacing.hero,
+  },
+};
+
+export type Colors = typeof lightColors;
+export type Typography = typeof typography;
+export type Spacing = typeof spacing;
+export type Rounded = typeof rounded;
+export type Shadows = typeof shadows;
+export type Components = typeof components;
