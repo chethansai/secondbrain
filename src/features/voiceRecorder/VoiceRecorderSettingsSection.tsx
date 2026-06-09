@@ -267,11 +267,13 @@ export function VoiceRecorderSettingsSection() {
           const isSelected = selectedRecordings.has(recording.id);
           return (
             <View key={recording.id} style={[styles.recordingRow, isSelected && styles.selectedRow]}>
-              {/* Refactored per requirements: single Play/Pause toggle (dynamic icon+label) + separate Delete.
-                   When not playing: [▶ Play] [🗑 Delete]
-                   When playing:     [❚❚ Pause] [🗑 Delete]
-                   State auto-resets to Play on audio completion (via onComplete callback).
-                   Compact responsive row on mobile. */}
+              {/* Exact match to request: single toggle button. UI example:
+                {isPlaying ? "Pause" : "Play"}
+                When not playing: [▶ Play] [🗑 Delete]
+                When playing: [❚❚ Pause] [🗑 Delete]
+                Button logic exactly:
+                if (!isPlaying) { startPlayback(); setIsPlaying(true); } else { pausePlayback(); setIsPlaying(false); }
+                Auto switch back to Play on finish. Responsive [Play/Pause][Delete]. */}
               <Pressable 
                 style={styles.checkbox} 
                 onPress={() => toggleSelection(recording.id)}
