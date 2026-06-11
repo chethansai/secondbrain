@@ -411,6 +411,7 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-06-11: **TELEPROMPTER NATIVE INTEGRATION COMPLETE**. Root cause: React Native Animated teleprompter killed on background/app close. Wired NotesTeleprompterBar to existing native TeleprompterService via OverlayModule.startTeleprompter(). Speed (1x-10x), Duration (15 options), Visible Categories (1-4) settings added and persisted in TeleprompterSettings.kt. Multi-category filtering implemented. Audio layout already had fixed-width buttons. All 5 tasks done. Updated plan.md/CLAUDE.md.
 - 2026-06-11: Fixed playback controls layout in VoiceRecorderSettingsSection.tsx: added `flexShrink: 0` to playPauseButton and deleteButton styles to ensure container remains fixed size when Play/Pause label changes. Prevents row expansion on button state toggle. Updated plan.md history.
 - 2026-06-08: Read plan.md + CLAUDE.md + AGENTS.md; ran `git pull` after committing pending local changes (OverlayService.kt, firebase.ts, CLAUDE.md, .claude/settings, AGENTS.md). Merged remote updates including widget quick-note mode, teleprompter, subcategory extraction, noteOrdering.ts, useWorkspaceBackHandler, and expanded design tokens. History and AGENTS.md updated per mandatory workflow.
 
