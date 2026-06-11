@@ -25,6 +25,7 @@ import {
 import { addNote, appendHistoryNote } from '../notes/noteMutations';
 import { useNotesSync } from '../sync/useNotesSync';
 import { copyText } from '../settings/clipboard';
+import { CategoryPicker } from '../categories/CategoryPicker';
 
 type SortOrder = 'desc' | 'asc';
 
@@ -41,8 +42,10 @@ export function VoiceRecorderSettingsSection() {
   const [transcriptionTexts, setTranscriptionTexts] = useState<Record<string, string>>({});
   const [selectedRecordings, setSelectedRecordings] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [saveTargetRecording, setSaveTargetRecording] = useState<{ id: string; text: string } | null>(null);
   const { data, commit } = useNotesSync();
 
   useEffect(() => {
@@ -137,23 +140,36 @@ export function VoiceRecorderSettingsSection() {
   }
 
   async function removeRecording(id: string) {
+    setDeleteTargetId(id);
+    setShowDeleteConfirm(true);
+  }
+
+  async function confirmDeleteRecording() {
+    if (!deleteTargetId) return;
     setSaving(true);
+    setShowDeleteConfirm(false);
     try {
-      const deleted = await deleteVoiceRecording(id);
+      const deleted = await deleteVoiceRecording(deleteTargetId);
       await refreshRecordings();
       setStatus(deleted ? 'Recording deleted.' : 'Recording could not be deleted.');
       setTranscriptionTexts(prev => {
         const next = { ...prev };
-        delete next[id];
+        delete next[deleteTargetId];
         return next;
       });
       setSelectedRecordings(prev => {
         const next = new Set(prev);
-        next.delete(id);
+        next.delete(deleteTargetId);
         return next;
       });
+      // Stop playback if deleting currently playing recording
+      if (currentlyPlayingId === deleteTargetId) {
+        await stopVoiceRecordingPlayback();
+        setCurrentlyPlayingId(null);
+      }
     } finally {
       setSaving(false);
+      setDeleteTargetId(null);
     }
   }
 
@@ -171,6 +187,11 @@ export function VoiceRecorderSettingsSection() {
           delete next[id];
           return next;
         });
+      }
+      // Stop playback if deleting currently playing recording
+      if (currentlyPlayingId && selectedRecordings.has(currentlyPlayingId)) {
+        await stopVoiceRecordingPlayback();
+        setCurrentlyPlayingId(null);
       }
       await refreshRecordings();
       setStatus(`Deleted ${deletedCount} recording(s).`);
@@ -200,6 +221,49 @@ export function VoiceRecorderSettingsSection() {
     } else {
       setSelectedRecordings(new Set(sortedRecordings.map(r => r.id)));
     }
+  };
+
+  const handleSaveTo = (recording: VoiceRecording) => {
+    const textToSave = recording.transcribedText || transcriptionTexts[recording.id] || '';
+    if (!textToSave) {
+      setStatus('No transcription available to save.');
+      return;
+    }
+    setSaveTargetRecording({ id: recording.id, text: textToSave });
+    setShowCategoryPicker(true);
+  };
+
+  const handleCategorySelected = async (paths: string[][]) => {
+    if (!saveTargetRecording || paths.length === 0) {
+      setShowCategoryPicker(false);
+      setSaveTargetRecording(null);
+      return;
+    }
+
+    setSaving(true);
+    setShowCategoryPicker(false);
+
+    try {
+      let savedCount = 0;
+      for (const path of paths) {
+        const result = addNote(data, path, saveTargetRecording.text);
+        if (result.ok) {
+          const historyText = `Voice transcription saved - ${path.join(' > ')} - ${new Date().toISOString()}`;
+          await commit(appendHistoryNote(result.data, historyText));
+          savedCount++;
+        }
+      }
+      setStatus(`Saved to ${savedCount} categor${savedCount === 1 ? 'y' : 'ies'}.`);
+    } catch (e) {
+      setStatus('Failed to save to category.');
+    } finally {
+      setSaving(false);
+      setSaveTargetRecording(null);
+    }
+  };
+
+  const isRecordingPlaying = (recordingId: string): boolean => {
+    return currentlyPlayingId === recordingId;
   };
 
   return (
@@ -265,9 +329,10 @@ export function VoiceRecorderSettingsSection() {
         ) : sortedRecordings.map((recording) => {
           const currentTranscription = recording.transcribedText || transcriptionTexts[recording.id] || '';
           const isSelected = selectedRecordings.has(recording.id);
+          const isThisPlaying = isRecordingPlaying(recording.id);
           return (
             <View key={recording.id} style={[styles.recordingRow, isSelected && styles.selectedRow]}>
-              {/* Required layout: [✓] [Play/Pause] [Copy] [Save To] [Delete] - single horizontal row, fixed widths */}
+              {/* Required layout: [✓] [Play/Pause] [Save To] [Delete] - single horizontal row, fixed widths */}
               <View style={styles.actionContainer}>
                 <Pressable
                   style={styles.checkbox}
@@ -279,25 +344,28 @@ export function VoiceRecorderSettingsSection() {
                 </Pressable>
 
                 <Button
-                  label={isPlaying ? 'Pause' : 'Play'}
-                  icon={isPlaying ? 'pause' : 'play'}
+                  label={isThisPlaying ? 'Pause' : 'Play'}
+                  icon={isThisPlaying ? 'pause' : 'play'}
                   variant="secondary"
                   onPress={async () => {
-                    if (!isPlaying) {
+                    if (!isThisPlaying) {
+                      // Stop any currently playing recording first
+                      if (currentlyPlayingId) {
+                        await stopVoiceRecordingPlayback();
+                      }
+                      // Start playback for THIS specific recording
                       const played = await playVoiceRecording(recording.uri, () => {
-                        setIsPlaying(false);
                         setCurrentlyPlayingId(null);
                         setStatus('Playback finished.');
                       });
                       if (played) {
-                        setIsPlaying(true);
                         setCurrentlyPlayingId(recording.id);
                         setStatus('Playing recording...');
                       }
                     } else {
+                      // Pause THIS recording
                       const paused = await pauseVoiceRecording();
                       if (paused) {
-                        setIsPlaying(false);
                         setCurrentlyPlayingId(null);
                         setStatus('Playback paused.');
                       }
@@ -308,25 +376,10 @@ export function VoiceRecorderSettingsSection() {
                 />
 
                 <Button
-                  label="Copy"
-                  icon="copy-outline"
-                  variant="secondary"
-                  onPress={() => copyText(currentTranscription).then(copied => setStatus(copied ? 'Copied to clipboard.' : 'Copy failed.'))}
-                  disabled={!currentTranscription}
-                  style={styles.fixedButton}
-                />
-
-                <Button
                   label="Save To"
                   icon="add"
                   variant="primary"
-                  onPress={async () => {
-                    if (!currentTranscription) return;
-                    const result = addNote(data, ['VOICENOTES'], currentTranscription);
-                    const historyText = `Voice transcription - VOICENOTES - ${new Date().toISOString()}`;
-                    const commitResult = await commit(appendHistoryNote(result.ok ? result.data : data, historyText));
-                    setStatus(commitResult ? 'Saved to VOICENOTES category.' : 'Save failed.');
-                  }}
+                  onPress={() => handleSaveTo(recording)}
                   disabled={!currentTranscription}
                   style={styles.fixedButton}
                 />
@@ -358,7 +411,36 @@ export function VoiceRecorderSettingsSection() {
         })}
       </View>
 
-      {showDeleteConfirm && (
+      {/* Single recording delete confirmation */}
+      {showDeleteConfirm && deleteTargetId && (
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmDialog}>
+            <Text style={styles.confirmTitle}>Delete Recording?</Text>
+            <Text style={styles.confirmText}>This action cannot be undone. The audio file and transcription will be permanently deleted.</Text>
+            <View style={styles.confirmButtons}>
+              <Button
+                label="Cancel"
+                variant="secondary"
+                onPress={() => {
+                  setShowDeleteConfirm(false);
+                  setDeleteTargetId(null);
+                }}
+                style={styles.confirmButton}
+              />
+              <Button
+                label="Delete"
+                variant="danger"
+                onPress={confirmDeleteRecording}
+                disabled={saving}
+                style={styles.confirmButton}
+              />
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Bulk delete confirmation */}
+      {showDeleteConfirm && !deleteTargetId && selectedRecordings.size > 0 && (
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmDialog}>
             <Text style={styles.confirmTitle}>Delete {selectedRecordings.size} recording(s)?</Text>
@@ -381,6 +463,36 @@ export function VoiceRecorderSettingsSection() {
           </View>
         </View>
       )}
+
+      {/* Category Picker Modal for Save To */}
+      {showCategoryPicker && saveTargetRecording && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Save to Category</Text>
+            <Text style={styles.modalSubtitle}>Select a category to save the transcription</Text>
+            <CategoryPicker
+              data={data}
+              selectedPath={null}
+              onSelect={(path) => {
+                handleCategorySelected([path]);
+              }}
+              disabled={saving}
+            />
+            <View style={styles.modalActions}>
+              <Button
+                label="Cancel"
+                variant="secondary"
+                onPress={() => {
+                  setShowCategoryPicker(false);
+                  setSaveTargetRecording(null);
+                }}
+                disabled={saving}
+              />
+            </View>
+          </View>
+        </View>
+      )}
+
       {status ? <Text style={styles.status}>{status}</Text> : null}
     </View>
   );
@@ -460,5 +572,10 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     confirmText: { ...typography.bodySm, color: colors.slate, textAlign: 'center', marginBottom: spacing.lg },
     confirmButtons: { flexDirection: 'row', gap: spacing.sm, width: '100%' },
     confirmButton: { flex: 1 },
+    modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 20 },
+    modalContent: { backgroundColor: colors.canvas, borderRadius: rounded.lg, padding: spacing.lg, width: '90%', maxWidth: 400, maxHeight: '80%' },
+    modalTitle: { ...typography.bodyMdMedium, color: colors.ink, marginBottom: spacing.xs },
+    modalSubtitle: { ...typography.bodySm, color: colors.slate, marginBottom: spacing.md },
+    modalActions: { marginTop: spacing.md },
   });
 }
