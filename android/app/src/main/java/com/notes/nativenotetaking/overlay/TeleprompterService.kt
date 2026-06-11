@@ -46,7 +46,16 @@ class TeleprompterService : Service() {
             stopSelf()
             return
         }
-        startForeground(NOTIFICATION_ID, createTeleprompterNotification())
+        // Android 14+ (API 34+) requires foregroundServiceType parameter when declared in manifest
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(
+                NOTIFICATION_ID,
+                createTeleprompterNotification(),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, createTeleprompterNotification())
+        }
         if (currentState.isRunning) {
             showTeleprompter()
             startCountdown()

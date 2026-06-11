@@ -60,7 +60,16 @@ class OverlayService : Service() {
       stopSelf()
       return
     }
-    startForeground(OverlayNotification.id, createOverlayNotification(this))
+    // Android 14+ (API 34+) requires foregroundServiceType parameter when declared in manifest
+    if (Build.VERSION.SDK_INT >= 34) {
+      startForeground(
+        OverlayNotification.id,
+        createOverlayNotification(this),
+        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+      )
+    } else {
+      startForeground(OverlayNotification.id, createOverlayNotification(this))
+    }
     showButton()
   }
 
