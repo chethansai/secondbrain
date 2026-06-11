@@ -23,13 +23,19 @@ import {
   currentPlaybackStatus,
 } from './voiceRecorderService';
 import { addNote, appendHistoryNote } from '../notes/noteMutations';
-import { useNotesSync } from '../sync/useNotesSync';
 import { copyText } from '../settings/clipboard';
 import { CategoryPicker } from '../categories/CategoryPicker';
+import { NotesData, CategoryPath } from '../../shared/types/notes';
+import { MutationResult } from '../sync/useNotesSync';
 
 type SortOrder = 'desc' | 'asc';
 
-export function VoiceRecorderSettingsSection() {
+type Props = {
+  data: NotesData;
+  commit: (result: any) => Promise<boolean>;
+};
+
+export function VoiceRecorderSettingsSection({ data, commit }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [settings, setSettings] = useState<VoiceRecorderSettings>({ enabled: false, durationSeconds: 300 });
@@ -46,7 +52,6 @@ export function VoiceRecorderSettingsSection() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [saveTargetRecording, setSaveTargetRecording] = useState<{ id: string; text: string } | null>(null);
-  const { data, commit } = useNotesSync();
 
   useEffect(() => {
     refreshVoiceRecorder();
@@ -233,7 +238,7 @@ export function VoiceRecorderSettingsSection() {
     setShowCategoryPicker(true);
   };
 
-  const handleCategorySelected = async (paths: string[][]) => {
+  const handleCategorySelected = async (paths: CategoryPath[]) => {
     if (!saveTargetRecording || paths.length === 0) {
       setShowCategoryPicker(false);
       setSaveTargetRecording(null);
@@ -246,11 +251,14 @@ export function VoiceRecorderSettingsSection() {
     try {
       let savedCount = 0;
       for (const path of paths) {
-        const result = addNote(data, path, saveTargetRecording.text);
+        const result: MutationResult = addNote(data, path, saveTargetRecording.text);
         if (result.ok) {
           const historyText = `Voice transcription saved - ${path.join(' > ')} - ${new Date().toISOString()}`;
-          await commit(appendHistoryNote(result.data, historyText));
-          savedCount++;
+          const commitResult = appendHistoryNote(result.data, historyText);
+          if (commitResult.ok) {
+            const ok = await commit(commitResult);
+            if (ok) savedCount++;
+          }
         }
       }
       setStatus(`Saved to ${savedCount} categor${savedCount === 1 ? 'y' : 'ies'}.`);
@@ -372,7 +380,7 @@ export function VoiceRecorderSettingsSection() {
                     }
                   }}
                   disabled={saving}
-                  style={styles.fixedButton}
+                  style={styles.playButton}
                 />
 
                 <Button
@@ -381,7 +389,7 @@ export function VoiceRecorderSettingsSection() {
                   variant="primary"
                   onPress={() => handleSaveTo(recording)}
                   disabled={!currentTranscription}
-                  style={styles.fixedButton}
+                  style={styles.saveButton}
                 />
 
                 <Button
@@ -520,7 +528,8 @@ function formatSize(bytes?: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function createStyles(colors: typeof import('../../shared/design/tokens').colors) {
+function createStyles(colors: typeof import('../../shared/design/tokens').colors, screenWidth: number = 400) {
+  const isNarrow = screenWidth < 360;
   return StyleSheet.create({
     panel: { position: 'relative', gap: spacing.sm, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.surfaceSoft, padding: spacing.md },
     headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
@@ -542,22 +551,33 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     actionContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      justifyContent: 'flex-start',
+      gap: spacing.xs,
+      flexWrap: 'wrap',
       width: '100%',
     },
-    fixedButton: {
-      width: 80,
+    playButton: {
+      minWidth: isNarrow ? 64 : 72,
       height: 44,
       justifyContent: 'center',
       alignItems: 'center',
+      flexShrink: 1,
+    },
+    saveButton: {
+      minWidth: isNarrow ? 64 : 72,
+      height: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+      flexShrink: 1,
     },
     deleteButton: {
-      width: 80,
+      minWidth: isNarrow ? 64 : 72,
       height: 44,
       justifyContent: 'center',
       alignItems: 'center',
+      flexShrink: 1,
     },
-    checkbox: { width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
+    checkbox: { width: 28, height: 28, justifyContent: 'center', alignItems: 'center', marginRight: spacing.xs },
     checkboxText: { fontSize: 18, color: colors.primary },
     emptyText: { ...typography.bodySmMedium, color: colors.slate },
     status: { ...typography.bodySmMedium, color: colors.slate },

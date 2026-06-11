@@ -247,7 +247,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
         </View>
       </View>
       <View style={styles.settingGroup}>
-        <VoiceRecorderSettingsSection />
+        <VoiceRecorderSettingsSection data={data} commit={commit} />
       </View>
 
       <View style={styles.settingGroup}>

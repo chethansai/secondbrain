@@ -9,6 +9,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 
 class OverlayModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
@@ -101,7 +102,8 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
       if (categories != null) {
         val arr = org.json.JSONArray()
         for (i in 0 until categories.size()) {
-          categories.getString(i)?.let { arr.put(it) }
+          val cat: String? = categories.getString(i)
+          cat?.let { arr.put(it) }
         }
         putExtra("categories", arr.toString())
       }

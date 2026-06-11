@@ -30,7 +30,7 @@ type OverlayNativeModule = {
   updateOverlaySettings: (settings: Partial<FloatingOverlaySettings>) => Promise<boolean>;
   resetOverlayPlacement: () => Promise<boolean>;
   readOverlaySettings: () => Promise<FloatingOverlayNativeSettings>;
-  startTeleprompter: (text: string, durationMs: number, speed: number, textSize: number) => Promise<boolean>;
+  startTeleprompter: (text: string, durationMs: number, speed: number, textSize: number, categories?: string[] | null) => Promise<boolean>;
   stopTeleprompter: () => Promise<boolean>;
   readTeleprompterState: () => Promise<TeleprompterState>;
   updateTeleprompterSettings: (settings: any) => Promise<boolean>;
@@ -146,7 +146,7 @@ export const durationOptions: Array<{label: string; value: number}> = [
 export async function startTeleprompter(text: string, durationMs: number, speed = 34, textSize = 14, categories?: string[]): Promise<boolean> {
   if (!isFloatingOverlayAvailable() || !overlayModule) return false;
   try {
-    return await overlayModule.startTeleprompter(text, durationMs, speed, textSize, categories ?? null);
+    return await overlayModule.startTeleprompter(text, durationMs, speed, textSize, categories || []);
   } catch {
     return false;
   }
