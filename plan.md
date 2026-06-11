@@ -12,6 +12,7 @@ This post-step Git workflow is mandatory and must not be skipped after any imple
 
 ## history
 
+- 2026-06-11: Fixed playback controls layout in VoiceRecorderSettingsSection.tsx: added `flexShrink: 0` to playPauseButton and deleteButton styles to ensure container remains fixed size when Play/Pause label changes. Prevents row expansion on button state toggle.
 - 2026-06-09: **VOICE RECORDER CONTROLS REFACTORED (SUCCESS)**. Perfect implementation of requested UI: single [Play/Pause] toggle (dynamic icon + label via `isPlaying` state), separate Delete button, exact `if (!isPlaying)` logic, auto-reset to Play on completion via `onComplete`, responsive mobile layout. Comment updated with UI example. All 8 requirements + state sync met. Typecheck clean. Git workflow (status/add/commit/push) completed after 'Try Again'.
 - 2026-06-08: Completed teleprompter (status bar scrolling notes) settings by moving ON/OFF toggle + multi-root-category checkboxes + Save to dedicated section in SettingsPanel.tsx. Removed duplicate/glitchy toggle from WorkspaceBoard header menu. Updated App.tsx prop passing and SettingsPanel state/sync. Improved NotesTeleprompterBar restart reliability on AppState 'active' after background/close. Toggle now works reliably and scrolling resumes on app resume. Typecheck clean. Updated both histories.
 

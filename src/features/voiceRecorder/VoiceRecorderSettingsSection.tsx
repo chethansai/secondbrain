@@ -439,16 +439,18 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
       alignItems: 'center',
       gap: spacing.xs,
       flexShrink: 0,
+      width: 158, // fixed width to prevent row/container expansion on label change
     },
     playPauseButton: {
-      minWidth: 92,
+      width: 100, // fixed width that comfortably fits longest label "Pause" + icon
       minHeight: 44,
-      paddingHorizontal: spacing.md,
+      justifyContent: 'center',
+      flexShrink: 0,
     },
     deleteButton: {
-      minWidth: 52,
+      width: 52,
       minHeight: 44,
-      paddingHorizontal: spacing.sm,
+      flexShrink: 0,
     },
     emptyText: { ...typography.bodySmMedium, color: colors.slate },
     status: { ...typography.bodySmMedium, color: colors.slate },

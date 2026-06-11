@@ -411,6 +411,7 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-06-11: Fixed playback controls layout in VoiceRecorderSettingsSection.tsx: added `flexShrink: 0` to playPauseButton and deleteButton styles to ensure container remains fixed size when Play/Pause label changes. Prevents row expansion on button state toggle. Updated plan.md history.
 - 2026-06-08: Read plan.md + CLAUDE.md + AGENTS.md; ran `git pull` after committing pending local changes (OverlayService.kt, firebase.ts, CLAUDE.md, .claude/settings, AGENTS.md). Merged remote updates including widget quick-note mode, teleprompter, subcategory extraction, noteOrdering.ts, useWorkspaceBackHandler, and expanded design tokens. History and AGENTS.md updated per mandatory workflow.
 
 - 2026-06-02: Implemented permission-free Android home-gesture quick note entry. `NoteWidgetConfigureActivity` now supports quick-note mode without a widget id, saving through the existing native Firestore path and finishing after save. Android voice interaction and fallback assistant intents now launch this quick-note UI instead of requiring overlay permission.
