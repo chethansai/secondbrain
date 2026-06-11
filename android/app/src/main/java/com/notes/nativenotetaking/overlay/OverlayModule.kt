@@ -87,7 +87,7 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
   }
 
   @ReactMethod
-  fun startTeleprompter(text: String, durationMs: Double, speed: Double, textSize: Double, promise: Promise) {
+  fun startTeleprompter(text: String, durationMs: Double, speed: Double, textSize: Double, categories: ReadableArray?, promise: Promise) {
     if (!canDrawOverlays()) {
       promise.reject("overlay_permission_missing", "Display over other apps permission is not granted.")
       return
@@ -98,6 +98,13 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
       putExtra("durationMs", durationMs.toLong())
       putExtra("speed", speed.toFloat())
       putExtra("textSize", textSize.toFloat())
+      if (categories != null) {
+        val arr = org.json.JSONArray()
+        for (i in 0 until categories.size()) {
+          categories.getString(i)?.let { arr.put(it) }
+        }
+        putExtra("categories", arr.toString())
+      }
     }
     startOverlayService(intent)
     promise.resolve(true)

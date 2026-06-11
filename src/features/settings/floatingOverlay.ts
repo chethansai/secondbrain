@@ -122,6 +122,7 @@ export type TeleprompterState = {
   durationMs: number;
   remaining: string;
   permissionGranted: boolean;
+  selectedCategories?: string[];
 };
 
 export const durationOptions: Array<{label: string; value: number}> = [
@@ -142,10 +143,10 @@ export const durationOptions: Array<{label: string; value: number}> = [
   { label: 'Unlimited', value: -1 },
 ];
 
-export async function startTeleprompter(text: string, durationMs: number, speed = 34, textSize = 14): Promise<boolean> {
+export async function startTeleprompter(text: string, durationMs: number, speed = 34, textSize = 14, categories?: string[]): Promise<boolean> {
   if (!isFloatingOverlayAvailable() || !overlayModule) return false;
   try {
-    return await overlayModule.startTeleprompter(text, durationMs, speed, textSize);
+    return await overlayModule.startTeleprompter(text, durationMs, speed, textSize, categories ?? null);
   } catch {
     return false;
   }

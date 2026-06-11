@@ -56,21 +56,35 @@ class OverlayService : Service() {
     super.onCreate()
     windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
     settings = OverlaySettings.read(this)
-    if (!canDrawOverlays()) {
+
+    // ALWAYS start foreground immediately (root cause fix for "Native Note Taking keeps stopping")
+    try {
+      if (Build.VERSION.SDK_INT >= 34) {
+        startForeground(
+          OverlayNotification.id,
+          createOverlayNotification(this),
+          android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        )
+      } else {
+        startForeground(OverlayNotification.id, createOverlayNotification(this))
+      }
+    } catch (e: Exception) {
+      android.util.Log.e("OverlayService", "Failed to start foreground", e)
       stopSelf()
       return
     }
-    // Android 14+ (API 34+) requires foregroundServiceType parameter when declared in manifest
-    if (Build.VERSION.SDK_INT >= 34) {
-      startForeground(
-        OverlayNotification.id,
-        createOverlayNotification(this),
-        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-      )
-    } else {
-      startForeground(OverlayNotification.id, createOverlayNotification(this))
+
+    if (!canDrawOverlays()) {
+      android.util.Log.w("OverlayService", "No overlay permission - stopping")
+      stopSelf()
+      return
     }
-    showButton()
+    try {
+      showButton()
+    } catch (e: Exception) {
+      android.util.Log.e("OverlayService", "Failed to show button", e)
+      stopSelf()
+    }
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

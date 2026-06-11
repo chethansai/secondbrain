@@ -22,7 +22,7 @@ class TeleprompterService : Service() {
     private val settings by lazy { TeleprompterSettings }
     private val handler = Handler(Looper.getMainLooper())
     private var countdownRunnable: Runnable? = null
-    private var currentState = TeleprompterSettings.State(false, "", 34f, 14f, -1L, 0L, 0f)
+    private var currentState = TeleprompterSettings.State(false, "", 34f, 14f, -1L, 0L, 0f, emptyList())
     private var isPaused = false
 
     companion object {
@@ -42,23 +42,39 @@ class TeleprompterService : Service() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
         currentState = settings.read(this)
-        if (!canDrawOverlays()) {
+
+        // CRITICAL: startForeground IMMEDIATELY before any permission or view work. This was the root cause of "Native Note Taking keeps stopping" crash.
+        try {
+            val notification = createTeleprompterNotification()
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("TeleprompterService", "Failed to start foreground service", e)
             stopSelf()
             return
         }
-        // Android 14+ (API 34+) requires foregroundServiceType parameter when declared in manifest
-        if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(
-                NOTIFICATION_ID,
-                createTeleprompterNotification(),
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, createTeleprompterNotification())
+
+        if (!canDrawOverlays()) {
+            android.util.Log.w("TeleprompterService", "No overlay permission - stopping gracefully (PHASE 4)")
+            stopSelf()
+            return
         }
+
         if (currentState.isRunning) {
-            showTeleprompter()
-            startCountdown()
+            try {
+                showTeleprompter()
+                startCountdown()
+            } catch (e: Exception) {
+                android.util.Log.e("TeleprompterService", "Failed to show teleprompter view", e)
+                stopTeleprompter()
+            }
         }
     }
 
@@ -76,6 +92,16 @@ class TeleprompterService : Service() {
                 val duration = intent.getLongExtra("durationMs", currentState.durationMs)
                 val speed = intent.getFloatExtra("speed", currentState.speed)
                 val size = intent.getFloatExtra("textSize", currentState.textSize)
+                val categoriesJson = intent.getStringExtra("categories")
+                val categories = if (categoriesJson != null) {
+                    try {
+                        org.json.JSONArray(categoriesJson).let { arr ->
+                            (0 until arr.length()).map { arr.getString(it) }
+                        }
+                    } catch (e: Exception) { emptyList() }
+                } else currentState.selectedCategories
+                currentState = currentState.copy(selectedCategories = categories)
+                settings.save(this, currentState)
                 updateState(text, speed, size, duration, System.currentTimeMillis())
                 showTeleprompter()
                 startCountdown()
