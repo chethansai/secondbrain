@@ -24,7 +24,14 @@ export function useNotesSync() {
   const activeWorkspaceId = workspaceIndex.activeWorkspaceId;
   const activeWorkspace = (workspaceIndex.workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? workspaceIndex.workspaces[0] ?? null) as WorkspaceMeta | null;
 
+  // PERFORMANCE INSTRUMENTATION - Startup timing
+  const perfStartTime = Date.now();
+  console.log('[PERF] useNotesSync hook initialized at', perfStartTime);
+
   useEffect(() => {
+    const effectStartTime = Date.now();
+    console.log('[PERF] useNotesSync useEffect started at', effectStartTime, '(+' + (effectStartTime - perfStartTime) + 'ms from hook init)');
+
     let cancelled = false;
     let hydratedFromSnapshot = false;
     let remoteWorkspaceSettled = false;
@@ -41,8 +48,14 @@ export function useNotesSync() {
     }
 
     async function bootstrapLocalSnapshot() {
+      const snapshotStartTime = Date.now();
+      console.log('[PERF] bootstrapLocalSnapshot started at', snapshotStartTime, '(+' + (snapshotStartTime - effectStartTime) + 'ms from effect start)');
+
       try {
         const snapshot = await readLocalWorkspaceSnapshot();
+        const snapshotReadTime = Date.now();
+        console.log('[PERF] readLocalWorkspaceSnapshot completed in', (snapshotReadTime - snapshotStartTime) + 'ms');
+
         if (cancelled) return;
         if (snapshot && !remoteNotesSettled) {
           hydratedFromSnapshot = true;
@@ -53,6 +66,9 @@ export function useNotesSync() {
           setRefreshing(true);
           setLocalMode(true);
           setError(null);
+
+          const snapshotHydrationTime = Date.now();
+          console.log('[PERF] Local snapshot hydration completed at', snapshotHydrationTime, '(+' + (snapshotHydrationTime - snapshotStartTime) + 'ms from snapshot start)');
         }
       } catch {
         if (cancelled) return;
@@ -68,6 +84,8 @@ export function useNotesSync() {
     const unsubscribe = subscribeToWorkspaceIndex(
       (snapshot) => {
         if (cancelled) return;
+        const remoteWorkspaceTime = Date.now();
+        console.log('[PERF] Remote workspace index received at', remoteWorkspaceTime, '(+' + (remoteWorkspaceTime - effectStartTime) + 'ms from effect start)');
         setWorkspaceIndex(snapshot);
         setWorkspaceLoading(false);
         setError(null);
@@ -98,6 +116,8 @@ export function useNotesSync() {
       defaultWorkspaceId,
       (snapshot) => {
         if (cancelled) return;
+        const remoteNotesTime = Date.now();
+        console.log('[PERF] Remote notes data received at', remoteNotesTime, '(+' + (remoteNotesTime - effectStartTime) + 'ms from effect start)');
         setData(snapshot.data);
         setLoading(false);
         setError(null);

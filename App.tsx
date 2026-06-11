@@ -41,7 +41,12 @@ type Tab = 'workspace' | 'search' | 'settings' | 'aiChat' | 'ai' | 'aiWorkspace'
 type DeleteTarget = { type: 'category'; path: CategoryPath } | { type: 'note'; note: FlatNote } | null;
 const DEFAULT_NOTE_CATEGORY = 'No TS';
 
+const APP_START_TIME = Date.now();
+console.log('[PERF] App module loaded at', APP_START_TIME);
+
 export default function App() {
+  const appRenderTime = Date.now();
+  console.log('[PERF] App component render at', appRenderTime, '(+' + (appRenderTime - APP_START_TIME) + 'ms from module load)');
   return <ThemeProvider><AppContent /></ThemeProvider>;
 }
 function AppContent() {

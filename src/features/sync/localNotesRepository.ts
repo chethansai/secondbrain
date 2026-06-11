@@ -16,7 +16,11 @@ export type LocalWorkspaceSnapshot = {
 };
 
 export async function readLocalWorkspaceSnapshot(): Promise<LocalWorkspaceSnapshot | null> {
+  const startTime = Date.now();
+  console.log('[PERF] readLocalWorkspaceSnapshot AsyncStorage.getItem started');
   const raw = await AsyncStorage.getItem(localWorkspaceSnapshotKey);
+  const endTime = Date.now();
+  console.log('[PERF] readLocalWorkspaceSnapshot AsyncStorage.getItem completed in', (endTime - startTime) + 'ms');
   if (raw) {
     const snapshot = parseLocalWorkspaceSnapshot(raw);
     if (snapshot) return snapshot;

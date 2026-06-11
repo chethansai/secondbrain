@@ -9,18 +9,27 @@ type Props = {
 };
 
 export function AuthGate({ children }: Props) {
+  const authGateStartTime = Date.now();
+  console.log('[PERF] AuthGate component mount at', authGateStartTime);
+
   const [unlocked, setUnlocked] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [authTimeoutHours, setAuthTimeoutHours] = useState(defaultAuthTimeoutHours);
 
   useEffect(() => {
+    const authEffectStartTime = Date.now();
+    console.log('[PERF] AuthGate useEffect started at', authEffectStartTime, '(+' + (authEffectStartTime - authGateStartTime) + 'ms from mount)');
+
     let mounted = true;
     async function loadAuthSession() {
       try {
+        const authReadStartTime = Date.now();
         const [timeoutHours, shouldStartUnlocked] = await Promise.all([
           readAuthTimeoutHours(),
           readShouldStartUnlocked(),
         ]);
+        const authReadEndTime = Date.now();
+        console.log('[PERF] Auth session reads completed in', (authReadEndTime - authReadStartTime) + 'ms');
         if (!mounted) return;
         setAuthTimeoutHours(timeoutHours);
         setUnlocked(shouldStartUnlocked);
