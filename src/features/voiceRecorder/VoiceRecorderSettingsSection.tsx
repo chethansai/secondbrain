@@ -238,21 +238,21 @@ export function VoiceRecorderSettingsSection() {
 
       {sortedRecordings.length > 0 && (
         <View style={styles.bulkActions}>
-          <Button 
-            label={selectedRecordings.size === sortedRecordings.length ? 'Deselect All' : 'Select All'} 
-            icon="checkmark" 
-            variant="secondary" 
-            onPress={selectAll} 
-            disabled={saving} 
+          <Button
+            label={selectedRecordings.size === sortedRecordings.length ? 'Deselect All' : 'Select All'}
+            icon="checkmark"
+            variant="secondary"
+            onPress={selectAll}
+            disabled={saving}
             style={styles.bulkButton}
           />
           {selectedRecordings.size > 0 && (
-            <Button 
-              label={`Delete Selected (${selectedRecordings.size})`} 
-              icon="trash-outline" 
-              variant="danger" 
-              onPress={() => setShowDeleteConfirm(true)} 
-              disabled={saving} 
+            <Button
+              label={`Delete Selected (${selectedRecordings.size})`}
+              icon="trash-outline"
+              variant="danger"
+              onPress={() => setShowDeleteConfirm(true)}
+              disabled={saving}
               style={styles.bulkButton}
             />
           )}
@@ -267,65 +267,23 @@ export function VoiceRecorderSettingsSection() {
           const isSelected = selectedRecordings.has(recording.id);
           return (
             <View key={recording.id} style={[styles.recordingRow, isSelected && styles.selectedRow]}>
-              {/* Exact match to request: single toggle button. UI example:
-                {isPlaying ? "Pause" : "Play"}
-                When not playing: [▶ Play] [🗑 Delete]
-                When playing: [❚❚ Pause] [🗑 Delete]
-                Button logic exactly:
-                if (!isPlaying) { startPlayback(); setIsPlaying(true); } else { pausePlayback(); setIsPlaying(false); }
-                Auto switch back to Play on finish. Responsive [Play/Pause][Delete]. */}
-              <Pressable 
-                style={styles.checkbox} 
-                onPress={() => toggleSelection(recording.id)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: isSelected }}
-              >
-                <Text style={styles.checkboxText}>{isSelected ? '☑' : '☐'}</Text>
-              </Pressable>
-              <View style={styles.recordingTextWrap}>
-                <Text style={styles.recordingTitle} numberOfLines={1}>{recording.fileName ?? recording.id}</Text>
-                <Text style={styles.recordingMeta} numberOfLines={1}>{formatRecordingMeta(recording)}</Text>
-                {currentTranscription ? (
-                  <View style={styles.transcriptionBox}>
-                    <Text style={styles.transcriptionLabel}>Transcription:</Text>
-                    <TextInputField
-                      value={currentTranscription}
-                      onChangeText={(newText) => setTranscriptionTexts(prev => ({ ...prev, [recording.id]: newText }))}
-                      multiline
-                      style={styles.transcriptionInput}
-                    />
-                    <View style={styles.transcriptionActions}>
-                      <Button 
-                        label="Copy" 
-                        icon="copy-outline" 
-                        variant="secondary" 
-                        onPress={() => copyText(currentTranscription).then(copied => setStatus(copied ? 'Copied to clipboard.' : 'Copy failed.'))} 
-                        style={styles.smallButton}
-                      />
-                      <Button 
-                        label="Save to Notes" 
-                        icon="add" 
-                        variant="primary" 
-                        onPress={async () => {
-                          const result = addNote(data, ['VOICENOTES'], currentTranscription);
-                          const historyText = `Edited voice transcription - VOICENOTES - ${new Date().toISOString()}`;
-                          const commitResult = await commit(appendHistoryNote(result.ok ? result.data : data, historyText));
-                          setStatus(commitResult ? 'Saved to VOICENOTES category.' : 'Save failed.');
-                        }} 
-                        style={styles.smallButton}
-                      />
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-              <View style={styles.audioControlsRow}>
+              {/* Required layout: [✓] [Play/Pause] [Copy] [Save To] [Delete] - single horizontal row, fixed widths */}
+              <View style={styles.actionContainer}>
+                <Pressable
+                  style={styles.checkbox}
+                  onPress={() => toggleSelection(recording.id)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isSelected }}
+                >
+                  <Text style={styles.checkboxText}>{isSelected ? '☑' : '☐'}</Text>
+                </Pressable>
+
                 <Button
                   label={isPlaying ? 'Pause' : 'Play'}
                   icon={isPlaying ? 'pause' : 'play'}
                   variant="secondary"
                   onPress={async () => {
                     if (!isPlaying) {
-                      // startPlayback - using the specific recording
                       const played = await playVoiceRecording(recording.uri, () => {
                         setIsPlaying(false);
                         setCurrentlyPlayingId(null);
@@ -346,8 +304,33 @@ export function VoiceRecorderSettingsSection() {
                     }
                   }}
                   disabled={saving}
-                  style={styles.playPauseButton}
+                  style={styles.fixedButton}
                 />
+
+                <Button
+                  label="Copy"
+                  icon="copy-outline"
+                  variant="secondary"
+                  onPress={() => copyText(currentTranscription).then(copied => setStatus(copied ? 'Copied to clipboard.' : 'Copy failed.'))}
+                  disabled={!currentTranscription}
+                  style={styles.fixedButton}
+                />
+
+                <Button
+                  label="Save To"
+                  icon="add"
+                  variant="primary"
+                  onPress={async () => {
+                    if (!currentTranscription) return;
+                    const result = addNote(data, ['VOICENOTES'], currentTranscription);
+                    const historyText = `Voice transcription - VOICENOTES - ${new Date().toISOString()}`;
+                    const commitResult = await commit(appendHistoryNote(result.ok ? result.data : data, historyText));
+                    setStatus(commitResult ? 'Saved to VOICENOTES category.' : 'Save failed.');
+                  }}
+                  disabled={!currentTranscription}
+                  style={styles.fixedButton}
+                />
+
                 <Button
                   label="Delete"
                   icon="trash-outline"
@@ -357,6 +340,19 @@ export function VoiceRecorderSettingsSection() {
                   style={styles.deleteButton}
                 />
               </View>
+
+              {/* Transcription text below action row when present */}
+              {currentTranscription ? (
+                <View style={styles.transcriptionBox}>
+                  <Text style={styles.transcriptionLabel}>Transcription:</Text>
+                  <TextInputField
+                    value={currentTranscription}
+                    onChangeText={(newText) => setTranscriptionTexts(prev => ({ ...prev, [recording.id]: newText }))}
+                    multiline
+                    style={styles.transcriptionInput}
+                  />
+                </View>
+              ) : null}
             </View>
           );
         })}
@@ -368,16 +364,16 @@ export function VoiceRecorderSettingsSection() {
             <Text style={styles.confirmTitle}>Delete {selectedRecordings.size} recording(s)?</Text>
             <Text style={styles.confirmText}>This action cannot be undone. All selected audio files will be permanently deleted from storage.</Text>
             <View style={styles.confirmButtons}>
-              <Button 
-                label="Cancel" 
-                variant="secondary" 
-                onPress={() => setShowDeleteConfirm(false)} 
+              <Button
+                label="Cancel"
+                variant="secondary"
+                onPress={() => setShowDeleteConfirm(false)}
                 style={styles.confirmButton}
               />
-              <Button 
-                label="Delete All Selected" 
-                variant="danger" 
-                onPress={deleteSelectedRecordings} 
+              <Button
+                label="Delete All Selected"
+                variant="danger"
+                onPress={deleteSelectedRecordings}
                 disabled={saving}
                 style={styles.confirmButton}
               />
@@ -429,40 +425,35 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     sortButton: { minHeight: 34, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.canvas },
     sortText: { ...typography.micro, color: colors.ink },
     recordingList: { gap: spacing.xs },
-    recordingRow: { borderWidth: 1, borderColor: colors.hairlineSoft, borderRadius: rounded.md, backgroundColor: colors.canvas, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 64 },
+    recordingRow: { borderWidth: 1, borderColor: colors.hairlineSoft, borderRadius: rounded.md, backgroundColor: colors.canvas, padding: spacing.sm, flexDirection: 'column', gap: spacing.sm, minHeight: 64 },
     selectedRow: { backgroundColor: colors.surfaceSoft, borderColor: colors.primary },
-    recordingTextWrap: { flex: 1, minWidth: 0, gap: 2 },
-    recordingTitle: { ...typography.bodySmMedium, color: colors.ink },
-    recordingMeta: { ...typography.micro, color: colors.slate },
-    audioControlsRow: {
+    actionContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.xs,
-      flexShrink: 0,
-      width: 158, // fixed width to prevent row/container expansion on label change
+      justifyContent: 'space-between',
+      width: '100%',
     },
-    playPauseButton: {
-      width: 100, // fixed width that comfortably fits longest label "Pause" + icon
-      minHeight: 44,
+    fixedButton: {
+      width: 80,
+      height: 44,
       justifyContent: 'center',
-      flexShrink: 0,
+      alignItems: 'center',
     },
     deleteButton: {
-      width: 52,
-      minHeight: 44,
-      flexShrink: 0,
+      width: 80,
+      height: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
+    checkbox: { width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
+    checkboxText: { fontSize: 18, color: colors.primary },
     emptyText: { ...typography.bodySmMedium, color: colors.slate },
     status: { ...typography.bodySmMedium, color: colors.slate },
-    transcriptionBox: { marginTop: spacing.xs, padding: spacing.xs, backgroundColor: colors.surfaceSoft, borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairlineStrong, width: '100%' },
+    transcriptionBox: { padding: spacing.xs, backgroundColor: colors.surfaceSoft, borderRadius: rounded.sm, borderWidth: 1, borderColor: colors.hairlineStrong, width: '100%' },
     transcriptionLabel: { ...typography.micro, color: colors.slate, marginBottom: 2 },
     transcriptionInput: { minHeight: 60, fontSize: 14, backgroundColor: colors.canvas },
-    transcriptionActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs, width: '100%' },
-    smallButton: { flex: 1, minWidth: 100, marginBottom: spacing.xs },
     bulkActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.xs },
     bulkButton: { flex: 1, minWidth: 140 },
-    checkbox: { width: 28, height: 28, justifyContent: 'center', alignItems: 'center', marginRight: spacing.xs },
-    checkboxText: { fontSize: 18, color: colors.primary },
     confirmOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
     confirmDialog: { backgroundColor: colors.canvas, padding: spacing.lg, borderRadius: rounded.lg, width: '85%', maxWidth: 340, alignItems: 'center' },
     confirmTitle: { ...typography.bodyMdMedium, color: colors.ink, marginBottom: spacing.sm, textAlign: 'center' },
