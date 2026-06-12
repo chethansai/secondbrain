@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NativeSyntheticEvent, PermissionsAndroid, Platform, Pressable, StyleSheet, Text, TextInputSelectionChangeEventData, View } from 'react-native';
+import { NativeSyntheticEvent, PermissionsAndroid, Platform, Pressable, StyleSheet, Text, TextInput, TextInputSelectionChangeEventData, View } from 'react-native';
 import { rounded, spacing, typography } from '../../shared/design/tokens';
 import { CategoryPath, NotesData } from '../../shared/types/notes';
 import { InlineCategorySavePicker } from '../categories/InlineCategorySavePicker';
@@ -11,6 +11,7 @@ import { TextInputField } from '../../shared/ui/TextInputField';
 import { SEEK_CATEGORY } from '../ai/aiReviewTypes';
 import { requestAiText } from '../ai/aiReviewService';
 import { SpeechRecognitionService } from '../speech/SpeechRecognitionService';
+import { createRootCategory } from '../categories/categoryTree';
 
 type Props = {
   visible: boolean;
@@ -24,12 +25,14 @@ type Props = {
   onSubmitDefaultCategory?: (text: string) => Promise<boolean> | boolean;
   defaultCategoryLabel?: string;
   onCreateSubcategory?: (path: CategoryPath, name: string) => Promise<CategoryPath | null> | CategoryPath | null;
+  onCreateRootCategory?: (name: string) => Promise<CategoryPath | null> | CategoryPath | null;
   pinnedPaths?: CategoryPath[];
   onToggleCategoryPin?: (path: CategoryPath) => Promise<boolean> | boolean | void;
 };
 
-export function NoteEditorModal({ visible, title, initialText = '', categoryData, selectedPath = null, onClose, onSubmit, onSubmitToCategory, onSubmitDefaultCategory, defaultCategoryLabel = 'No TS', onCreateSubcategory, pinnedPaths = [], onToggleCategoryPin }: Props) {
+export function NoteEditorModal({ visible, title, initialText = '', categoryData, selectedPath = null, onClose, onSubmit, onSubmitToCategory, onSubmitDefaultCategory, defaultCategoryLabel = 'No TS', onCreateSubcategory, onCreateRootCategory, pinnedPaths = [], onToggleCategoryPin }: Props) {
   const [text, setText] = useState(initialText);
+  const [newCategoryName, setNewCategoryName] = useState('');
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
@@ -41,6 +44,7 @@ export function NoteEditorModal({ visible, title, initialText = '', categoryData
   useEffect(() => {
     const nextText = normalizeNoteText(initialText);
     setText(nextText);
+    setNewCategoryName('');
     setSelection({ start: nextText.length, end: nextText.length });
     setPartialTranscript('');
     setSpeechError(null);
@@ -162,6 +166,23 @@ export function NoteEditorModal({ visible, title, initialText = '', categoryData
     }
   }
 
+  async function createAndSaveToNewRoot() {
+    if (!onCreateRootCategory || !newCategoryName.trim() || busy) return;
+    setBusy(true);
+    try {
+      const nextPath = await onCreateRootCategory(newCategoryName.trim());
+      if (nextPath) {
+        const ok = await onSubmitToCategory?.(nextPath, await prepareNoteText());
+        if (ok) {
+          setNewCategoryName('');
+          onClose();
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <ModalShell visible={visible} title={title} onClose={onClose}>
       <View style={styles.content}>
@@ -178,6 +199,30 @@ export function NoteEditorModal({ visible, title, initialText = '', categoryData
             <Text style={styles.aiToggleText}>AI Process Note</Text>
           </Pressable>
         ) : null}
+
+        {categoryData && onSubmitToCategory && onCreateRootCategory ? (
+          <View style={styles.newCategorySection}>
+            <Text style={styles.newCategoryLabel}>New category name</Text>
+            <TextInput
+              value={newCategoryName}
+              onChangeText={setNewCategoryName}
+              style={styles.newCategoryInput}
+              placeholder="New category name"
+              placeholderTextColor="#999"
+              autoCapitalize="sentences"
+              editable={!busy}
+              returnKeyType="done"
+              onSubmitEditing={createAndSaveToNewRoot}
+            />
+            <Button
+              label="CREATE CATEGORY + NOTE"
+              onPress={createAndSaveToNewRoot}
+              disabled={!newCategoryName.trim() || busy || !canSubmit}
+              style={styles.createCategoryButton}
+            />
+          </View>
+        ) : null}
+
         {categoryData && onSubmitToCategory ? (
           <>
             <View style={styles.mainActions}>
@@ -208,4 +253,20 @@ const styles = StyleSheet.create({
   checkboxOn: { borderColor: '#5645d4', backgroundColor: '#5645d4' },
   checkboxText: { ...typography.captionBold, color: '#ffffff' },
   aiToggleText: { ...typography.bodySmMedium, color: '#1a1a1a' },
+  newCategorySection: { gap: spacing.sm, marginTop: spacing.sm, marginBottom: spacing.md },
+  newCategoryLabel: { ...typography.bodySmMedium, color: '#37352f', paddingLeft: spacing.xs },
+  newCategoryInput: {
+    minHeight: 44,
+    borderRadius: rounded.md,
+    borderWidth: 1,
+    borderColor: '#c8c4be',
+    backgroundColor: '#fff',
+    paddingHorizontal: spacing.md,
+    fontSize: 16,
+  },
+  createCategoryButton: {
+    backgroundColor: '#e5e5e5',
+    minHeight: 48,
+    borderRadius: 999,
+  },
 });

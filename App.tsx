@@ -363,6 +363,17 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     return ok;
   }
 
+  async function createEditorRootCategory(name: string) {
+    const cleanName = name.trim();
+    if (!cleanName) return null;
+    const result = createRootCategory(data, cleanName);
+    const nextPath = [cleanName];
+    const ok = await commitWithHistory(result, `${formatHistoryPath(nextPath)} category created - ${formatHistoryPath(nextPath)} - ${formatHistoryTime()} - Event: CATEGORY_CREATED`);
+    if (!ok || !result.ok) return null;
+    await includeWorkspacePinnedCategory(nextPath);
+    return nextPath;
+  }
+
   async function createEditorSubcategory(parentPath: CategoryPath, name: string) {
     const cleanName = name.trim();
     const nextPath = [...parentPath, cleanName];
@@ -811,6 +822,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         onSubmitDefaultCategory={editorMode === 'add' ? addEditorDefaultNote : undefined}
         defaultCategoryLabel={(editorPath?.length ? editorPath : path.length ? path : [DEFAULT_NOTE_CATEGORY]).join(' > ')}
         onCreateSubcategory={editorMode === 'add' ? createEditorSubcategory : undefined}
+        onCreateRootCategory={editorMode === 'add' ? createEditorRootCategory : undefined}
         pinnedPaths={activeWorkspace?.pinnedCategoryPaths ?? []}
         onToggleCategoryPin={togglePinnedMoveCopyCategory}
       />

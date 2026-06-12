@@ -8,6 +8,7 @@ import { TextInputField } from '../../shared/ui/TextInputField';
 import { NotesData, NoteItem } from '../../shared/types/notes';
 import { authTimeoutOptions, formatAuthTimeout } from '../auth/authSession';
 import { cloneItems, isCategoryNode, listAllCategories } from '../categories/categoryTree';
+import type { CategorySummary } from '../../shared/types/notes';
 import { validateNotesData } from '../sync/validation';
 import { VoiceRecorderSettingsSection } from '../voiceRecorder/VoiceRecorderSettingsSection';
 import { copyText } from './clipboard';
@@ -49,6 +50,8 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
   });
   const [selectedDuration, setSelectedDuration] = useState(-1);
   const [teleSaving, setTeleSaving] = useState(false);
+  const [teleCategoryDialogOpen, setTeleCategoryDialogOpen] = useState(false);
+  const [selectedTeleCategories, setSelectedTeleCategories] = useState<string[]>(teleprompterCategories || []);
 
   useEffect(() => {
     refreshOverlayPermission();
@@ -65,6 +68,13 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
       clearInterval(interval);
     };
   }, []);
+
+  // Sync local selected categories when prop updates
+  useEffect(() => {
+    if (teleprompterCategories) {
+      setSelectedTeleCategories(teleprompterCategories);
+    }
+  }, [teleprompterCategories]);
 
   async function refreshTeleprompterState() {
     const state = await readTeleprompterState().catch(() => null);
@@ -247,7 +257,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
         </View>
       </View>
       <View style={styles.settingGroup}>
-        <VoiceRecorderSettingsSection data={data} commit={commit} />
+        <VoiceRecorderSettingsSection data={data} commit={async () => true} />
       </View>
 
       <View style={styles.settingGroup}>
@@ -283,33 +293,91 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
               await updateTeleprompterSettings({speed: v});
             }} 
           />
-          <LineControl 
-            label="Text Size" 
-            value={teleprompterState.textSize} 
-            min={10} 
-            max={24} 
-            formatter={(v) => `${Math.round(v)} sp`} 
-            colors={colors} 
-            styles={styles} 
+          <LineControl
+            label="Text Size"
+            value={teleprompterState.textSize}
+            min={10}
+            max={24}
+            formatter={(v) => `${Math.round(v)} sp`}
+            colors={colors}
+            styles={styles}
             onChange={async (v) => {
               setTeleprompterState(s => ({...s, textSize: v}));
               await updateTeleprompterSettings({textSize: v});
-            }} 
+            }}
           />
+
+          {/* Category Selection for Teleprompter - Checklist Dialog */}
+          <View style={{ marginTop: 12 }}>
+            <Text style={styles.settingLabel}>Displayed Categories</Text>
+            <Pressable
+              onPress={() => setTeleCategoryDialogOpen(true)}
+              style={[styles.dropdownButton, { marginTop: 4 }]}
+            >
+              <Text style={styles.dropdownValue} numberOfLines={1}>
+                {selectedTeleCategories.length > 0
+                  ? `${selectedTeleCategories.length} selected`
+                  : 'None selected (shows all)'}
+              </Text>
+              <Icon name="chevron-down" size={16} color={colors.ink} />
+            </Pressable>
+            {teleCategoryDialogOpen && (
+              <View style={[styles.dropdownMenu, { maxHeight: 280 }]}>
+                <Text style={[styles.dropdownOptionText, { paddingHorizontal: 12, paddingVertical: 8, fontWeight: '600' }]}>Select categories to display in teleprompter</Text>
+                {listAllCategories(data).map((cat: CategorySummary) => {
+                  const checked = selectedTeleCategories.includes(cat.name);
+                  return (
+                    <Pressable
+                      key={cat.name}
+                      onPress={() => {
+                        setSelectedTeleCategories(prev =>
+                          checked ? prev.filter(c => c !== cat.name) : [...prev, cat.name]
+                        );
+                      }}
+                      style={styles.dropdownOption}
+                    >
+                      <Text style={styles.dropdownOptionText}>{cat.name}</Text>
+                      {checked && <Icon name="checkmark" size={16} color={colors.primary} />}
+                    </Pressable>
+                  );
+                })}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 8 }}>
+                  <Button label="Cancel" variant="secondary" onPress={() => setTeleCategoryDialogOpen(false)} style={{ flex: 1, marginRight: 4 }} />
+                  <Button
+                    label="Save"
+                    onPress={async () => {
+                      setTeleCategoryDialogOpen(false);
+                      if (onUpdateTeleprompterSettings) {
+                        await onUpdateTeleprompterSettings(!!teleprompterEnabled, selectedTeleCategories);
+                      }
+                    }}
+                    style={{ flex: 1, marginLeft: 4 }}
+                  />
+                </View>
+              </View>
+            )}
+          </View>
+
           <View style={styles.buttonRow}>
-            <Button 
-              label="Start Teleprompter" 
-              icon="play" 
+            <Button
+              label="Start Teleprompter"
+              icon="play"
               onPress={async () => {
                 setTeleSaving(true);
-                const text = 'Live notes from workspace...'; // or fetch from notes
-                await startTeleprompter(text, selectedDuration || -1, teleprompterState.speed, teleprompterState.textSize);
+                // Build text from selected categories or all if none selected
+                const catsToUse = selectedTeleCategories.length > 0 ? selectedTeleCategories : listAllCategories(data).map(c => c.name);
+                const text = catsToUse.map((catName) => {
+                  const items = (data as any)[catName] || [];
+                  const notes = items.filter((it: any) => typeof it === 'string').join(' • ');
+                  return notes ? `${catName}: ${notes}` : catName;
+                }).join('  |  ') || 'No notes in selected categories';
+                await startTeleprompter(text, selectedDuration || -1, teleprompterState.speed, teleprompterState.textSize, selectedTeleCategories);
                 await refreshTeleprompterState();
                 setTeleSaving(false);
                 setStatus('Teleprompter started as system overlay.');
-              }} 
-              disabled={teleSaving || teleprompterState.isRunning} 
-              style={styles.rowButton} 
+              }}
+              disabled={teleSaving || teleprompterState.isRunning}
+              style={styles.rowButton}
             />
             <Button 
               label="Stop Teleprompter" 

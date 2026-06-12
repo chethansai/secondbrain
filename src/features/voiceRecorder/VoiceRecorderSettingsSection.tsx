@@ -25,8 +25,7 @@ import {
 import { addNote, appendHistoryNote } from '../notes/noteMutations';
 import { copyText } from '../settings/clipboard';
 import { CategoryPicker } from '../categories/CategoryPicker';
-import { NotesData, CategoryPath } from '../../shared/types/notes';
-import { MutationResult } from '../sync/useNotesSync';
+import { NotesData, CategoryPath, MutationResult } from '../../shared/types/notes';
 
 type SortOrder = 'desc' | 'asc';
 
