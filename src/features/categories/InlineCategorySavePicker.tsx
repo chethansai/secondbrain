@@ -159,7 +159,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
   return StyleSheet.create({
     pane: { maxHeight: 196, borderRadius: rounded.md, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surfaceSoft },
     chipGroup: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: spacing.xs, padding: spacing.xs, paddingBottom: spacing.md },
-    chipWrap: { position: 'relative', width: '100%', maxWidth: 320, zIndex: 1 },
+    chipWrap: { position: 'relative', flex: 1, minWidth: 140, maxWidth: 320, zIndex: 1 },
     chipWrapOpen: { zIndex: 20, elevation: 8 },
     chip: { minHeight: 38, maxWidth: '100%', borderRadius: rounded.full, borderWidth: 1, borderColor: colors.hairlineStrong, backgroundColor: colors.canvas, flexDirection: 'row', alignItems: 'stretch', overflow: 'visible' },
     chipPinned: { borderColor: colors.primary, backgroundColor: colors.surface },
