@@ -23,7 +23,6 @@ import {
   currentPlaybackStatus,
 } from './voiceRecorderService';
 import { addNote, appendHistoryNote } from '../notes/noteMutations';
-import { copyText } from '../settings/clipboard';
 import { CategoryPicker } from '../categories/CategoryPicker';
 import { NotesData, CategoryPath, MutationResult } from '../../shared/types/notes';
 
@@ -237,15 +236,6 @@ export function VoiceRecorderSettingsSection({ data, commit }: Props) {
     setShowCategoryPicker(true);
   };
 
-  const handleCopy = async (text: string) => {
-    if (!text) {
-      setStatus('No text to copy.');
-      return;
-    }
-    const copied = await copyText(text);
-    setStatus(copied ? 'Transcription copied to clipboard.' : 'Copy failed.');
-  };
-
   const handleCategorySelected = async (paths: CategoryPath[]) => {
     if (!saveTargetRecording || paths.length === 0) {
       setShowCategoryPicker(false);
@@ -398,15 +388,6 @@ export function VoiceRecorderSettingsSection({ data, commit }: Props) {
                   onPress={() => handleSaveTo(recording)}
                   disabled={!currentTranscription}
                   style={styles.saveButton}
-                />
-
-                <Button
-                  label="Copy"
-                  icon="copy-outline"
-                  variant="secondary"
-                  onPress={() => handleCopy(currentTranscription)}
-                  disabled={!currentTranscription}
-                  style={styles.copyButton}
                 />
 
                 <Button
@@ -581,13 +562,6 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
       flexShrink: 0,
     },
     saveButton: {
-      width: 80,
-      height: 44,
-      justifyContent: 'center',
-      alignItems: 'center',
-      flexShrink: 0,
-    },
-    copyButton: {
       width: 80,
       height: 44,
       justifyContent: 'center',
