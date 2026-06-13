@@ -147,8 +147,10 @@ export async function startTeleprompter(text: string, durationMs: number, speed 
   if (!isFloatingOverlayAvailable() || !overlayModule) return false;
   try {
     return await overlayModule.startTeleprompter(text, durationMs, speed, textSize, categories || []);
-  } catch {
-    return false;
+  } catch (e: any) {
+    console.error('startTeleprompter failed:', e.message || e);
+    // Let SettingsPanel catch and show the exact message
+    throw new Error(e.message || 'Unknown teleprompter error');
   }
 }
 

@@ -413,10 +413,10 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
                     const duration = selectedDuration > 0 ? selectedDuration : -1;
                     const success = await startTeleprompter(textSnippets || 'No notes yet', duration, teleprompterState.speed || 34, teleprompterState.textSize || 14, catsToUse);
                     if (success) {
-                      setStatus('Teleprompter started with selected categories.');
+                      setStatus('Teleprompter started successfully.');
                       await refreshTeleprompterState();
                     } else {
-                      setStatus('Could not start teleprompter (check permissions).');
+                      setStatus('Could not start teleprompter (check permissions or see console/logs).');
                     }
                   }
                 } catch (e) {

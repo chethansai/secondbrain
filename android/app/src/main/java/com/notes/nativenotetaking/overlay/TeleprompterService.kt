@@ -67,9 +67,8 @@ class TeleprompterService : Service() {
             android.util.Log.i("TeleprompterService", "No overlay permission - using notification-only foreground mode (safe Android behavior)")
         }
 
-        // CRITICAL FIX: NEVER auto-start teleprompter on service creation or resume. Only explicit user Start button. Prevents auto on app launch, category load, Firebase sync.
-        android.util.Log.d("TeleprompterService", "onCreate: loaded state, isRunning=${currentState.isRunning} (will NOT auto-start per spec - user must press Start)")
-        // Do NOT call showTeleprompter() or startCountdown() here automatically
+        // CRITICAL FIX: NEVER auto-start teleprompter on service creation or resume. Only explicit user Start button via ACTION_START. Prevents unwanted start on app launch, sync, or category changes.
+        android.util.Log.d("TeleprompterService", "onCreate: loaded state isRunning=${currentState.isRunning} (will NOT auto-start - waiting for explicit ACTION_START)")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -101,7 +100,7 @@ class TeleprompterService : Service() {
                 }
                 currentState = currentState.copy(selectedCategories = categories)
                 settings.save(this, currentState)
-                android.util.Log.i("TeleprompterService", "ACTION_START: categories=${categories}, duration=${duration}, text.length=${text.length}")
+                android.util.Log.i("TeleprompterService", "ACTION_START: categories=${categories}, duration=${duration}, text.length=${text.length()}")
                 updateState(text, speed, size, duration, System.currentTimeMillis())
                 if (canDrawOverlays()) {
                     try {
@@ -109,13 +108,14 @@ class TeleprompterService : Service() {
                     } catch (e: Exception) {
                         android.util.Log.e("TeleprompterService", "Overlay failed, falling back to notification-only", e)
                     }
+                } else {
+                    android.util.Log.i("TeleprompterService", "No overlay permission - running in notification-only mode")
                 }
                 startCountdown()
                 updateNotification()
             }
             else -> {
-                // PATCH: No auto-start in default case. Prevents resume/auto on app open, Firebase sync, category load.
-                android.util.Log.d("TeleprompterService", "No action - status=${currentState.isRunning} (stopped by default)")
+                android.util.Log.d("TeleprompterService", "No matching action (status=${currentState.isRunning})")
             }
         }
         return START_STICKY

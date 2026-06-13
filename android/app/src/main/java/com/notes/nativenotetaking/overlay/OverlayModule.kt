@@ -90,26 +90,34 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
   @ReactMethod
   fun startTeleprompter(text: String, durationMs: Double, speed: Double, textSize: Double, categories: ReadableArray?, promise: Promise) {
     if (!canDrawOverlays()) {
-      promise.reject("overlay_permission_missing", "Display over other apps permission is not granted.")
+      promise.reject("overlay_permission_missing", "Display over other apps permission is not granted. Go to Settings → Apps → Native Note Taking → Display over other apps.")
       return
     }
-    val intent = Intent(reactContext, TeleprompterService::class.java).apply {
-      action = TeleprompterService.ACTION_START
-      putExtra("text", text)
-      putExtra("durationMs", durationMs.toLong())
-      putExtra("speed", speed.toFloat())
-      putExtra("textSize", textSize.toFloat())
-      if (categories != null) {
-        val arr = org.json.JSONArray()
-        for (i in 0 until categories.size()) {
-          val cat: String? = categories.getString(i)
-          cat?.let { arr.put(it) }
+    try {
+      val intent = Intent(reactContext, TeleprompterService::class.java).apply {
+        action = TeleprompterService.ACTION_START
+        putExtra("text", text)
+        putExtra("durationMs", durationMs.toLong())
+        putExtra("speed", speed.toFloat())
+        putExtra("textSize", textSize.toFloat())
+        if (categories != null && categories.size() > 0) {
+          val arr = org.json.JSONArray()
+          for (i in 0 until categories.size()) {
+            val cat: String? = categories.getString(i)
+            cat?.let { arr.put(it) }
+          }
+          putExtra("categories", arr.toString())
+        } else {
+          // fallback: use all root categories if none selected
+          putExtra("categories", "[]")
         }
-        putExtra("categories", arr.toString())
       }
+      startOverlayService(intent)
+      promise.resolve(true)
+    } catch (e: Exception) {
+      android.util.Log.e("OverlayModule", "startTeleprompter failed", e)
+      promise.reject("teleprompter_start_failed", "Could not start teleprompter: ${e.message ?: e.toString()}")
     }
-    startOverlayService(intent)
-    promise.resolve(true)
   }
 
   @ReactMethod
