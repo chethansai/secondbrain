@@ -10,7 +10,7 @@ import { rounded, spacing, typography } from '../../shared/design/tokens';
 import { CategoryPath, FlatNote, NotesData, PinnedNoteRef } from '../../shared/types/notes';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
-import { consumeAiResponseText } from './aiReviewService';
+import { consumeAiResponseText, normalizeAssistantText } from './aiReviewService';
 
 type AiChatRole = 'user' | 'assistant';
 

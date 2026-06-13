@@ -44,6 +44,36 @@ const DEFAULT_NOTE_CATEGORY = 'No TS';
 const APP_START_TIME = Date.now();
 console.log('[PERF] App module loaded at', APP_START_TIME);
 
+// Global crash-safe error handlers for APK stability
+if (typeof ErrorUtils !== 'undefined') {
+  const originalHandler = ErrorUtils.getGlobalHandler?.();
+  ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+    console.error('[CRASH] Global JS error:', error, 'isFatal:', isFatal);
+    // Log to console but don't crash the app
+    if (originalHandler) {
+      try {
+        originalHandler(error, isFatal);
+      } catch (e) {
+        console.error('[CRASH] Original handler failed:', e);
+      }
+    }
+  });
+}
+
+// Handle unhandled promise rejections (common crash source in release APK)
+if (typeof global !== 'undefined' && (global as any).HermesInternal) {
+  // Hermes-specific: already handles promise rejections gracefully
+} else {
+  // Add rejection tracker for JSC/older runtimes
+  const rejectionTracker = (id: any, rejection?: any) => {
+    console.error('[CRASH] Unhandled promise rejection:', rejection?.reason || rejection);
+  };
+  // @ts-ignore - React Native promise rejection handler
+  if (typeof global !== 'undefined') {
+    (global as any).onunhandledrejection = rejectionTracker;
+  }
+}
+
 export default function App() {
   const appRenderTime = Date.now();
   console.log('[PERF] App component render at', appRenderTime, '(+' + (appRenderTime - APP_START_TIME) + 'ms from module load)');
@@ -86,6 +116,17 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const { data, workspaces, activeWorkspace, activeWorkspaceId, defaultWorkspaceId, loading, saving, refreshing, error, setError, commit, createWorkspace, selectWorkspace, setDefaultWorkspace, renameWorkspace, updateSelectedCategoryPaths, updatePinnedCategoryPaths, updatePinnedNotes, updateTeleprompterSettings, refresh } = useNotesSync();
   const { ledger: aiReviewLedger, loading: aiReviewLoading, setError: setAiReviewError, upsertDecision } = useAiReviewSync();
   const [tab, setTab] = useState<Tab>('workspace');
+
+  // Safeguard against native module crashes in release builds (common cause of "keeps stopping")
+  const safeCallNative = useCallback(async (fn: () => Promise<any>, fallback = false) => {
+    try {
+      return await fn();
+    } catch (e) {
+      console.error('Native module call failed (release build safeguard):', e);
+      setError('Native service unavailable. Some features disabled.');
+      return fallback;
+    }
+  }, [setError]);
   const [path, setPath] = useState<CategoryPath>([]);
   const [promptMode, setPromptMode] = useState<ModalMode>(null);
   const [promptPath, setPromptPath] = useState<CategoryPath | null>(null);
@@ -109,10 +150,10 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const backToWorkspace = useCallback(() => setTab('workspace'), []);
   const backPath = useCallback(() => setPath((currentPath) => currentPath.slice(0, -1)), []);
 
-  const currentItems = path.length ? getCategoryItems(data, path) : null;
+  const currentItems = path.length ? getCategoryItems(data ?? {}, path) : null;
   const overlayAvailable = isFloatingOverlayAvailable();
   const childCategories = useMemo(() => (currentItems ? listChildCategories(currentItems, path) : []), [currentItems, path]);
-  const detailCategories = useMemo(() => listAllCategories(data).filter((category) => startsWithPath(category.path, path) && category.path.length > path.length), [data, path]);
+  const detailCategories = useMemo(() => (data ? listAllCategories(data).filter((category) => startsWithPath(category.path, path) && category.path.length > path.length) : []), [data, path]);
   const expandableDetailKeys = useMemo(() => detailCategories.filter((category) => category.childCount > 0).map((category) => category.path.join('')), [detailCategories]);
   const allDetailCategoriesExpanded = expandableDetailKeys.length > 0 && expandableDetailKeys.every((key) => expandedCategoryKeys.has(key));
   const pinnedNotes = activeWorkspace?.pinnedNotes ?? [];

@@ -31,11 +31,13 @@ export function getCategoryItems(data: NotesData, path: CategoryPath): NoteItem[
   return current;
 }
 
-export function listRootCategories(data: NotesData): CategorySummary[] {
+export function listRootCategories(data: NotesData | undefined): CategorySummary[] {
+  if (!data || typeof data !== 'object') return [];
   return Object.entries(data).map(([name, items]) => summarizeCategory(name, [name], items));
 }
 
-export function listAllCategories(data: NotesData): CategorySummary[] {
+export function listAllCategories(data: NotesData | undefined): CategorySummary[] {
+  if (!data || typeof data !== 'object') return [];
   return Object.entries(data).flatMap(([name, items]) => listCategoryBranch(name, [name], items));
 }
 

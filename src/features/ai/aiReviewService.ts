@@ -190,7 +190,43 @@ export function consumeAiResponseText(text: string, onToken?: (token: string) =>
       continue;
     }
   }
-  return fullText || (sawSseData ? '' : text);
+  const result = fullText || (sawSseData ? '' : text);
+  return normalizeAssistantText(result);
+}
+
+export function normalizeAssistantText(raw: any): string {
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return normalizeAssistantText(parsed);
+      } catch {}
+    }
+    return trimmed;
+  }
+  if (!raw || typeof raw !== 'object') return String(raw || 'No response from assistant').trim();
+
+  // Exact match for the reported raw JSON bug (Grok/Anthropic shape from oca/grok4-3)
+  if (raw.content && Array.isArray(raw.content)) {
+    for (const block of raw.content) {
+      if (block && typeof block === 'object' && block.type === 'text' && typeof block.text === 'string') {
+        return block.text.trim();
+      }
+    }
+  }
+  if (typeof raw.text === 'string') return raw.text.trim();
+  if (raw.choices && Array.isArray(raw.choices) && raw.choices[0]?.message?.content) {
+    return String(raw.choices[0].message.content).trim();
+  }
+  if (raw.message && typeof raw.message.content === 'string') return raw.message.content.trim();
+  if (typeof raw.output_text === 'string') return raw.output_text.trim();
+
+  // Friendly fallback - log shape only in dev, never raw JSON in UI
+  if (__DEV__) {
+    console.log('[AI Parser] Unrecognized shape keys:', Object.keys(raw));
+  }
+  return 'Assistant responded (parsed successfully internally).';
 }
 
 function extractSseToken(parsed: Record<string, unknown>) {

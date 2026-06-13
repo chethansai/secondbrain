@@ -51,6 +51,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
   const [selectedDuration, setSelectedDuration] = useState(-1);
   const [teleSaving, setTeleSaving] = useState(false);
   const [teleCategoryDialogOpen, setTeleCategoryDialogOpen] = useState(false);
+  const [teleDurationMenuOpen, setTeleDurationMenuOpen] = useState(false);
   const [selectedTeleCategories, setSelectedTeleCategories] = useState<string[]>(teleprompterCategories || []);
 
   useEffect(() => {
@@ -69,9 +70,9 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
     };
   }, []);
 
-  // Sync local selected categories when prop updates
+  // Sync local selected categories when prop updates - NO auto-write to prevent loops or "Cannot add to Firestore"
   useEffect(() => {
-    if (teleprompterCategories) {
+    if (teleprompterCategories && teleprompterCategories.length > 0) {
       setSelectedTeleCategories(teleprompterCategories);
     }
   }, [teleprompterCategories]);
@@ -271,7 +272,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
           </View>
           <Text style={styles.settingLabel}>Duration</Text>
           <Pressable
-            onPress={() => { /* Picker logic can be expanded with modal if needed */ }}
+            onPress={() => setTeleDurationMenuOpen((current) => !current)}
             style={styles.dropdownButton}
           >
             <Text style={styles.dropdownValue}>
@@ -280,7 +281,25 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
             <Icon name="chevron-down" size={16} color={colors.ink} />
           </Pressable>
           <Text style={styles.settingLabel}>Remaining: {teleprompterState.remaining}</Text>
-          <LineControl 
+          {teleDurationMenuOpen && (
+            <View style={styles.dropdownMenu}>
+              {durationOptions.map((opt) => (
+                <Pressable
+                  key={opt.value}
+                  onPress={async () => {
+                    setSelectedDuration(opt.value);
+                    setTeleDurationMenuOpen(false);
+                    await updateTeleprompterSettings({ durationMs: opt.value }).catch(() => undefined);
+                  }}
+                  style={[styles.dropdownOption, (selectedDuration === opt.value || teleprompterState.durationMs === opt.value) && styles.dropdownOptionSelected]}
+                >
+                  <Text style={[styles.dropdownOptionText, (selectedDuration === opt.value || teleprompterState.durationMs === opt.value) && styles.dropdownOptionTextSelected]}>{opt.label}</Text>
+                  {(selectedDuration === opt.value || teleprompterState.durationMs === opt.value) && <Icon name="checkmark" size={16} color={colors.onPrimary} />}
+                </Pressable>
+              ))}
+            </View>
+          )}
+          <LineControl
             label="Scroll Speed" 
             value={teleprompterState.speed} 
             min={10} 
@@ -307,7 +326,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
             }}
           />
 
-          {/* Category Selection for Teleprompter - Checklist Dialog */}
+          {/* Category Selection for Teleprompter - Checklist Dialog - PATCH: Added Select All, friendly message, no auto-write on load, read-only listAllCategories */}
           <View style={{ marginTop: 12 }}>
             <Text style={styles.settingLabel}>Displayed Categories</Text>
             <Pressable
@@ -317,13 +336,23 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
               <Text style={styles.dropdownValue} numberOfLines={1}>
                 {selectedTeleCategories.length > 0
                   ? `${selectedTeleCategories.length} selected`
-                  : 'None selected (shows all)'}
+                  : 'None selected (will use all available)'}
               </Text>
               <Icon name="chevron-down" size={16} color={colors.ink} />
             </Pressable>
             {teleCategoryDialogOpen && (
               <View style={[styles.dropdownMenu, { maxHeight: 280 }]}>
-                <Text style={[styles.dropdownOptionText, { paddingHorizontal: 12, paddingVertical: 8, fontWeight: '600' }]}>Select categories to display in teleprompter</Text>
+                <Text style={[styles.dropdownOptionText, { paddingHorizontal: 12, paddingVertical: 8, fontWeight: '600' }]}>Select categories for teleprompter (read-only load)</Text>
+                {listAllCategories(data).length === 0 && <Text style={{padding: 12, color: colors.muted}}>No categories loaded yet. Add some notes first.</Text>}
+                <Pressable
+                  onPress={() => {
+                    const all = listAllCategories(data).map((cat: CategorySummary) => cat.name);
+                    setSelectedTeleCategories(all);
+                  }}
+                  style={styles.dropdownOption}
+                >
+                  <Text style={[styles.dropdownOptionText, {fontWeight: '600'}]}>Select All</Text>
+                </Pressable>
                 {listAllCategories(data).map((cat: CategorySummary) => {
                   const checked = selectedTeleCategories.includes(cat.name);
                   return (
@@ -344,11 +373,12 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 8 }}>
                   <Button label="Cancel" variant="secondary" onPress={() => setTeleCategoryDialogOpen(false)} style={{ flex: 1, marginRight: 4 }} />
                   <Button
-                    label="Save"
+                    label="Save Selection"
                     onPress={async () => {
                       setTeleCategoryDialogOpen(false);
+                      console.log('[Categories] saving displayed selection:', selectedTeleCategories);
                       if (onUpdateTeleprompterSettings) {
-                        await onUpdateTeleprompterSettings(!!teleprompterEnabled, selectedTeleCategories);
+                        await onUpdateTeleprompterSettings(!!teleprompterEnabled, selectedTeleCategories); // only explicit, no load/write loop
                       }
                     }}
                     style={{ flex: 1, marginLeft: 4 }}
@@ -360,38 +390,43 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
 
           <View style={styles.buttonRow}>
             <Button
-              label="Start Teleprompter"
-              icon="play"
+              label={teleprompterState.isRunning ? 'Stop Teleprompter' : 'Start Teleprompter'}
+              icon={teleprompterState.isRunning ? 'close' : 'play'}
+              variant={teleprompterState.isRunning ? 'secondary' : 'primary'}
               onPress={async () => {
                 setTeleSaving(true);
-                // Build text from selected categories or all if none selected
-                const catsToUse = selectedTeleCategories.length > 0 ? selectedTeleCategories : listAllCategories(data).map(c => c.name);
-                const text = catsToUse.map((catName) => {
-                  const items = (data as any)[catName] || [];
-                  const notes = items.filter((it: any) => typeof it === 'string').join(' • ');
-                  return notes ? `${catName}: ${notes}` : catName;
-                }).join('  |  ') || 'No notes in selected categories';
-                await startTeleprompter(text, selectedDuration || -1, teleprompterState.speed, teleprompterState.textSize, selectedTeleCategories);
-                await refreshTeleprompterState();
-                setTeleSaving(false);
-                setStatus('Teleprompter started as system overlay.');
+                try {
+                  if (teleprompterState.isRunning) {
+                    await stopTeleprompter();
+                    setStatus('Teleprompter stopped.');
+                  } else {
+                    const catsToUse = selectedTeleCategories.length > 0 ? selectedTeleCategories : listAllCategories(data).map((c: CategorySummary) => c.name);
+                    if (catsToUse.length === 0) {
+                      setStatus('Add some categories first. No notes to show in teleprompter.');
+                      return;
+                    }
+                    // Build text (reused from existing formatTeleprompterNotes logic)
+                    const textSnippets = catsToUse.map((catName) => {
+                      const items = (data as any)[catName] || [];
+                      return items.filter((item: any) => typeof item === 'string').slice(0, 5).join(' | ');
+                    }).filter(Boolean).join('   |   ');
+                    const duration = selectedDuration > 0 ? selectedDuration : -1;
+                    const success = await startTeleprompter(textSnippets || 'No notes yet', duration, teleprompterState.speed || 34, teleprompterState.textSize || 14, catsToUse);
+                    if (success) {
+                      setStatus('Teleprompter started with selected categories.');
+                      await refreshTeleprompterState();
+                    } else {
+                      setStatus('Could not start teleprompter (check permissions).');
+                    }
+                  }
+                } catch (e) {
+                  console.error('Teleprompter start/stop error:', e);
+                  setStatus('Teleprompter error - see logs.');
+                } finally {
+                  setTeleSaving(false);
+                }
               }}
-              disabled={teleSaving || teleprompterState.isRunning}
-              style={styles.rowButton}
-            />
-            <Button 
-              label="Stop Teleprompter" 
-              icon="close" 
-              variant="secondary" 
-              onPress={async () => {
-                setTeleSaving(true);
-                await stopTeleprompter();
-                await refreshTeleprompterState();
-                setTeleSaving(false);
-                setStatus('Teleprompter stopped.');
-              }} 
-              disabled={teleSaving || !teleprompterState.isRunning} 
-              style={styles.rowButton} 
+              disabled={teleSaving}
             />
           </View>
         </View>
@@ -404,8 +439,6 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
     </View>
   );
 }
-
-
 
 function parseImportNotesData(value: unknown) {
   const direct = validateNotesData(value);

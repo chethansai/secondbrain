@@ -12,7 +12,7 @@ type Props = {
   onSelect: (path: CategoryPath) => void;
 };
 
-export function CategoryList({ categories, expandedKeys, onToggleCategory, onSelect }: Props) {
+export function CategoryList({ categories = [], expandedKeys, onToggleCategory, onSelect }: Props) {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const tints = useMemo(() => createCategoryTints(colors, isDark), [colors, isDark]);

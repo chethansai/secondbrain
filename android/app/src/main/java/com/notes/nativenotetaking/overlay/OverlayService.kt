@@ -354,7 +354,8 @@ class OverlayService : Service() {
             override fun afterTextChanged(text: Editable?) {}
           })
         }
-      } catch (_: Exception) {
+      } catch (e: Exception) {
+        android.util.Log.e("OverlayService", "loadCategoryChips failed", e)
         Handler(Looper.getMainLooper()).post {
           chipWrap.removeAllViews()
           chipWrap.addView(TextView(this).apply {
@@ -516,13 +517,14 @@ class OverlayService : Service() {
           Toast.makeText(this, "Added to ${path.joinToString(" > ")}", Toast.LENGTH_SHORT).show()
           hideInput()
         }
-      } catch (_: Exception) {
+      } catch (e: Exception) {
+        android.util.Log.e("OverlayService", "submitInput/appendNote failed", e)
         Handler(Looper.getMainLooper()).post {
           editText.isEnabled = true
           categoryInput?.isEnabled = true
           editText.requestFocus()
           ContextCompat.getSystemService(this, InputMethodManager::class.java)?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
-          Toast.makeText(this, "Could not add to Firestore.", Toast.LENGTH_LONG).show()
+          Toast.makeText(this, "Could not add to Firestore: ${e.message}", Toast.LENGTH_LONG).show()
         }
       }
     }.start()

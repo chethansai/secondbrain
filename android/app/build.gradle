@@ -135,7 +135,9 @@ android {
             signingConfig signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
-            minifyEnabled enableMinifyInReleaseBuilds
+            // Disabled minify for release to prevent Proguard/R8 from stripping native module bindings and causing crashes (common in RN apps with custom Kotlin services like OverlayModule and TeleprompterService).
+            // Re-enable only after adding -keep rules for com.notes.nativenotetaking.* in proguard-rules.pro
+            minifyEnabled false
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             def enablePngCrunchInRelease = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
             crunchPngs enablePngCrunchInRelease.toBoolean()

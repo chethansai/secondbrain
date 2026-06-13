@@ -31,7 +31,17 @@ class VoiceRecorderService : Service() {
 
   override fun onCreate() {
     super.onCreate()
-    startForeground(VoiceRecorderNotification.id, createVoiceRecorderNotification(this))
+    try {
+      // CRITICAL: Create notification channel BEFORE startForeground on Android 8+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        createVoiceRecorderNotification(this)
+      }
+      startForeground(VoiceRecorderNotification.id, createVoiceRecorderNotification(this))
+    } catch (e: Exception) {
+      android.util.Log.e("VoiceRecorderService", "Failed to start foreground", e)
+      stopSelf()
+      return
+    }
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

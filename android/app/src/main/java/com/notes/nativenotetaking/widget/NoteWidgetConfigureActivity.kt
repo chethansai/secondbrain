@@ -319,10 +319,10 @@ class NoteWidgetConfigureActivity : Activity() {
           updateWidgetAndFinish()
           Toast.makeText(this, "Added to ${path.joinToString(" > ")}", Toast.LENGTH_SHORT).show()
         }
-      } catch (_: Exception) {
+      } catch (e: Exception) {
         Handler(Looper.getMainLooper()).post {
           setInputsEnabled(true)
-          Toast.makeText(this, "Could not add to Firestore.", Toast.LENGTH_LONG).show()
+          Toast.makeText(this, "Could not add to Firestore: ${e.message}", Toast.LENGTH_LONG).show()
         }
       }
     }.start()

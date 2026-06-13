@@ -92,7 +92,8 @@ export function listNotesAtPath(data: NotesData, path: CategoryPath): FlatNote[]
   }, []);
 }
 
-export function flattenNotes(data: NotesData): FlatNote[] {
+export function flattenNotes(data: NotesData | undefined): FlatNote[] {
+  if (!data || typeof data !== 'object') return [];
   return Object.entries(data).flatMap(([name, items]) => flattenItems(items, [name]));
 }
 

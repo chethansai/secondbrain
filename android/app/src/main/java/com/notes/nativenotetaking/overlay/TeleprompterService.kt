@@ -55,27 +55,21 @@ class TeleprompterService : Service() {
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
+            android.util.Log.i("TeleprompterService", "onCreate foreground started: running=${currentState.isRunning}, duration=${currentState.durationMs}, categories=${currentState.selectedCategories.size}")
         } catch (e: Exception) {
             android.util.Log.e("TeleprompterService", "Failed to start foreground service", e)
             stopSelf()
             return
         }
 
+        // PATCH: Removed stopSelf on no overlay - notification mode is safe fallback per spec. No crash.
         if (!canDrawOverlays()) {
-            android.util.Log.w("TeleprompterService", "No overlay permission - stopping gracefully (PHASE 4)")
-            stopSelf()
-            return
+            android.util.Log.i("TeleprompterService", "No overlay permission - using notification-only foreground mode (safe Android behavior)")
         }
 
-        if (currentState.isRunning) {
-            try {
-                showTeleprompter()
-                startCountdown()
-            } catch (e: Exception) {
-                android.util.Log.e("TeleprompterService", "Failed to show teleprompter view", e)
-                stopTeleprompter()
-            }
-        }
+        // CRITICAL FIX: NEVER auto-start teleprompter on service creation or resume. Only explicit user Start button. Prevents auto on app launch, category load, Firebase sync.
+        android.util.Log.d("TeleprompterService", "onCreate: loaded state, isRunning=${currentState.isRunning} (will NOT auto-start per spec - user must press Start)")
+        // Do NOT call showTeleprompter() or startCountdown() here automatically
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -100,16 +94,28 @@ class TeleprompterService : Service() {
                         }
                     } catch (e: Exception) { emptyList() }
                 } else currentState.selectedCategories
+                if (categories.isEmpty()) {
+                    android.util.Log.w("TeleprompterService", "No categories selected - cannot start")
+                    stopTeleprompter()
+                    return START_STICKY
+                }
                 currentState = currentState.copy(selectedCategories = categories)
                 settings.save(this, currentState)
+                android.util.Log.i("TeleprompterService", "ACTION_START: categories=${categories}, duration=${duration}, text.length=${text.length}")
                 updateState(text, speed, size, duration, System.currentTimeMillis())
-                showTeleprompter()
+                if (canDrawOverlays()) {
+                    try {
+                        showTeleprompter()
+                    } catch (e: Exception) {
+                        android.util.Log.e("TeleprompterService", "Overlay failed, falling back to notification-only", e)
+                    }
+                }
                 startCountdown()
                 updateNotification()
             }
-            else -> if (currentState.isRunning) {
-                showTeleprompter()
-                startCountdown()
+            else -> {
+                // PATCH: No auto-start in default case. Prevents resume/auto on app open, Firebase sync, category load.
+                android.util.Log.d("TeleprompterService", "No action - status=${currentState.isRunning} (stopped by default)")
             }
         }
         return START_STICKY
@@ -179,12 +185,13 @@ class TeleprompterService : Service() {
     }
 
     private fun startCountdown() {
-        countdownRunnable?.let { handler.removeCallbacks(it) }
+        countdownRunnable?.let { handler.removeCallbacks(it) } // Prevent duplicate timers
         countdownRunnable = object : Runnable {
             override fun run() {
                 if (!currentState.isRunning || isPaused) return
                 val remaining = TeleprompterSettings.getRemainingTime(currentState)
                 if (remaining <= 0 && currentState.durationMs > 0) {
+                    android.util.Log.i("TeleprompterService", "Duration ended - stopping cleanly")
                     stopTeleprompter()
                     return
                 }
