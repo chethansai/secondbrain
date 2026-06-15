@@ -405,13 +405,8 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
                       setStatus('Add some categories first. No notes to show in teleprompter.');
                       return;
                     }
-                    // Build text (reused from existing formatTeleprompterNotes logic)
-                    const textSnippets = catsToUse.map((catName) => {
-                      const items = (data as any)[catName] || [];
-                      return items.filter((item: any) => typeof item === 'string').slice(0, 5).join(' | ');
-                    }).filter(Boolean).join('   |   ');
-                    const duration = selectedDuration > 0 ? selectedDuration : -1;
-                    const success = await startTeleprompter(textSnippets || 'No notes yet', duration, teleprompterState.speed || 34, teleprompterState.textSize || 14, catsToUse);
+                    // Use selected category names only for slim ticker (no note content or UI labels)
+                    const success = await startTeleprompter(catsToUse);
                     if (success) {
                       setStatus('Teleprompter started successfully.');
                       await refreshTeleprompterState();

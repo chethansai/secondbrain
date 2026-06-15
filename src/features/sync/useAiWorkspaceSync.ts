@@ -79,9 +79,13 @@ export function useAiWorkspaceSync() {
       await writeLocalAiWorkspaceIndex(nextIndex);
       setLocalMode(false);
       return true;
-    } catch {
+    } catch (error) {
+      console.log('FIRESTORE ERROR CODE:', (error as any).code);
+      console.log('FIRESTORE ERROR MESSAGE:', (error as any).message);
+      console.log('FIRESTORE ERROR FULL:', error);
       await writeLocalAiWorkspaceIndex(nextIndex);
       setLocalMode(true);
+      setError(`Could not save to Firestore: ${(error as any).code}\n${(error as any).message}`);
       return true;
     }
   }, []);
@@ -121,11 +125,15 @@ export function useAiWorkspaceSync() {
       setIndex(nextIndex);
       setLocalMode(false);
       return true;
-    } catch {
+    } catch (error) {
+      console.log('FIRESTORE ERROR CODE:', (error as any).code);
+      console.log('FIRESTORE ERROR MESSAGE:', (error as any).message);
+      console.log('FIRESTORE ERROR FULL:', error);
       await writeLocalAiWorkspaceNotes(documentMeta.documentId, validation.data);
       await writeLocalAiWorkspaceIndex(nextIndex);
       setIndex(nextIndex);
       setLocalMode(true);
+      setError(`Could not add to Firestore: ${(error as any).code}\n${(error as any).message}`);
       return true;
     } finally {
       setSaving(false);
@@ -167,10 +175,14 @@ export function useAiWorkspaceSync() {
       await writeLocalAiWorkspaceIndex(nextIndex);
       setLocalMode(false);
       return true;
-    } catch {
+    } catch (error) {
+      console.log('FIRESTORE ERROR CODE:', (error as any).code);
+      console.log('FIRESTORE ERROR MESSAGE:', (error as any).message);
+      console.log('FIRESTORE ERROR FULL:', error);
       await deleteLocalAiWorkspaceNotes(documentId);
       await writeLocalAiWorkspaceIndex(nextIndex);
       setLocalMode(true);
+      setError(`Could not delete from Firestore: ${(error as any).code}\n${(error as any).message}`);
       return true;
     } finally {
       setSaving(false);
@@ -205,11 +217,15 @@ export function useAiWorkspaceSync() {
       setIndex(nextIndex);
       setLocalMode(false);
       return true;
-    } catch {
+    } catch (error) {
+      console.log('FIRESTORE ERROR CODE:', (error as any).code);
+      console.log('FIRESTORE ERROR MESSAGE:', (error as any).message);
+      console.log('FIRESTORE ERROR FULL:', error);
       await writeLocalAiWorkspaceNotes(index.activeDocumentId, result.data);
       await writeLocalAiWorkspaceIndex(nextIndex);
       setIndex(nextIndex);
       setLocalMode(true);
+      setError(`Could not add to Firestore: ${(error as any).code}\n${(error as any).message}`);
       return true;
     } finally {
       setSaving(false);

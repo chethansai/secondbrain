@@ -160,10 +160,14 @@ export function useNotesSync() {
       await writeLocalWorkspaceSnapshot(index, data);
       setLocalMode(false);
       return true;
-    } catch {
+    } catch (error) {
+      console.log('FIRESTORE ERROR CODE:', (error as any).code);
+      console.log('FIRESTORE ERROR MESSAGE:', (error as any).message);
+      console.log('FIRESTORE ERROR FULL:', error);
       await writeLocalWorkspaceIndex(index);
       await writeLocalWorkspaceSnapshot(index, data);
       setLocalMode(true);
+      setError(`Could not save to Firestore: ${(error as any).code}\n${(error as any).message}`);
       return true;
     }
   }, [data]);
@@ -183,11 +187,14 @@ export function useNotesSync() {
         await writeLocalWorkspaceSnapshot(workspaceIndex, result.data);
         setLocalMode(false);
         return true;
-      } catch {
+      } catch (error) {
+        console.log('FIRESTORE ERROR CODE:', (error as any).code);
+        console.log('FIRESTORE ERROR MESSAGE:', (error as any).message);
+        console.log('FIRESTORE ERROR FULL:', error);
         await writeLocalWorkspaceNotes(defaultWorkspaceId, result.data);
         await writeLocalWorkspaceSnapshot(workspaceIndex, result.data);
         setLocalMode(true);
-        setError(null);
+        setError(`Could not add to Firestore: ${(error as any).code}\n${(error as any).message}`);
         return true;
       } finally {
         setSaving(false);

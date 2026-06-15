@@ -18,6 +18,11 @@ There is no test script in `package.json`; use `npm run typecheck` as the availa
 
 After every implemented chat step or redirection/decision that changes the repo:
 
+## history
+
+- 2026-06-16: FULL FLOATING TELEPROMPTER OVERLAY IMPLEMENTED (per guidance). Enhanced TeleprompterService + Notification (Pause/Resume/Stop actions) + RN bridge (floatingOverlay.ts merge conflict fixed, SettingsPanel integration). AppState sync + notification-only fallback. typecheck clean. Histories updated.
+- 2026-06-15: TELEPROMPTER CONFIRMED (TJ spec). Native ForegroundService + slim overlay *below* status bar + notification with Stop works when app minimized/closed. Cannot draw inside real status bar. Must start from inside app. Current TeleprompterService.kt (no auto-start), TeleprompterView.kt, OverlayModule.kt, floatingOverlay.ts, SettingsPanel.tsx, NotesTeleprompterBar.tsx already implement correctly. No code changes. Histories synced with plan.md.
+
 1. Update `plan.md` under `## history` with a dated summary of the completed step and any decision/redirection.
 2. Update this file under `## history` with the same dated summary in concise Claude-readable form.
 3. Run `git status`.

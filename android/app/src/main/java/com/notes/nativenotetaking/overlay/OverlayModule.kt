@@ -88,7 +88,7 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
   }
 
   @ReactMethod
-  fun startTeleprompter(text: String, durationMs: Double, speed: Double, textSize: Double, categories: ReadableArray?, promise: Promise) {
+  fun startTeleprompter(text: String, durationMs: Long, speed: Double, textSize: Double, categories: ReadableArray?, promise: Promise) {
     if (!canDrawOverlays()) {
       promise.reject("overlay_permission_missing", "Display over other apps permission is not granted. Go to Settings → Apps → Native Note Taking → Display over other apps.")
       return
@@ -96,10 +96,10 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
     try {
       val intent = Intent(reactContext, TeleprompterService::class.java).apply {
         action = TeleprompterService.ACTION_START
-        putExtra("text", text)
-        putExtra("durationMs", durationMs.toLong())
-        putExtra("speed", speed.toFloat())
-        putExtra("textSize", textSize.toFloat())
+        putExtra(TeleprompterService.EXTRA_TEXT, text)
+        putExtra("durationMs", durationMs)
+        putExtra(TeleprompterService.EXTRA_SPEED, speed.toFloat())
+        putExtra(TeleprompterService.EXTRA_TEXT_SIZE, textSize.toFloat())
         if (categories != null && categories.size() > 0) {
           val arr = org.json.JSONArray()
           for (i in 0 until categories.size()) {
@@ -108,7 +108,6 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
           }
           putExtra("categories", arr.toString())
         } else {
-          // fallback: use all root categories if none selected
           putExtra("categories", "[]")
         }
       }

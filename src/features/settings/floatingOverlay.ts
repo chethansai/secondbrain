@@ -143,13 +143,18 @@ export const durationOptions: Array<{label: string; value: number}> = [
   { label: 'Unlimited', value: -1 },
 ];
 
-export async function startTeleprompter(text: string, durationMs: number, speed = 34, textSize = 14, categories?: string[]): Promise<boolean> {
+export async function startTeleprompter(selectedCategories: any[] = [], speed = 69, textSize = 14, durationMs = -1): Promise<boolean> {
   if (!isFloatingOverlayAvailable() || !overlayModule) return false;
   try {
-    return await overlayModule.startTeleprompter(text, durationMs, speed, textSize, categories || []);
+    // Build clean ticker text from category names only (slim one-line status bar style)
+    const text = selectedCategories
+      .map(item => item.name || item.title || item.categoryName || String(item))
+      .filter(Boolean)
+      .join('     •     ') || 'No categories selected';
+
+    return await overlayModule.startTeleprompter(text, durationMs, speed, textSize, selectedCategories);
   } catch (e: any) {
     console.error('startTeleprompter failed:', e.message || e);
-    // Let SettingsPanel catch and show the exact message
     throw new Error(e.message || 'Unknown teleprompter error');
   }
 }

@@ -1,14 +1,27 @@
 import { CategoryPath, FlatNote, MutationResult, NotesData } from '../../shared/types/notes';
-import { cloneData, getCategoryItems, isCategoryNode, syncStandaloneCategory } from '../categories/categoryTree';
+import { cloneData, createRootCategory, getCategoryItems, isCategoryNode, syncStandaloneCategory } from '../categories/categoryTree';
 
 export const HISTORY_CATEGORY = 'HISTORY';
 
 export function addNote(data: NotesData, path: CategoryPath, text: string): MutationResult {
   const cleanText = normalizeNoteText(text);
   if (!cleanText) return failure('empty_note', 'Note text cannot be empty.');
-  const next = cloneData(data);
-  const items = getCategoryItems(next, path);
+
+  let next = cloneData(data);
+  let items = getCategoryItems(next, path);
+  if (!items) {
+    if (path.length === 1) {
+      // Auto-create root category (e.g. VOICENOTES for voice transcriptions)
+      const createResult = createRootCategory(next, path[0]);
+      if (!createResult.ok) return createResult;
+      next = createResult.data;
+      items = getCategoryItems(next, path);
+    } else {
+      return failure('path_not_found', 'The selected category no longer exists.');
+    }
+  }
   if (!items) return failure('path_not_found', 'The selected category no longer exists.');
+
   items.push(cleanText);
   syncStandaloneCategory(next, path);
   return { ok: true, data: next };

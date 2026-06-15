@@ -11,7 +11,12 @@ import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
+import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
+import android.widget.TextView
+import android.animation.ValueAnimator
+import android.view.animation.LinearInterpolator
 import java.util.concurrent.TimeUnit
 import java.math.BigInteger
 
@@ -19,6 +24,8 @@ class TeleprompterService : Service() {
 
     private lateinit var windowManager: WindowManager
     private var teleprompterView: TeleprompterView? = null
+    private var overlayView: FrameLayout? = null
+    private var animator: ValueAnimator? = null
     private val settings by lazy { TeleprompterSettings }
     private val handler = Handler(Looper.getMainLooper())
     private var countdownRunnable: Runnable? = null
@@ -33,6 +40,10 @@ class TeleprompterService : Service() {
         const val ACTION_PAUSE = "com.notes.nativenotetaking.teleprompter.PAUSE"
         const val ACTION_RESUME = "com.notes.nativenotetaking.teleprompter.RESUME"
         const val ACTION_UPDATE = "com.notes.nativenotetaking.teleprompter.UPDATE"
+
+        const val EXTRA_TEXT = "text"
+        const val EXTRA_SPEED = "speed"
+        const val EXTRA_TEXT_SIZE = "textSize"
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -81,11 +92,11 @@ class TeleprompterService : Service() {
             ACTION_PAUSE -> pauseTeleprompter()
             ACTION_RESUME -> resumeTeleprompter()
             ACTION_START, ACTION_UPDATE -> {
-                val text = intent.getStringExtra("text") ?: currentState.text
-                val duration = intent.getLongExtra("durationMs", currentState.durationMs)
-                val speed = intent.getFloatExtra("speed", currentState.speed)
-                val size = intent.getFloatExtra("textSize", currentState.textSize)
-                val categoriesJson = intent.getStringExtra("categories")
+                val text = intent?.getStringExtra(EXTRA_TEXT) ?: intent?.getStringExtra("text") ?: currentState.text
+                val duration = intent?.getLongExtra("durationMs", currentState.durationMs) ?: currentState.durationMs
+                val speed = intent?.getFloatExtra(EXTRA_SPEED, currentState.speed) ?: currentState.speed
+                val size = intent?.getFloatExtra(EXTRA_TEXT_SIZE, currentState.textSize) ?: currentState.textSize
+                val categoriesJson = intent?.getStringExtra("categories")
                 val categories = if (categoriesJson != null) {
                     try {
                         org.json.JSONArray(categoriesJson).let { arr ->
@@ -93,18 +104,18 @@ class TeleprompterService : Service() {
                         }
                     } catch (e: Exception) { emptyList() }
                 } else currentState.selectedCategories
-                if (categories.isEmpty()) {
-                    android.util.Log.w("TeleprompterService", "No categories selected - cannot start")
+                if (categories.isEmpty() && text.isBlank()) {
+                    android.util.Log.w("TeleprompterService", "No categories or text - cannot start")
                     stopTeleprompter()
                     return START_STICKY
                 }
                 currentState = currentState.copy(selectedCategories = categories)
                 settings.save(this, currentState)
-                android.util.Log.i("TeleprompterService", "ACTION_START: categories=${categories}, duration=${duration}, text.length=${text.length()}")
+                android.util.Log.i("TeleprompterService", "ACTION_START: categories=${categories.size}, text.length=${text.length}, speed=$speed")
                 updateState(text, speed, size, duration, System.currentTimeMillis())
                 if (canDrawOverlays()) {
                     try {
-                        showTeleprompter()
+                        showStatusBarStyleTicker(text, speed, size)
                     } catch (e: Exception) {
                         android.util.Log.e("TeleprompterService", "Overlay failed, falling back to notification-only", e)
                     }
@@ -146,24 +157,106 @@ class TeleprompterService : Service() {
         nm.notify(NOTIFICATION_ID, createTeleprompterNotification(isPaused))
     }
 
-    private fun showTeleprompter() {
-        if (teleprompterView != null) return
-        val view = TeleprompterView(this)
+    private fun showStatusBarStyleTicker(
+        text: String,
+        speedPxPerSecond: Float = 69f,
+        textSizeSp: Float = 14f
+    ) {
+        removeOverlay()
+
+        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(Color.rgb(7, 20, 43))
+            setPadding(8.dp(), 0, 8.dp(), 0)
+            clipChildren = true
+            clipToPadding = true
+        }
+
+        val tickerText = TextView(this).apply {
+            this.text = text
+            setTextColor(Color.WHITE)
+            textSize = textSizeSp
+            setSingleLine(true)
+            includeFontPadding = false
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        root.addView(
+            tickerText,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER_VERTICAL
+            )
+        )
+
+        val overlayType =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY else WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            30.dp(),
+            overlayType,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = (Gravity.TOP or Gravity.CENTER_HORIZONTAL).toInt()
-            y = 40
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
         }
-        val safeInsets = TeleprompterView.calculateSafeInsets(this, windowManager)
-        view.setText(currentState.text, currentState.speed, currentState.textSize)
-        view.attachToWindow(windowManager, params)
-        view.updatePositionAndSize(safeInsets)
-        teleprompterView = view
+
+        windowManager?.addView(root, params)
+        overlayView = root
+
+        root.post {
+            val screenWidth = root.width.toFloat()
+
+            tickerText.measure(
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(root.height, View.MeasureSpec.EXACTLY)
+            )
+
+            val textWidth = tickerText.measuredWidth.toFloat()
+            val distance = screenWidth + textWidth
+
+            animator = ValueAnimator.ofFloat(screenWidth, -textWidth).apply {
+                duration = ((distance / speedPxPerSecond) * 1000).toLong().coerceAtLeast(6000L)
+                repeatCount = ValueAnimator.INFINITE
+                interpolator = LinearInterpolator()
+
+                addUpdateListener { animation ->
+                    tickerText.translationX = animation.animatedValue as Float
+                }
+
+                start()
+            }
+        }
+    }
+
+    private fun removeOverlay() {
+        animator?.cancel()
+        animator = null
+
+        overlayView?.let {
+            try {
+                windowManager?.removeView(it)
+            } catch (_: Exception) {
+            }
+        }
+
+        overlayView = null
+    }
+
+    private fun Int.dp(): Int {
+        return (this * resources.displayMetrics.density).toInt()
     }
 
     private fun hideTeleprompter() {
@@ -196,7 +289,7 @@ class TeleprompterService : Service() {
                     return
                 }
                 val remainingStr = if (remaining < 0) "Unlimited" else formatRemaining(remaining)
-                teleprompterView?.updateCountdown(remainingStr)
+                // Note: countdown only updates notification (no longer in slim ticker UI)
                 updateNotification()
                 handler.postDelayed(this, 1000)
             }
@@ -213,14 +306,13 @@ class TeleprompterService : Service() {
 
     private fun pauseTeleprompter() {
         isPaused = true
-        teleprompterView?.setScrolling(false)
+        // ticker does not pause animation for simplicity (remains visible scrolling)
         updateNotification()
         settings.update(this, isRunning = true) // keep running state but paused
     }
 
     private fun resumeTeleprompter() {
         isPaused = false
-        teleprompterView?.setScrolling(true)
         currentState = currentState.copy(startTimeMs = System.currentTimeMillis() - (currentState.durationMs - TeleprompterSettings.getRemainingTime(currentState))) // adjust for pause
         settings.save(this, currentState)
         startCountdown()
@@ -229,6 +321,7 @@ class TeleprompterService : Service() {
 
     private fun stopTeleprompter() {
         isPaused = false
+        removeOverlay()
         hideTeleprompter()
         countdownRunnable?.let { handler.removeCallbacks(it) }
         currentState = currentState.copy(isRunning = false, startTimeMs = 0)
@@ -241,6 +334,7 @@ class TeleprompterService : Service() {
     }
 
     override fun onDestroy() {
+        removeOverlay()
         hideTeleprompter()
         countdownRunnable?.let { handler.removeCallbacks(it) }
         super.onDestroy()
