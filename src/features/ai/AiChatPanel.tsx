@@ -10,7 +10,7 @@ import { rounded, spacing, typography } from '../../shared/design/tokens';
 import { CategoryPath, FlatNote, NotesData, PinnedNoteRef } from '../../shared/types/notes';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
-import { consumeAiResponseText, normalizeAssistantText } from './aiReviewService';
+import { requestAiText, consumeAiResponseText, normalizeAssistantText } from './aiReviewService';
 
 type AiChatRole = 'user' | 'assistant';
 
@@ -266,14 +266,28 @@ async function readAiChatConversations(): Promise<AiChatConversation[]> {
 }
 
 async function requestAiChat(data: NotesData, messages: AiChatMessage[], input: string, onToken: (token: string) => void) {
-  const response = await fetch('https://vmi3321442.tailb6229f.ts.net/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': 'dummy', 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'oca/grok4-3', max_tokens: 4096, messages: [{ role: 'user', content: buildPrompt(data, messages, input) }] }),
-  });
-  if (!response.ok) throw new Error(`AI request failed with ${response.status}.`);
-  const text = await response.text();
-  return consumeAiResponseText(text, onToken);
+  const fullPrompt = buildPrompt(data, messages, input);
+
+  // Primary: Try remote AI endpoint first (via requestAiText which has ChatPTUI fallback)
+  try {
+    const response = await fetch('https://vmi3321442.tailb6229f.ts.net/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': 'dummy', 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'oca/grok4-3', max_tokens: 4096, messages: [{ role: 'user', content: fullPrompt }] }),
+    });
+    if (response.ok) {
+      const text = await response.text();
+      return consumeAiResponseText(text, onToken);
+    }
+  } catch {
+    // Primary failed, requestAiText will use ChatPTUI fallback
+  }
+
+  // Fallback: Use requestAiText which routes to ChatPTUI server when primary fails
+  // Note: requestAiText handles the ChatPTUI job-based async flow internally
+  const result = await requestAiText(fullPrompt);
+  onToken(result);
+  return result;
 }
 
 function formatAiRequestError(error: unknown) {
