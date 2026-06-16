@@ -111,11 +111,7 @@ class TeleprompterService : Service() {
                 }
                 currentState = currentState.copy(selectedCategories = categories)
                 settings.save(this, currentState)
-<<<<<<< HEAD
                 android.util.Log.i("TeleprompterService", "ACTION_START: categories=${categories.size}, text.length=${text.length}, speed=$speed")
-=======
-                android.util.Log.i("TeleprompterService", "ACTION_START: categories=${categories}, duration=${duration}, text.length=${text.length}")
->>>>>>> e9ad6f3 (feat: integrate ChatPTUI server job-based async API for AI requests)
                 updateState(text, speed, size, duration, System.currentTimeMillis())
                 if (canDrawOverlays()) {
                     try {
@@ -181,7 +177,8 @@ class TeleprompterService : Service() {
             this.text = text
             setTextColor(Color.WHITE)
             textSize = textSizeSp
-            setSingleLine(true)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
             includeFontPadding = false
             gravity = Gravity.CENTER_VERTICAL
         }
@@ -205,16 +202,15 @@ class TeleprompterService : Service() {
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            30.dp(),
+            48.dp(),  // taller to support expanded multi-line text
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,  // removed NOT_TOUCHABLE so tap on text works for expansion
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 0
-            y = 0
+            y = 40  // slightly below status bar
         }
 
         windowManager?.addView(root, params)

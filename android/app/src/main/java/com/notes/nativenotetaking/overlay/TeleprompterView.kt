@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Rect
 import android.os.Build
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.WindowInsets
 import android.view.WindowManager
@@ -54,7 +55,7 @@ class TeleprompterView(context: Context) : LinearLayout(context) {
         currentSpeed = speed
         marqueeText.textSize = textSize
         marqueeText.text = text
-        marqueeText.isSelected = isScrolling
+        marqueeText.isSelected = isScrolling && !isExpanded
     }
 
     fun updateCountdown(remaining: String) {
@@ -63,13 +64,14 @@ class TeleprompterView(context: Context) : LinearLayout(context) {
 
     fun setScrolling(scrolling: Boolean) {
         isScrolling = scrolling
-        marqueeText.isSelected = scrolling
+        marqueeText.isSelected = scrolling && !isExpanded
     }
 
     private fun toggleExpansion() {
         isExpanded = !isExpanded
         marqueeText.maxLines = if (isExpanded) Int.MAX_VALUE else 1
         marqueeText.isSelected = if (isExpanded) false else isScrolling
+        requestLayout()
     }
 
     fun attachToWindow(wm: WindowManager, params: WindowManager.LayoutParams) {
