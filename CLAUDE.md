@@ -20,6 +20,7 @@ After every implemented chat step or redirection/decision that changes the repo:
 
 ## history
 
+- 2026-06-16: **TELEPROMPTER TAP-TO-EXPAND IMPLEMENTED**. Added click listener + `toggleExpansion()` to TeleprompterView marqueeText: toggles `maxLines` between 1 and `Int.MAX_VALUE`, disables marquee when expanded. Works in floating overlay even when app closed. Git workflow next.
 - 2026-06-16: FULL FLOATING TELEPROMPTER OVERLAY IMPLEMENTED (per guidance). Enhanced TeleprompterService + Notification (Pause/Resume/Stop actions) + RN bridge (floatingOverlay.ts merge conflict fixed, SettingsPanel integration). AppState sync + notification-only fallback. typecheck clean. Histories updated.
 - 2026-06-15: TELEPROMPTER CONFIRMED (TJ spec). Native ForegroundService + slim overlay *below* status bar + notification with Stop works when app minimized/closed. Cannot draw inside real status bar. Must start from inside app. Current TeleprompterService.kt (no auto-start), TeleprompterView.kt, OverlayModule.kt, floatingOverlay.ts, SettingsPanel.tsx, NotesTeleprompterBar.tsx already implement correctly. No code changes. Histories synced with plan.md.
 

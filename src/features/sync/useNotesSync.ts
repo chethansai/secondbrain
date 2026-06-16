@@ -81,6 +81,18 @@ export function useNotesSync() {
       writeLocalWorkspaceSnapshot(nextWorkspaceIndex, nextData).catch(() => undefined);
     }
 
+    // SAFETY TIMEOUT - Prevents permanent "Loading workspace" blank screen (root cause fix)
+    // If Firestore subscriptions never settle (no network, permission, rules, etc.), force offline mode
+    const loadingTimeout = setTimeout(() => {
+      if (!cancelled) {
+        console.log('[PERF] [SAFETY] Loading timeout triggered after 8s - forcing offline mode to prevent stuck screen');
+        setLoading(false);
+        setWorkspaceLoading(false);
+        if (!localMode) setLocalMode(true);
+        if (!error) setError('Started in offline mode (Firestore timeout). Check connection/firewall/rules.');
+      }
+    }, 8000);
+
     const unsubscribe = subscribeToWorkspaceIndex(
       (snapshot) => {
         if (cancelled) return;
@@ -147,6 +159,7 @@ export function useNotesSync() {
 
     return () => {
       cancelled = true;
+      clearTimeout(loadingTimeout);
       unsubscribe();
       unsubscribeNotes();
     };

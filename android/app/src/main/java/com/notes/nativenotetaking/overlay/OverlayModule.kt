@@ -88,7 +88,7 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
   }
 
   @ReactMethod
-  fun startTeleprompter(text: String, durationMs: Long, speed: Double, textSize: Double, categories: ReadableArray?, promise: Promise) {
+  fun startTeleprompter(text: String, durationMs: Double, speed: Double, textSize: Double, categories: ReadableArray?, promise: Promise) {
     if (!canDrawOverlays()) {
       promise.reject("overlay_permission_missing", "Display over other apps permission is not granted. Go to Settings → Apps → Native Note Taking → Display over other apps.")
       return
@@ -97,7 +97,7 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
       val intent = Intent(reactContext, TeleprompterService::class.java).apply {
         action = TeleprompterService.ACTION_START
         putExtra(TeleprompterService.EXTRA_TEXT, text)
-        putExtra("durationMs", durationMs)
+        putExtra("durationMs", durationMs.toLong())
         putExtra(TeleprompterService.EXTRA_SPEED, speed.toFloat())
         putExtra(TeleprompterService.EXTRA_TEXT_SIZE, textSize.toFloat())
         if (categories != null && categories.size() > 0) {
@@ -146,8 +146,8 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
   fun updateTeleprompterSettings(settingsMap: ReadableMap, promise: Promise) {
     val speed = if (settingsMap.hasKey("speed")) settingsMap.getDouble("speed").toFloat() else null
     val textSize = if (settingsMap.hasKey("textSize")) settingsMap.getDouble("textSize").toFloat() else null
-    val durationMs = if (settingsMap.hasKey("durationMs")) settingsMap.getDouble("durationMs").toLong() else null
-    TeleprompterSettings.update(reactContext, null, null, speed, textSize, durationMs)
+    val durationMs = if (settingsMap.hasKey("durationMs")) settingsMap.getDouble("durationMs") else null
+    TeleprompterSettings.update(reactContext, null, null, speed, textSize, durationMs?.toLong())
     val intent = Intent(reactContext, TeleprompterService::class.java).apply { action = TeleprompterService.ACTION_UPDATE }
     startOverlayService(intent)
     promise.resolve(true)

@@ -18,6 +18,7 @@ class TeleprompterView(context: Context) : LinearLayout(context) {
     private var layoutParams: WindowManager.LayoutParams? = null
     private var currentSpeed = 34f
     private var isScrolling = true
+    private var isExpanded = false
 
     init {
         orientation = VERTICAL
@@ -31,6 +32,9 @@ class TeleprompterView(context: Context) : LinearLayout(context) {
             maxLines = 1
             isSelected = true // for marquee effect (marquee in TextView)
             gravity = Gravity.CENTER_VERTICAL
+            setOnClickListener {
+                toggleExpansion()
+            }
         }
 
         countdownText = TextView(context).apply {
@@ -60,6 +64,12 @@ class TeleprompterView(context: Context) : LinearLayout(context) {
     fun setScrolling(scrolling: Boolean) {
         isScrolling = scrolling
         marqueeText.isSelected = scrolling
+    }
+
+    private fun toggleExpansion() {
+        isExpanded = !isExpanded
+        marqueeText.maxLines = if (isExpanded) Int.MAX_VALUE else 1
+        marqueeText.isSelected = if (isExpanded) false else isScrolling
     }
 
     fun attachToWindow(wm: WindowManager, params: WindowManager.LayoutParams) {
