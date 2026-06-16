@@ -153,6 +153,29 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
     promise.resolve(true)
   }
 
+  @ReactMethod
+  fun startHeaderFloat(text: String, promise: Promise) {
+    if (!canDrawOverlays()) {
+      promise.reject("overlay_permission_missing", "Display over other apps permission required.")
+      return
+    }
+    val intent = Intent(reactContext, HeaderFloatService::class.java).apply {
+      action = HeaderFloatService.ACTION_START
+      putExtra(HeaderFloatService.EXTRA_TEXT, text)
+    }
+    startOverlayService(intent)
+    promise.resolve(true)
+  }
+
+  @ReactMethod
+  fun stopHeaderFloat(promise: Promise) {
+    val intent = Intent(reactContext, HeaderFloatService::class.java).apply {
+      action = HeaderFloatService.ACTION_STOP
+    }
+    startOverlayService(intent)
+    promise.resolve(true)
+  }
+
   private fun startOverlayService(intent: Intent) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       reactContext.startForegroundService(intent)
