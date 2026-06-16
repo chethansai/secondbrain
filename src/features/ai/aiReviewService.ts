@@ -42,15 +42,90 @@ export function defaultPromptConfig(): AiReviewPromptConfig {
   return { scorePromptTemplate: defaultScorePromptTemplate, actionPromptTemplate: defaultActionPromptTemplate };
 }
 
+const CHATPTUI_BASE_URL = 'http://vmi3321442.tailb6229f.ts.net:8787';
+const CHATPTUI_API_KEY = 'dev-local-api-key';
+
 export async function requestAiText(input: string) {
-  const response = await fetch('https://vmi3321442.tailb6229f.ts.net/v1/responses', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer dummy' },
-    body: JSON.stringify({ model: 'oca/gpt-5.4', input }),
-  });
-  if (!response.ok) throw new Error(`AI review failed with ${response.status}.`);
-  const text = await response.text();
-  return consumeAiResponseText(text);
+  // Primary: Try remote AI endpoint first
+  try {
+    const response = await fetch('https://vmi3321442.tailb6229f.ts.net/v1/responses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer dummy' },
+      body: JSON.stringify({ model: 'oca/gpt-5.4', input }),
+    });
+    if (response.ok) {
+      const text = await response.text();
+      return consumeAiResponseText(text);
+    }
+  } catch {
+    // Remote failed, try ChatPTUI server fallback
+  }
+
+  // Fallback: Try ChatPTUI server (job-based async API)
+  try {
+    // Step 1: POST to create async job
+    const postResponse = await fetch(`${CHATPTUI_BASE_URL}/api/text`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': CHATPTUI_API_KEY,
+      },
+      body: JSON.stringify({ prompt: input, wait: false }),
+    });
+
+    if (!postResponse.ok) {
+      throw new Error(`Job creation failed with status ${postResponse.status}`);
+    }
+
+    const postResult = await postResponse.json();
+    const jobId = postResult?.job?.id;
+
+    if (!jobId) {
+      throw new Error('No job ID returned from server');
+    }
+
+    // Step 2: Poll GET /api/jobs/{jobId} until completion
+    const maxAttempts = 60; // 60 seconds max wait
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      const jobResponse = await fetch(`${CHATPTUI_BASE_URL}/api/jobs/${jobId}`);
+
+      if (!jobResponse.ok) {
+        throw new Error(`Job status check failed with status ${jobResponse.status}`);
+      }
+
+      const jobResult = await jobResponse.json();
+      const job = jobResult?.job;
+
+      if (!job) {
+        throw new Error('Invalid job response format');
+      }
+
+      // Check for completion
+      if (job.status === 'completed') {
+        if (job.textResponse) {
+          return job.textResponse;
+        }
+        throw new Error('Job completed but no textResponse found');
+      }
+
+      // Check for failure
+      if (job.status === 'failed' || job.error) {
+        throw new Error(job.error || 'Job failed without error message');
+      }
+
+      // Still pending, wait and retry
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      attempts++;
+    }
+
+    throw new Error('Job polling timed out after 60 seconds');
+  } catch (chatptuiError) {
+    throw new Error(
+      `ChatPTUI server failed: ${chatptuiError instanceof Error ? chatptuiError.message : 'connection failed'}`
+    );
+  }
 }
 
 export function createDecisionFromSuggestion(note: FlatNote, suggestion: AiReviewSuggestion, nextId: string): AiReviewDecision {

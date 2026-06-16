@@ -111,7 +111,11 @@ class TeleprompterService : Service() {
                 }
                 currentState = currentState.copy(selectedCategories = categories)
                 settings.save(this, currentState)
+<<<<<<< HEAD
                 android.util.Log.i("TeleprompterService", "ACTION_START: categories=${categories.size}, text.length=${text.length}, speed=$speed")
+=======
+                android.util.Log.i("TeleprompterService", "ACTION_START: categories=${categories}, duration=${duration}, text.length=${text.length}")
+>>>>>>> e9ad6f3 (feat: integrate ChatPTUI server job-based async API for AI requests)
                 updateState(text, speed, size, duration, System.currentTimeMillis())
                 if (canDrawOverlays()) {
                     try {
