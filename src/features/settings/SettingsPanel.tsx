@@ -13,6 +13,7 @@ import { validateNotesData } from '../sync/validation';
 import { VoiceRecorderSettingsSection } from '../voiceRecorder/VoiceRecorderSettingsSection';
 import { copyText } from './clipboard';
 import { overlayActionLabels, overlayTapActions, isFloatingOverlayAvailable, readFloatingOverlaySettings, requestFloatingOverlayPermission, resetFloatingOverlayPlacement, startFloatingOverlay, stopFloatingOverlay, updateFloatingOverlaySettings, startTeleprompter, stopTeleprompter, readTeleprompterState, updateTeleprompterSettings, durationOptions, TeleprompterState } from './floatingOverlay';
+import { TeleprompterPermissionModal } from './TeleprompterPermissionModal';
 
 type Props = {
   data: NotesData;
@@ -53,6 +54,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
   const [teleCategoryDialogOpen, setTeleCategoryDialogOpen] = useState(false);
   const [teleDurationMenuOpen, setTeleDurationMenuOpen] = useState(false);
   const [selectedTeleCategories, setSelectedTeleCategories] = useState<string[]>(teleprompterCategories || []);
+  const [teleprompterPermissionModalOpen, setTeleprompterPermissionModalOpen] = useState(false);
 
   useEffect(() => {
     refreshOverlayPermission();
@@ -405,6 +407,12 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
                       setStatus('Add some categories first. No notes to show in teleprompter.');
                       return;
                     }
+                    // Check overlay permission first - show dialog if not granted
+                    if (!teleprompterState.permissionGranted) {
+                      setTeleprompterPermissionModalOpen(true);
+                      setTeleSaving(false);
+                      return;
+                    }
                     // Use selected category names only for slim ticker (no note content or UI labels)
                     const success = await startTeleprompter(catsToUse);
                     if (success) {
@@ -414,9 +422,10 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
                       setStatus('Could not start teleprompter (check permissions or see console/logs).');
                     }
                   }
-                } catch (e) {
+                } catch (e: any) {
                   console.error('Teleprompter start/stop error:', e);
-                  setStatus('Teleprompter error - see logs.');
+                  const errorMsg = e?.message || e?.toString() || 'Unknown error';
+                  setStatus(`Teleprompter error: ${errorMsg}`);
                 } finally {
                   setTeleSaving(false);
                 }
@@ -431,6 +440,16 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
       <TextInputField value={importText} onChangeText={setImportText} multiline placeholder="Paste simple nested JSON" accessibilityLabel="Import JSON" autoCapitalize="none" autoCorrect={false} />
       <Button label="Import JSON" icon="cloud-upload-outline" variant="dark" onPress={importJson} disabled={!importText.trim()} />
       {status ? <Text style={styles.status}>{status}</Text> : null}
+
+        {/* Teleprompter Permission Dialog */}
+        <TeleprompterPermissionModal
+          visible={teleprompterPermissionModalOpen}
+          onClose={() => setTeleprompterPermissionModalOpen(false)}
+          onPermissionGranted={async () => {
+            await refreshTeleprompterState();
+            setStatus('Permission granted! Tap Start Teleprompter again.');
+          }}
+        />
     </View>
   );
 }
