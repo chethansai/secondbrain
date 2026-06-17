@@ -41,7 +41,7 @@ class HeaderFloatService : Service() {
         return START_STICKY
     }
 
-    private fun createFloatingHeader(text: String) {
+    private fun createFloatingHeader(initialText: String) {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
         floatingView = FrameLayout(this).apply {
@@ -50,14 +50,14 @@ class HeaderFloatService : Service() {
         }
 
         headerText = TextView(this).apply {
-            text = text
-            textSize = 14f
-            setTextColor(0xFFFFFFFF.toInt())
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(16, 8, 16, 8)
-            setOnClickListener {
+            this.text = initialText
+            this.textSize = 14f
+            this.setTextColor(0xFFFFFFFF.toInt())
+            this.maxLines = 1
+            this.ellipsize = android.text.TextUtils.TruncateAt.END
+            this.gravity = Gravity.CENTER_VERTICAL
+            this.setPadding(16, 8, 16, 8)
+            this.setOnClickListener {
                 toggleExpansion()
             }
         }

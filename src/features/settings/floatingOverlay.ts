@@ -168,6 +168,25 @@ export async function stopTeleprompter(): Promise<boolean> {
   }
 }
 
+export async function startHeaderFloat(text: string): Promise<boolean> {
+  if (!isFloatingOverlayAvailable() || !overlayModule) return false;
+  try {
+    return await overlayModule.startHeaderFloat(text);
+  } catch (e: any) {
+    console.error('startHeaderFloat failed:', e.message || e);
+    return false;
+  }
+}
+
+export async function stopHeaderFloat(): Promise<boolean> {
+  if (!isFloatingOverlayAvailable() || !overlayModule) return false;
+  try {
+    return await overlayModule.stopHeaderFloat();
+  } catch {
+    return false;
+  }
+}
+
 export async function readTeleprompterState(): Promise<TeleprompterState> {
   if (!isFloatingOverlayAvailable() || !overlayModule) {
     return { isRunning: false, text: '', speed: 34, textSize: 14, durationMs: -1, remaining: '00:00:00', permissionGranted: false };
