@@ -67,7 +67,7 @@ fun createTeleprompterNotification(context: Context, text: String, remaining: St
   return builder
     .setSmallIcon(android.R.drawable.ic_media_play)
     .setContentTitle(if (isPaused) "Teleprompter Paused" else "Teleprompter Active")
-    .setContentText("Text: ${text.take(35)}...\nRemaining: $remaining")
+    .setContentText("Scrolling ticker is running")
     .setOngoing(true)
     .addAction(0, if (isPaused) "Resume" else "Pause", pausePending)
     .addAction(0, "Stop", stopPending)

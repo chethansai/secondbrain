@@ -147,9 +147,7 @@ class TeleprompterService : Service() {
     }
 
     private fun createTeleprompterNotification(isPaused: Boolean = false): Notification {
-        val remaining = TeleprompterSettings.getRemainingTime(currentState)
-        val remainingStr = if (remaining > 0) formatRemaining(remaining) else if (currentState.durationMs < 0) "Unlimited" else "00:00:00"
-        return createTeleprompterNotification(this, currentState.text, remainingStr, isPaused)
+        return createTeleprompterNotification(this, currentState.text, "", isPaused)
     }
 
     private fun updateNotification() {
@@ -166,21 +164,22 @@ class TeleprompterService : Service() {
 
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
+        // Slim status-bar-style ticker: ~28dp height, dark navy background
         val root = FrameLayout(this).apply {
-            setBackgroundColor(Color.rgb(7, 20, 43))
-            setPadding(8.dp(), 0, 8.dp(), 0)
+            setBackgroundColor(Color.rgb(7, 20, 43)) // Deep navy matching app header
+            setPadding(12.dp(), 0, 12.dp(), 0)
             clipChildren = true
             clipToPadding = true
         }
 
         val tickerText = TextView(this).apply {
-            this.text = text
+            this.text = if (text.isBlank()) "No categories selected" else text
             setTextColor(Color.WHITE)
             textSize = textSizeSp
             maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
             includeFontPadding = false
             gravity = Gravity.CENTER_VERTICAL
+            // No ellipsize - we want continuous scrolling
         }
 
         root.addView(
@@ -200,24 +199,35 @@ class TeleprompterService : Service() {
                 WindowManager.LayoutParams.TYPE_PHONE
             }
 
+        // Calculate status bar height for proper positioning below it
+        val statusBarHeight = getStatusBarHeight()
+
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            48.dp(),  // taller to support expanded multi-line text
+            28.dp(), // Slim status-bar ticker height
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,  // removed NOT_TOUCHABLE so tap on text works for expansion
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 0
-            y = 40  // slightly below status bar
+            y = statusBarHeight // Position directly below real status bar
         }
 
-        windowManager?.addView(root, params)
-        overlayView = root
+        try {
+            windowManager?.addView(root, params)
+            overlayView = root
+            android.util.Log.i("TeleprompterService", "Overlay added successfully at y=$statusBarHeight")
+        } catch (e: Exception) {
+            android.util.Log.e("TeleprompterService", "Failed to add overlay view", e)
+            return
+        }
 
         root.post {
             val screenWidth = root.width.toFloat()
+            if (screenWidth <= 0) return@post
 
             tickerText.measure(
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
@@ -225,10 +235,14 @@ class TeleprompterService : Service() {
             )
 
             val textWidth = tickerText.measuredWidth.toFloat()
-            val distance = screenWidth + textWidth
+            if (textWidth <= 0) return@post
 
+            val distance = screenWidth + textWidth
+            val duration = ((distance / speedPxPerSecond) * 1000).toLong().coerceAtLeast(4000L)
+
+            animator?.cancel()
             animator = ValueAnimator.ofFloat(screenWidth, -textWidth).apply {
-                duration = ((distance / speedPxPerSecond) * 1000).toLong().coerceAtLeast(6000L)
+                this.duration = duration
                 repeatCount = ValueAnimator.INFINITE
                 interpolator = LinearInterpolator()
 
@@ -238,7 +252,29 @@ class TeleprompterService : Service() {
 
                 start()
             }
+            android.util.Log.i("TeleprompterService", "Ticker animation started: speed=${speedPxPerSecond}px/s, textWidth=$textWidth")
         }
+    }
+
+    private fun getStatusBarHeight(): Int {
+        // Try WindowInsets first (API 30+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val metrics = windowManager.currentWindowMetrics
+            val insets = metrics.windowInsets.getInsetsIgnoringVisibility(
+                android.view.WindowInsets.Type.statusBars()
+            )
+            if (insets.top > 0) return insets.top
+        }
+
+        // Fallback to system resource
+        val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        if (resourceId > 0) {
+            return resources.getDimensionPixelSize(resourceId)
+        }
+
+        // Final fallback: approximate based on density
+        return (24 * resources.displayMetrics.density).toInt()
     }
 
     private fun removeOverlay() {
