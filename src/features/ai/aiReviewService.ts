@@ -45,20 +45,29 @@ export function defaultPromptConfig(): AiReviewPromptConfig {
 const CHATPTUI_BASE_URL = 'http://vmi3321442.tailb6229f.ts.net:8787';
 const CHATPTUI_API_KEY = 'dev-local-api-key';
 
+// TEST TOGGLE: Set to true to force primary AI to fail (tests ChatPTUI fallback)
+// Set to false to restore primary AI functionality
+const FORCE_CHATPTUI_FALLBACK = false;
+
 export async function requestAiText(input: string) {
-  // Primary: Try remote AI endpoint first
-  try {
-    const response = await fetch('https://vmi3321442.tailb6229f.ts.net/v1/responses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer dummy' },
-      body: JSON.stringify({ model: 'oca/gpt-5.4', input }),
-    });
-    if (response.ok) {
-      const text = await response.text();
-      return consumeAiResponseText(text);
+  // Primary: Try remote AI endpoint first (unless forced to use fallback for testing)
+  if (!FORCE_CHATPTUI_FALLBACK) {
+    try {
+      const response = await fetch('https://vmi3321442.tailb6229f.ts.net/v1/responses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer dummy' },
+        body: JSON.stringify({ model: 'oca/gpt-5.4', input }),
+      });
+      if (response.ok) {
+        const text = await response.text();
+        return consumeAiResponseText(text);
+      }
+    } catch {
+      // Remote failed, try ChatPTUI server fallback
     }
-  } catch {
-    // Remote failed, try ChatPTUI server fallback
+  } else {
+    // Primary forced to fail for testing fallback
+    console.log('[AI] Primary AI forced to fail (FORCE_CHATPTUI_FALLBACK=true), using ChatPTUI fallback');
   }
 
   // Fallback: Try ChatPTUI server (job-based async API)
