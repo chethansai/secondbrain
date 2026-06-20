@@ -32,6 +32,8 @@ type OverlayNativeModule = {
   readOverlaySettings: () => Promise<FloatingOverlayNativeSettings>;
   startTeleprompter: (text: string, durationMs: number, speed: number, textSize: number, categories?: string[] | null) => Promise<boolean>;
   stopTeleprompter: () => Promise<boolean>;
+  startHeaderFloat: (text: string) => Promise<boolean>;
+  stopHeaderFloat: () => Promise<boolean>;
   readTeleprompterState: () => Promise<TeleprompterState>;
   updateTeleprompterSettings: (settings: any) => Promise<boolean>;
 };

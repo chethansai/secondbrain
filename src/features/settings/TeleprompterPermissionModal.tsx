@@ -58,7 +58,7 @@ function createStyles(colors: typeof tokenColors) {
       gap: spacing.md,
     },
     message: {
-      ...typography.body,
+      ...typography.bodyMd,
       color: colors.charcoal,
       lineHeight: 22,
     },

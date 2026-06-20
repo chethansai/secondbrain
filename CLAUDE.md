@@ -20,6 +20,7 @@ After every implemented chat step or redirection/decision that changes the repo:
 
 ## history
 
+- 2026-06-20: **TYPE ERRORS FIXED FOR RELEASE BUILD**. Added `startHeaderFloat`/`stopHeaderFloat` to `OverlayNativeModule` TS interface (`floatingOverlay.ts`). Updated `typography.body` → `typography.bodyMd` in `TeleprompterPermissionModal.tsx`. `npm run typecheck` now clean. Updated histories in both files. Proceeding to generate release APK.
 - 2026-06-20: **GRADLE .ENV AUTO-PARSE + JAVA VERIFIED**. Pulled latest main (commit 309ecb9) that auto-loads Firebase creds from `.env` in build.gradle (no duplication). Confirmed OpenJDK 17 is present and working. Updated histories in plan.md + CLAUDE.md. No local code changes. Git workflow executed.
 - 2026-06-20: **GRADLE AUTO-PARSES .env FOR NATIVE FIREBASE CONFIG**. Modified `android/app/build.gradle` to load `.env` at build time and extract `EXPO_PUBLIC_FIREBASE_PROJECT_ID`/`EXPO_PUBLIC_FIREBASE_API_KEY` for BuildConfig. Priority chain: CLI `-P` flags > `.env` > `local.properties` > system env. Eliminates credential duplication between Expo JS and native overlay/widget REST calls. Git workflow next.
 - 2026-06-20: **CREATED FIREBASE CONFIG FILES FROM EXAMPLES**. Copied `.env.example` → `.env` and `.firebaserc.example` → `.firebaserc` per README setup instructions. Both files contain placeholder values ready for user to fill with their Firebase project credentials. Git workflow next.
