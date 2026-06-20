@@ -20,6 +20,7 @@ After every implemented chat step or redirection/decision that changes the repo:
 
 ## history
 
+- 2026-06-20: **CREATED FIREBASE CONFIG FILES FROM EXAMPLES**. Copied `.env.example` → `.env` and `.firebaserc.example` → `.firebaserc` per README setup instructions. Both files contain placeholder values ready for user to fill with their Firebase project credentials. Git workflow next.
 - 2026-06-16: **HEADER FLOAT WINDOW ADDED**. Extended existing overlay (OverlayModule + OverlayService) with HeaderFloatService.kt for floating truncated header + tap-to-expand on app close. startHeaderFloat/stopHeaderFloat wired to OverlayModule. AndroidManifest registered. Git workflow next.
 - 2026-06-16: **FIXED NATIVE FIREBASE CONFIG ERRORS**. Root cause: native Android (OverlayNotesStore.kt:321-326) validates BuildConfig.FIREBASE_PROJECT_ID/API_KEY before Firestore REST calls; these come from local.properties via build.gradle:117-118. .env was correct for JS firebase.ts but native build was stale. Ran gradle clean + npm run android rebuild to embed config. Errors ("Missing native Firebase config", "offline mode") will resolve on next launch. Git workflow next.
 - 2026-06-16: **TELEPROMPTER TAP-TO-EXPAND IMPLEMENTED**. Added click listener + `toggleExpansion()` to TeleprompterView marqueeText: toggles `maxLines` between 1 and `Int.MAX_VALUE`, disables marquee when expanded. Works in floating overlay even when app closed. Git workflow next.
