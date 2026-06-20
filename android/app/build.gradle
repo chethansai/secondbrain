@@ -9,8 +9,22 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.withInputStream { localProperties.load(it) }
 }
 
+// Load .env file (single source of truth for Firebase credentials across Expo + native builds)
+def envProperties = new Properties()
+def envFile = rootProject.file('../.env')
+if (envFile.exists()) {
+    envFile.withInputStream { envProperties.load(it) }
+}
+
 def readLocalConfig = { name ->
-    def value = findProperty(name) ?: localProperties.getProperty(name) ?: System.getenv(name) ?: ""
+    // Priority: command-line -P flag > .env file > local.properties > system env > empty
+    def envKey = name.startsWith('EXPO_PUBLIC_') ? name : "EXPO_PUBLIC_${name}"
+    def value = findProperty(name)
+        ?: envProperties.getProperty(envKey)
+        ?: envProperties.getProperty(name)
+        ?: localProperties.getProperty(name)
+        ?: System.getenv(name)
+        ?: ""
     return value.toString().trim()
 }
 
