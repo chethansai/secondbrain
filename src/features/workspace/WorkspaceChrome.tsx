@@ -15,7 +15,6 @@ type WorkspaceHeaderProps = {
   onOpenSearch: () => void;
   onOpenSettings: () => void;
   onOpenAiChat: () => void;
-  onOpenAssistant: () => void;
   onOpenAiNotifications: () => void;
   onOpenAi: () => void;
   onOpenAiWorkspace: () => void;
@@ -43,7 +42,7 @@ type ErrorBannerProps = {
   onDismiss: () => void;
 };
 
-export function WorkspaceHeader({ title, path, workspaceName, onBack, onOpenSearch, onOpenSettings, onOpenAiChat, onOpenAssistant, onOpenAiNotifications, onOpenAi, onOpenAiWorkspace }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({ title, path, workspaceName, onBack, onOpenSearch, onOpenSettings, onOpenAiChat, onOpenAiNotifications, onOpenAi, onOpenAiWorkspace }: WorkspaceHeaderProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -60,9 +59,6 @@ export function WorkspaceHeader({ title, path, workspaceName, onBack, onOpenSear
       <View style={styles.headerActions}>
         <Pressable accessibilityRole="button" accessibilityLabel="Open AI Chat" onPress={onOpenAiChat} style={styles.headerIconButton}>
           <Icon name="sparkles-outline" size={17} color={colors.ink} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open Assistant" onPress={onOpenAssistant} style={styles.headerIconButton}>
-          <Icon name="document-text-outline" size={17} color={colors.ink} />
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Open AI Review" onPress={onOpenAi} style={styles.headerIconButton}>
           <Icon name="sparkles-outline" size={17} color={colors.ink} />

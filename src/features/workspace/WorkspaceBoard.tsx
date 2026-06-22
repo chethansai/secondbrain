@@ -31,7 +31,6 @@ type Props = {
   onOpenSearch: () => void;
   onOpenSettings: () => void;
   onOpenAiChat: () => void;
-  onOpenAssistant: () => void;
   onOpenAiNotifications: () => void;
   onOpenAi: () => void;
   onOpenAiWorkspace: () => void;
@@ -78,7 +77,6 @@ export function WorkspaceBoard({
   onOpenSearch,
   onOpenSettings,
   onOpenAiChat,
-  onOpenAssistant,
   onOpenAiNotifications,
   onOpenAi,
   onOpenAiWorkspace,
@@ -251,19 +249,14 @@ export function WorkspaceBoard({
                   <Text style={styles.headerMenuRowText} numberOfLines={1}>Search</Text>
                 </Pressable>
 
-                <Pressable accessibilityRole="button" accessibilityLabel="Open OCR" onPress={() => { closeHeaderMenus(); onOpenOcr?.(); }} style={styles.headerMenuRow}>
-                  <View style={styles.headerMenuRowIcon}><Icon name="camera-outline" size={16} color={colors.ink} /></View>
-                  <Text style={styles.headerMenuRowText} numberOfLines={1}>OCR / Scan Text</Text>
-                </Pressable>
-
                 <Pressable accessibilityRole="button" accessibilityLabel="Open AI chat" onPress={() => { closeHeaderMenus(); onOpenAiChat(); }} style={styles.headerMenuRow}>
                   <View style={styles.headerMenuRowIcon}><Icon name="sparkles-outline" size={16} color={colors.ink} /></View>
                   <Text style={styles.headerMenuRowText} numberOfLines={1}>AI Chat</Text>
                 </Pressable>
 
-                <Pressable accessibilityRole="button" accessibilityLabel="Open Assistant" onPress={() => { closeHeaderMenus(); onOpenAssistant(); }} style={styles.headerMenuRow}>
-                  <View style={styles.headerMenuRowIcon}><Icon name="document-text-outline" size={16} color={colors.ink} /></View>
-                  <Text style={styles.headerMenuRowText} numberOfLines={1}>Assistant</Text>
+                <Pressable accessibilityRole="button" accessibilityLabel="Open OCR" onPress={() => { closeHeaderMenus(); onOpenOcr?.(); }} style={styles.headerMenuRow}>
+                  <View style={styles.headerMenuRowIcon}><Icon name="camera-outline" size={16} color={colors.ink} /></View>
+                  <Text style={styles.headerMenuRowText} numberOfLines={1}>OCR / Scan Text</Text>
                 </Pressable>
 
                 <Pressable accessibilityRole="button" accessibilityLabel="Open AI notifications" onPress={() => { closeHeaderMenus(); onOpenAiNotifications(); }} style={styles.headerMenuRow}>

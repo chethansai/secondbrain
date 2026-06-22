@@ -311,7 +311,6 @@ export function AiWorkspacePanel() {
           onOpenSearch={() => undefined}
           onOpenSettings={() => undefined}
           onOpenAiChat={() => undefined}
-          onOpenAssistant={() => undefined}
           onOpenAiNotifications={() => undefined}
           onOpenAi={() => undefined}
           onOpenAiWorkspace={() => undefined}

@@ -10,7 +10,6 @@ import { AiReviewPanel } from './src/features/ai/AiReviewPanel';
 import { createDecisionFromSuggestion, formatAiReviewRequestError, nextSimpleReviewId, noteFingerprint, requestAiReview } from './src/features/ai/aiReviewService';
 import { AiReviewLedger, SEEK_CATEGORY } from './src/features/ai/aiReviewTypes';
 import { AiWorkspacePanel } from './src/features/ai/AiWorkspacePanel';
-import { AssistantPanel } from './src/features/assistant/AssistantPanel';
 import { CategoryList } from './src/features/categories/CategoryList';
 import { categoryDeleteMessage, copyCategory, createRootCategory, createSubcategory, deleteCategory, getCategoryItems, listAllCategories, listChildCategories, renameCategory, setCategoryPriority, startsWithPath } from './src/features/categories/categoryTree';
 import { TextPromptModal } from './src/features/editor/TextPromptModal';
@@ -38,7 +37,7 @@ import { OcrModal } from './src/features/ocr/components/OcrModal';
 type ModalMode = 'root' | 'subcategory' | 'rename' | 'workspace' | 'renameWorkspace' | null;
 type MoveCopyAction = 'move' | 'copy';
 type MoveCopyTarget = { type: 'note'; note: FlatNote } | { type: 'category'; path: CategoryPath } | null;
-type Tab = 'workspace' | 'search' | 'settings' | 'aiChat' | 'ai' | 'aiWorkspace' | 'aiNotifications' | 'assistant';
+type Tab = 'workspace' | 'search' | 'settings' | 'aiChat' | 'ai' | 'aiWorkspace' | 'aiNotifications';
 type DeleteTarget = { type: 'category'; path: CategoryPath } | { type: 'note'; note: FlatNote } | null;
 const DEFAULT_NOTE_CATEGORY = 'No TS';
 
@@ -215,9 +214,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         setEditorMode(null);
         setEditorPath(null);
         setSelectedNote(null);
-      } else if (command.type === 'openAssistant') {
-        setTab('assistant');
-      } else {
+      } else if (command.type === 'addNote') {
         const result = addNote(data, command.categoryPath, command.note);
         const historyText = formatAddedNoteHistory(command.note, command.categoryPath);
         const ok = await commitWithHistory(result, historyText);
@@ -733,7 +730,6 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onOpenSearch={() => setTab('search')}
                   onOpenSettings={() => setTab('settings')}
                   onOpenAiChat={() => setTab('aiChat')}
-                  onOpenAssistant={() => setTab('assistant')}
                   onOpenAiNotifications={() => setTab('aiNotifications')}
                   onOpenAi={() => setTab('ai')}
                   onOpenAiWorkspace={() => setTab('aiWorkspace')}
@@ -771,7 +767,6 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     onOpenSearch={() => setTab('search')}
                     onOpenSettings={() => setTab('settings')}
                     onOpenAiChat={() => setTab('aiChat')}
-                    onOpenAssistant={() => setTab('assistant')}
                     onOpenAiNotifications={() => setTab('aiNotifications')}
                     onOpenAi={() => setTab('ai')}
                     onOpenAiWorkspace={() => setTab('aiWorkspace')}
@@ -863,12 +858,6 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
             <View style={styles.sectionStack}>
               <PanelHeader title="AI WORKSPACE" onBack={backToWorkspace} />
               <AiWorkspacePanel />
-            </View>
-          ) : null}
-          {!loading && tab === 'assistant' ? (
-            <View style={styles.sectionStack}>
-              <PanelHeader title="Assistant" onBack={backToWorkspace} />
-              <AssistantPanel />
             </View>
           ) : null}
         </View>

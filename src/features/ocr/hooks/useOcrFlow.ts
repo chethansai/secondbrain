@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import type {
   OcrFlowStatus,
   OcrImageAsset,
@@ -9,6 +10,7 @@ import {
   captureImageForOcr,
   pickImageForOcr,
   pickDocumentImageForOcr,
+  recoverPendingImagePickerResult,
 } from '../services/ocrImageSource';
 import { preprocessImageForOcr } from '../services/ocrImagePreprocess';
 import { ocrEngine, getOcrErrorMessage } from '../services/ocrEngine';
@@ -54,6 +56,7 @@ export function useOcrFlow(params: UseOcrFlowParams): UseOcrFlowReturn {
     defaultDestinationPath ?? []
   );
   const [error, setError] = useState<{ code: string; message: string } | null>(null);
+  const [isRecovering, setIsRecovering] = useState(false);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -67,7 +70,35 @@ export function useOcrFlow(params: UseOcrFlowParams): UseOcrFlowReturn {
     setEditableText('');
     setDestinationPath(defaultDestinationPath ?? []);
     setError(null);
+    setIsRecovering(false);
   }, [defaultDestinationPath]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active' && status === 'picking' && !isRecovering) {
+        setIsRecovering(true);
+        try {
+          const recoveredAsset = await recoverPendingImagePickerResult();
+          if (recoveredAsset) {
+            setSourceAsset(recoveredAsset);
+            setStatus('preview');
+          } else {
+            setStatus('idle');
+          }
+        } catch (recoveryError) {
+          const { message } = getOcrErrorMessage(recoveryError);
+          setError({ code: 'ocr_engine_failed', message });
+          setStatus('error');
+        } finally {
+          setIsRecovering(false);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [status, isRecovering]);
 
   const handleError = useCallback((err: unknown) => {
     const { code, message } = getOcrErrorMessage(err);

@@ -441,19 +441,6 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
       <TextInputField value={importText} onChangeText={setImportText} multiline placeholder="Paste simple nested JSON" accessibilityLabel="Import JSON" autoCapitalize="none" autoCorrect={false} />
       <Button label="Import JSON" icon="cloud-upload-outline" variant="dark" onPress={importJson} disabled={!importText.trim()} />
 
-      <View style={styles.settingGroup}>
-        <Text style={styles.settingLabel}>OCR Import</Text>
-        <Text style={styles.settingDescription}>
-          Take a photo or choose an image, extract text, edit it, and save it as a note.
-        </Text>
-        <Button
-          label="Scan Text / OCR"
-          icon="camera-outline"
-          onPress={() => onOpenOcr?.()}
-          accessibilityLabel="OCR / Scan Text"
-        />
-      </View>
-
       {status ? <Text style={styles.status}>{status}</Text> : null}
 
         {/* Teleprompter Permission Dialog */}

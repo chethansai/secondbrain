@@ -32,6 +32,8 @@ export function OcrResultEditor({
   isSaving,
   destinationPath,
   onChooseDestination,
+  onCreateCategory,
+  onCreateSubcategory,
 }: OcrResultEditorProps) {
   const isEmpty = text.trim().length === 0;
   const charCount = text.length;
