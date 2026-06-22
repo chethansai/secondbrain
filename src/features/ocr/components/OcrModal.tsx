@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, Modal, StyleSheet, TouchableOpacity } from 'react-native';
 import type { NotesData } from '../../../shared/types/notes';
-import type { OcrFlowStatus, OcrImageAsset, OcrResult } from '../types';
 import { OcrSourcePicker } from './OcrSourcePicker';
 import { OcrImagePreview } from './OcrImagePreview';
 import { OcrResultEditor } from './OcrResultEditor';
 import { OcrErrorState } from './OcrErrorState';
+import { useOcrFlow } from '../hooks/useOcrFlow';
 
 interface OcrModalProps {
   visible: boolean;
@@ -24,78 +24,74 @@ export function OcrModal({
   onSaveText,
   onInsertText,
 }: OcrModalProps) {
-  const [status, setStatus] = useState<OcrFlowStatus>('idle');
-  const [sourceAsset, setSourceAsset] = useState<OcrImageAsset | null>(null);
-  const [result, setResult] = useState<OcrResult | null>(null);
-  const [editableText, setEditableText] = useState('');
-  const [destinationPath, setDestinationPath] = useState<string[]>(
-    defaultDestinationPath ?? []
-  );
-  const [error, setError] = useState<{ code: string; message: string } | null>(null);
+  const ocr = useOcrFlow({
+    defaultDestinationPath,
+    onSaveText,
+    onInsertText,
+  });
 
   const handleClose = () => {
-    resetState();
+    ocr.reset();
     onClose();
   };
 
-  const resetState = () => {
-    setStatus('idle');
-    setSourceAsset(null);
-    setResult(null);
-    setEditableText('');
-    setDestinationPath(defaultDestinationPath ?? []);
-    setError(null);
-  };
-
   const renderContent = () => {
-    if (error) {
+    if (ocr.error) {
       return (
         <OcrErrorState
-          error={error}
+          error={ocr.error}
           onRetry={() => {
-            setError(null);
-            setStatus('idle');
+            ocr.clearError();
           }}
           onCancel={handleClose}
         />
       );
     }
 
-    switch (status) {
+    switch (ocr.status) {
       case 'idle':
       case 'picking':
         return (
           <OcrSourcePicker
-            onCamera={async () => {}}
-            onGallery={async () => {}}
-            onDocument={async () => {}}
+            onCamera={ocr.startCamera}
+            onGallery={ocr.startGallery}
+            onDocument={ocr.startDocument}
             onCancel={handleClose}
           />
         );
 
       case 'preview':
-        return sourceAsset ? (
+        return ocr.sourceAsset ? (
           <OcrImagePreview
-            asset={sourceAsset}
-            onRecognize={async () => {}}
+            asset={ocr.sourceAsset}
+            onRecognize={ocr.runRecognition}
             onRetake={() => {
-              setStatus('idle');
-              setSourceAsset(null);
+              ocr.reset();
             }}
           />
         ) : null;
+
+      case 'preprocessing':
+      case 'recognizing':
+        return (
+          <View style={styles.processingContainer}>
+            <Text style={styles.processingText}>
+              {ocr.status === 'preprocessing' ? 'Preprocessing image...' : 'Recognizing text...'}
+            </Text>
+          </View>
+        );
 
       case 'review':
       case 'saving':
         return (
           <OcrResultEditor
-            text={editableText}
-            onTextChange={setEditableText}
-            onSave={async () => {}}
-            onInsert={onInsertText ? () => {} : undefined}
-            onCopy={() => {}}
+            text={ocr.editableText}
+            onTextChange={ocr.setEditableText}
+            onSave={ocr.saveAsNote}
+            onInsert={onInsertText ? ocr.insertIntoEditor : undefined}
+            onCopy={ocr.copyText}
             onCancel={handleClose}
-            isSaving={status === 'saving'}
+            isSaving={ocr.status === 'saving'}
           />
         );
 
@@ -150,5 +146,14 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+  },
+  processingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  processingText: {
+    fontSize: 16,
+    color: '#5d5b54',
   },
 });
