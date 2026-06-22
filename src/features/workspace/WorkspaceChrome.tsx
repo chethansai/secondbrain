@@ -19,6 +19,7 @@ type WorkspaceHeaderProps = {
   onOpenAiNotifications: () => void;
   onOpenAi: () => void;
   onOpenAiWorkspace: () => void;
+  onOpenOcr?: () => void;
 };
 
 type PanelHeaderProps = {
@@ -34,6 +35,7 @@ type ActionGridProps = {
   onCopy: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onScanText?: () => void;
 };
 
 type ErrorBannerProps = {
@@ -98,7 +100,7 @@ export function PanelHeader({ title, onBack }: PanelHeaderProps) {
   );
 }
 
-export function ActionGrid({ discloseLabel, onDisclose, onAddNote, onSubcategory, onCopy, onRename, onDelete }: ActionGridProps) {
+export function ActionGrid({ discloseLabel, onDisclose, onAddNote, onSubcategory, onCopy, onRename, onDelete, onScanText }: ActionGridProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -106,6 +108,7 @@ export function ActionGrid({ discloseLabel, onDisclose, onAddNote, onSubcategory
       <Button label="Note" icon="add" onPress={onAddNote} style={styles.gridButton} />
       <Button label="Folder" icon="folder-outline" variant="secondary" onPress={onSubcategory} style={styles.gridButton} />
       {discloseLabel && onDisclose ? <Button label={discloseLabel} icon={discloseLabel === 'Enclose' ? 'chevron-up' : 'chevron-down'} variant="secondary" onPress={onDisclose} style={styles.gridButton} /> : null}
+      {onScanText && <Button label="Scan Text" icon="camera" variant="secondary" onPress={onScanText} style={styles.gridButton} accessibilityLabel="OCR / Scan Text" />}
       <Button label="Copy" icon="copy-outline" variant="secondary" onPress={onCopy} style={styles.gridButton} />
       <Button label="Rename" icon="create-outline" variant="secondary" onPress={onRename} style={styles.gridButton} />
       <Button label="Delete" icon="trash-outline" variant="danger" onPress={onDelete} style={styles.gridButton} />

@@ -5,6 +5,7 @@ export type IconName =
   | 'albums-outline'
   | 'arrow-back'
   | 'arrow-forward'
+  | 'camera-outline'
   | 'checkmark'
   | 'close'
   | 'cloud-done-outline'
@@ -21,6 +22,7 @@ export type IconName =
   | 'notifications-outline'
   | 'pin-outline'
   | 'reload-outline'
+  | 'scan-outline'
   | 'search-outline'
   | 'settings-outline'
   | 'sparkles-outline'
@@ -46,6 +48,7 @@ const labels: Record<IconName, string> = {
   'albums-outline': '▤',
   'arrow-back': '<',
   'arrow-forward': '>',
+  'camera-outline': '📷',
   checkmark: '✓',
   close: 'x',
   'cloud-done-outline': '✓',
@@ -58,6 +61,7 @@ const labels: Record<IconName, string> = {
   'folder-outline': 'F',
   'git-branch-outline': '↗',
   'log-out-outline': 'L',
+  'scan-outline': '🔎',
   'lock-open-outline': 'U',
   'mic-outline': 'M',
   'notifications-outline': 'N',

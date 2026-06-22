@@ -23,9 +23,10 @@ type Props = {
   teleprompterEnabled?: boolean;
   teleprompterCategories?: string[];
   onUpdateTeleprompterSettings?: (enabled: boolean, categories?: string[]) => Promise<boolean> | void;
+  onOpenOcr?: () => void;
 };
 
-export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onImport, teleprompterEnabled, teleprompterCategories, onUpdateTeleprompterSettings }: Props) {
+export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onImport, teleprompterEnabled, teleprompterCategories, onUpdateTeleprompterSettings, onOpenOcr }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [importText, setImportText] = useState('');
@@ -439,6 +440,20 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
       <Button label="Copy export JSON" icon="copy-outline" onPress={exportJson} />
       <TextInputField value={importText} onChangeText={setImportText} multiline placeholder="Paste simple nested JSON" accessibilityLabel="Import JSON" autoCapitalize="none" autoCorrect={false} />
       <Button label="Import JSON" icon="cloud-upload-outline" variant="dark" onPress={importJson} disabled={!importText.trim()} />
+
+      <View style={styles.settingGroup}>
+        <Text style={styles.settingLabel}>OCR Import</Text>
+        <Text style={styles.settingDescription}>
+          Take a photo or choose an image, extract text, edit it, and save it as a note.
+        </Text>
+        <Button
+          label="Scan Text / OCR"
+          icon="camera"
+          onPress={() => onOpenOcr?.()}
+          accessibilityLabel="OCR / Scan Text"
+        />
+      </View>
+
       {status ? <Text style={styles.status}>{status}</Text> : null}
 
         {/* Teleprompter Permission Dialog */}
@@ -536,6 +551,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
     wrap: { gap: spacing.md },
     settingGroup: { gap: spacing.xs },
     settingLabel: { ...typography.bodySmMedium, color: colors.charcoal },
+    settingDescription: { ...typography.bodySm, color: colors.slate, marginBottom: spacing.xs },
     overlayPanel: { gap: spacing.sm, borderWidth: 1, borderColor: colors.hairlineStrong, borderRadius: rounded.md, backgroundColor: colors.surfaceSoft, padding: spacing.md },
     overlayStatusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     overlayStatusText: { ...typography.bodySmMedium, color: colors.ink, flex: 1 },

@@ -33,6 +33,7 @@ import { rounded, spacing, typography } from './src/shared/design/tokens';
 import { CategoryPath, FlatNote, NotesData } from './src/shared/types/notes';
 import { ConfirmModal } from './src/shared/ui/ConfirmModal';
 import { EmptyState } from './src/shared/ui/EmptyState';
+import { OcrModal } from './src/features/ocr/components/OcrModal';
 
 type ModalMode = 'root' | 'subcategory' | 'rename' | 'workspace' | 'renameWorkspace' | null;
 type MoveCopyAction = 'move' | 'copy';
@@ -138,6 +139,10 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const [moveCopyAction, setMoveCopyAction] = useState<MoveCopyAction>('move');
   const [moveCopyTarget, setMoveCopyTarget] = useState<MoveCopyTarget>(null);
   const [boardTopActionsVisible, setBoardTopActionsVisible] = useState(true);
+  const [ocrModalState, setOcrModalState] = useState<{ visible: boolean; defaultDestinationPath?: string[] }>({
+    visible: false,
+    defaultDestinationPath: undefined,
+  });
   const [expandedCategoryKeys, setExpandedCategoryKeys] = useState<Set<string>>(() => new Set());
   const runningAutomationKey = useRef<string | null>(null);
   const fileAutomationRunKey = useRef<string | null>(null);
@@ -148,6 +153,12 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
   const closeMoveCopy = useCallback(() => { setMoveVisible(false); setSelectedNote(null); setMoveCopyTarget(null); }, []);
   const closeDelete = useCallback(() => setDeleteTarget(null), []);
   const backToWorkspace = useCallback(() => setTab('workspace'), []);
+  const openOcrModal = useCallback((defaultDestinationPath?: string[]) => {
+    setOcrModalState({ visible: true, defaultDestinationPath });
+  }, []);
+  const closeOcrModal = useCallback(() => {
+    setOcrModalState({ visible: false, defaultDestinationPath: undefined });
+  }, []);
   const backPath = useCallback(() => setPath((currentPath) => currentPath.slice(0, -1)), []);
 
   const currentItems = path.length ? getCategoryItems(data ?? {}, path) : null;
@@ -255,6 +266,29 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
     if (ok) await includeWorkspaceCategory(HISTORY_CATEGORY);
     return ok;
   }
+
+  const handleSaveOcrText = useCallback(
+    async (text: string, destinationPath: string[]) => {
+      const cleanedText = text.trim();
+
+      if (!cleanedText) {
+        throw new Error('OCR text is empty.');
+      }
+
+      if (!destinationPath.length) {
+        throw new Error('Choose a category before saving OCR text.');
+      }
+
+      const result = addNote(data, destinationPath, cleanedText);
+
+      if (!result.ok) {
+        throw new Error((result as any).reason ?? 'Could not add OCR text to notes.');
+      }
+
+      await commit(result.data as any);
+    },
+    [data, commit]
+  );
 
   async function startFloatingIcon() {
     try {
@@ -749,6 +783,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                     onRename={() => setPromptMode('rename')}
                     onDelete={confirmDeleteCategory}
                     onCopy={() => openCategoryCopy(path)}
+                    onScanText={() => openOcrModal(path)}
                   />
                   {childCategories.length ? <CategoryList categories={detailCategories} expandedKeys={expandedCategoryKeys} onToggleCategory={toggleDetailCategory} onSelect={setPath} /> : null}
                   {notes.length ? (
@@ -777,14 +812,15 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
           {!loading && tab === 'settings' ? (
             <View style={styles.sectionStack}>
               <PanelHeader title="Settings" onBack={backToWorkspace} />
-              <SettingsPanel 
-                data={data} 
-                authTimeoutHours={authTimeoutHours} 
-                onAuthTimeoutChange={onAuthTimeoutChange} 
+              <SettingsPanel
+                data={data}
+                authTimeoutHours={authTimeoutHours}
+                onAuthTimeoutChange={onAuthTimeoutChange}
                 onImport={importData}
                 teleprompterEnabled={teleprompterEnabled}
                 teleprompterCategories={teleprompterCategoryNames}
                 onUpdateTeleprompterSettings={updateTeleprompterSettings}
+                onOpenOcr={() => openOcrModal()}
               />
             </View>
           ) : null}
@@ -903,6 +939,13 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
         message={deleteTarget?.type === 'category' ? categoryDeleteMessage(data, deleteTarget.path) : 'This note will be removed from this category.'}
         onClose={closeDelete}
         onConfirm={runDelete}
+      />
+      <OcrModal
+        visible={ocrModalState.visible}
+        data={data}
+        defaultDestinationPath={ocrModalState.defaultDestinationPath}
+        onClose={closeOcrModal}
+        onSaveText={handleSaveOcrText}
       />
     </SafeAreaView>
   );
