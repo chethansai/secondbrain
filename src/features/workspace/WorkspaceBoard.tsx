@@ -35,6 +35,7 @@ type Props = {
   onOpenAiNotifications: () => void;
   onOpenAi: () => void;
   onOpenAiWorkspace: () => void;
+  onOpenOcr?: () => void;
   onAuthTimeoutChange: (hours: number) => Promise<void> | void;
   onLogout: () => void;
   onStartFloatingIcon: () => Promise<boolean> | boolean;
@@ -81,6 +82,7 @@ export function WorkspaceBoard({
   onOpenAiNotifications,
   onOpenAi,
   onOpenAiWorkspace,
+  onOpenOcr,
   onAuthTimeoutChange,
   onLogout,
   onStartFloatingIcon,
@@ -247,6 +249,11 @@ export function WorkspaceBoard({
                 <Pressable accessibilityRole="button" accessibilityLabel="Open search" onPress={() => { closeHeaderMenus(); onOpenSearch(); }} style={styles.headerMenuRow}>
                   <View style={styles.headerMenuRowIcon}><Icon name="search-outline" size={16} color={colors.ink} /></View>
                   <Text style={styles.headerMenuRowText} numberOfLines={1}>Search</Text>
+                </Pressable>
+
+                <Pressable accessibilityRole="button" accessibilityLabel="Open OCR" onPress={() => { closeHeaderMenus(); onOpenOcr?.(); }} style={styles.headerMenuRow}>
+                  <View style={styles.headerMenuRowIcon}><Icon name="camera-outline" size={16} color={colors.ink} /></View>
+                  <Text style={styles.headerMenuRowText} numberOfLines={1}>OCR / Scan Text</Text>
                 </Pressable>
 
                 <Pressable accessibilityRole="button" accessibilityLabel="Open AI chat" onPress={() => { closeHeaderMenus(); onOpenAiChat(); }} style={styles.headerMenuRow}>

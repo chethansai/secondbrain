@@ -1,19 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, StyleSheet, TouchableOpacity } from 'react-native';
-import type { NotesData } from '../../../shared/types/notes';
+import type { NotesData, CategoryPath } from '../../../shared/types/notes';
 import { OcrSourcePicker } from './OcrSourcePicker';
 import { OcrImagePreview } from './OcrImagePreview';
 import { OcrResultEditor } from './OcrResultEditor';
 import { OcrErrorState } from './OcrErrorState';
 import { useOcrFlow } from '../hooks/useOcrFlow';
+import { TextPromptModal } from '../../editor/TextPromptModal';
+import { CategoryPicker } from '../../categories/CategoryPicker';
+import { ModalShell } from '../../../shared/ui/ModalShell';
 
 interface OcrModalProps {
   visible: boolean;
-  defaultDestinationPath?: string[];
+  defaultDestinationPath?: CategoryPath;
   data: NotesData;
   onClose: () => void;
-  onSaveText: (text: string, destinationPath: string[]) => Promise<void>;
+  onSaveText: (text: string, destinationPath: CategoryPath) => Promise<void>;
   onInsertText?: (text: string) => void;
+  onCreateRootCategory?: (name: string) => Promise<CategoryPath | null>;
+  onCreateSubcategory?: (parentPath: CategoryPath, name: string) => Promise<CategoryPath | null>;
 }
 
 export function OcrModal({
@@ -23,6 +28,8 @@ export function OcrModal({
   onClose,
   onSaveText,
   onInsertText,
+  onCreateRootCategory,
+  onCreateSubcategory,
 }: OcrModalProps) {
   const ocr = useOcrFlow({
     defaultDestinationPath,
@@ -30,9 +37,48 @@ export function OcrModal({
     onInsertText,
   });
 
+  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+  const [createMode, setCreateMode] = useState<'root' | 'subcategory' | null>(null);
+
+  useEffect(() => {
+    if (visible && defaultDestinationPath) {
+      ocr.setDestinationPath(defaultDestinationPath);
+    }
+  }, [visible, defaultDestinationPath]);
+
   const handleClose = () => {
     ocr.reset();
+    setCategoryPickerVisible(false);
+    setCreateMode(null);
     onClose();
+  };
+
+  const handleChooseCategory = () => {
+    setCategoryPickerVisible(true);
+  };
+
+  const handleCategorySelected = (path: CategoryPath) => {
+    ocr.setDestinationPath(path);
+    setCategoryPickerVisible(false);
+  };
+
+  const handleCreateRoot = async (name: string) => {
+    if (!onCreateRootCategory) return;
+    const path = await onCreateRootCategory(name);
+    if (path) {
+      ocr.setDestinationPath(path);
+    }
+    setCreateMode(null);
+  };
+
+  const handleCreateSubcategory = async (name: string) => {
+    if (!onCreateSubcategory) return;
+    const parentPath = ocr.destinationPath.length > 0 ? ocr.destinationPath : [];
+    const path = await onCreateSubcategory(parentPath, name);
+    if (path) {
+      ocr.setDestinationPath(path);
+    }
+    setCreateMode(null);
   };
 
   const renderContent = () => {
@@ -92,6 +138,8 @@ export function OcrModal({
             onCopy={ocr.copyText}
             onCancel={handleClose}
             isSaving={ocr.status === 'saving'}
+            destinationPath={ocr.destinationPath}
+            onChooseDestination={handleChooseCategory}
           />
         );
 
@@ -117,6 +165,34 @@ export function OcrModal({
 
         <View style={styles.content}>{renderContent()}</View>
       </View>
+
+      <TextPromptModal
+        visible={createMode !== null}
+        title={createMode === 'root' ? 'New root category' : 'New subcategory'}
+        label="Category name"
+        submitLabel="Create"
+        onClose={() => setCreateMode(null)}
+        onSubmit={async (name) => {
+          if (createMode === 'root') {
+            await handleCreateRoot(name);
+          } else {
+            await handleCreateSubcategory(name);
+          }
+          return true;
+        }}
+      />
+
+      <ModalShell
+        visible={categoryPickerVisible}
+        title="Choose destination category"
+        onClose={() => setCategoryPickerVisible(false)}
+      >
+        <CategoryPicker
+          data={data}
+          selectedPath={ocr.destinationPath.length > 0 ? ocr.destinationPath : null}
+          onSelect={handleCategorySelected}
+        />
+      </ModalShell>
     </Modal>
   );
 }

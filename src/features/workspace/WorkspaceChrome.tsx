@@ -108,7 +108,7 @@ export function ActionGrid({ discloseLabel, onDisclose, onAddNote, onSubcategory
       <Button label="Note" icon="add" onPress={onAddNote} style={styles.gridButton} />
       <Button label="Folder" icon="folder-outline" variant="secondary" onPress={onSubcategory} style={styles.gridButton} />
       {discloseLabel && onDisclose ? <Button label={discloseLabel} icon={discloseLabel === 'Enclose' ? 'chevron-up' : 'chevron-down'} variant="secondary" onPress={onDisclose} style={styles.gridButton} /> : null}
-      {onScanText && <Button label="Scan Text" icon="camera" variant="secondary" onPress={onScanText} style={styles.gridButton} accessibilityLabel="OCR / Scan Text" />}
+      {onScanText && <Button label="Scan Text" icon="camera-outline" variant="secondary" onPress={onScanText} style={styles.gridButton} accessibilityLabel="OCR / Scan Text" />}
       <Button label="Copy" icon="copy-outline" variant="secondary" onPress={onCopy} style={styles.gridButton} />
       <Button label="Rename" icon="create-outline" variant="secondary" onPress={onRename} style={styles.gridButton} />
       <Button label="Delete" icon="trash-outline" variant="danger" onPress={onDelete} style={styles.gridButton} />

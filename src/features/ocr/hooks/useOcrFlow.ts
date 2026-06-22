@@ -163,10 +163,6 @@ export function useOcrFlow(params: UseOcrFlowParams): UseOcrFlowReturn {
     }
 
     if (destinationPath.length === 0) {
-      setError({
-        code: 'ocr_engine_failed',
-        message: 'Please select a destination category.',
-      });
       return;
     }
 

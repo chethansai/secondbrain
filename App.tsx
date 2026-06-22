@@ -737,6 +737,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onOpenAiNotifications={() => setTab('aiNotifications')}
                   onOpenAi={() => setTab('ai')}
                   onOpenAiWorkspace={() => setTab('aiWorkspace')}
+                  onOpenOcr={() => openOcrModal()}
                   onAuthTimeoutChange={onAuthTimeoutChange}
                   onLogout={onLogout}
                   onStartFloatingIcon={startFloatingIcon}

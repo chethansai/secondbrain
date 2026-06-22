@@ -448,7 +448,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
         </Text>
         <Button
           label="Scan Text / OCR"
-          icon="camera"
+          icon="camera-outline"
           onPress={() => onOpenOcr?.()}
           accessibilityLabel="OCR / Scan Text"
         />
