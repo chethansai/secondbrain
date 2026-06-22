@@ -3,6 +3,7 @@ import type {
   OcrResult,
   OcrEngineErrorCode,
 } from '../types';
+import { recognizeTextNative, isNativeOcrSupported } from '../native/OcrNativeModule';
 
 export interface OcrEngine {
   isSupported(): Promise<boolean>;
@@ -45,13 +46,30 @@ class MockOcrEngine implements OcrEngine {
   }
 }
 
+class AndroidMlKitEngine implements OcrEngine {
+  async isSupported(): Promise<boolean> {
+    return isNativeOcrSupported();
+  }
+
+  async recognizeImage(asset: OcrImageAsset): Promise<OcrResult> {
+    return recognizeTextNative(asset);
+  }
+}
+
 function createOcrError(code: OcrEngineErrorCode, message: string): Error {
   const error = new Error(message);
   (error as any).code = code;
   return error;
 }
 
-export const ocrEngine: OcrEngine = new MockOcrEngine();
+function createEngine(): OcrEngine {
+  if (isNativeOcrSupported()) {
+    return new AndroidMlKitEngine();
+  }
+  return new MockOcrEngine();
+}
+
+export const ocrEngine: OcrEngine = createEngine();
 
 export function getOcrErrorMessage(error: unknown): {
   code: OcrEngineErrorCode;

@@ -16,6 +16,7 @@ import com.notes.nativenotetaking.ainotifications.AiNotificationWorkerPackage
 import com.notes.nativenotetaking.assistant.AssistantPackage
 import com.notes.nativenotetaking.overlay.OverlayPackage
 import com.notes.nativenotetaking.voicerecorder.VoiceRecorderPackage
+import com.notes.nativenotetaking.ocr.OcrPackage
 
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
@@ -33,6 +34,7 @@ class MainApplication : Application(), ReactApplication {
               add(AssistantPackage())
               add(OverlayPackage())
               add(VoiceRecorderPackage())
+              add(OcrPackage())
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
