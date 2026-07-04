@@ -1,5 +1,8 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
+// Pin NDK version to the SDK-installed NDK to avoid NdkLocator resolution issues
+ext.ndkVersion = "27.1.12297006"
+
 buildscript {
   repositories {
     google()
