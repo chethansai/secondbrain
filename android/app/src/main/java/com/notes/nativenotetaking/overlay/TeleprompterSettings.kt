@@ -7,7 +7,7 @@ object TeleprompterSettings {
     private const val PREFS_NAME = "teleprompter_settings"
     private const val KEY_IS_RUNNING = "is_running"
     private const val KEY_TEXT = "current_text"
-    private const val KEY_SPEED = "scroll_speed" // pixels per second, default 34
+    private const val KEY_SPEED = "scroll_speed" // pixels per second, default 70
     private const val KEY_TEXT_SIZE = "text_size" // sp
     private const val KEY_DURATION_MS = "duration_ms" // -1 for unlimited
     private const val KEY_START_TIME_MS = "start_time_ms"
@@ -51,7 +51,7 @@ object TeleprompterSettings {
         return State(
             isRunning = prefs.getBoolean(KEY_IS_RUNNING, false),
             text = prefs.getString(KEY_TEXT, "No notes yet") ?: "No notes yet",
-            speed = prefs.getFloat(KEY_SPEED, 34f),
+            speed = prefs.getFloat(KEY_SPEED, 70f),
             textSize = prefs.getFloat(KEY_TEXT_SIZE, 14f),
             durationMs = prefs.getLong(KEY_DURATION_MS, -1L),
             startTimeMs = prefs.getLong(KEY_START_TIME_MS, 0L),

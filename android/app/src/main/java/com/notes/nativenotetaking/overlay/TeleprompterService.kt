@@ -29,7 +29,7 @@ class TeleprompterService : Service() {
     private val settings by lazy { TeleprompterSettings }
     private val handler = Handler(Looper.getMainLooper())
     private var countdownRunnable: Runnable? = null
-    private var currentState = TeleprompterSettings.State(false, "", 34f, 14f, -1L, 0L, 0f, emptyList())
+    private var currentState = TeleprompterSettings.State(false, "", 70f, 14f, -1L, 0L, 0f, emptyList())
     private var isPaused = false
 
     companion object {
@@ -164,12 +164,19 @@ class TeleprompterService : Service() {
 
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
-        // Slim status-bar-style ticker: ~28dp height, dark navy background
+        // Slim status-bar-style ticker: ~28dp height, transparent background
         val root = FrameLayout(this).apply {
-            setBackgroundColor(Color.rgb(7, 20, 43)) // Deep navy matching app header
-            setPadding(12.dp(), 0, 12.dp(), 0)
+            setBackgroundColor(Color.TRANSPARENT) // Removed dark navy background
+            setPadding(100.dp(), 0, 100.dp(), 0) // Margin for clock and battery
             clipChildren = true
             clipToPadding = true
+
+            setOnClickListener {
+                val intent = Intent(this@TeleprompterService, com.notes.nativenotetaking.MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
+                startActivity(intent)
+            }
         }
 
         val tickerText = TextView(this).apply {
@@ -204,16 +211,17 @@ class TeleprompterService : Service() {
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
-            28.dp(), // Slim status-bar ticker height
+            getStatusBarHeight(), // Match system status bar height
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, // Removed NOT_TOUCHABLE, added IN_SCREEN and NO_LIMITS to draw in status bar
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 0
-            y = statusBarHeight // Position directly below real status bar
+            y = 0 // Position exactly in the status bar
         }
 
         try {
