@@ -33,6 +33,8 @@ export type IconName =
   | 'chevron-forward'
   | 'play'
   | 'pause'
+  | 'stop'
+  | 'mic'
   | 'text-outline'
   | 'checkmark-square'
   | 'square';
@@ -77,6 +79,8 @@ const labels: Record<IconName, string> = {
   'chevron-forward': '>',
   play: '▶',
   pause: '❚❚',
+  stop: '■',
+  mic: '🎙',
   'checkmark-square': '☑',
   square: '☐',
 };
