@@ -1,3 +1,12 @@
+export type RecordingSegment = {
+  /** Segment index (0-based) */
+  index: number;
+  /** Transcript text for this segment */
+  text: string;
+  /** Duration of this segment in ms */
+  durationMs: number;
+};
+
 export type VoiceRecording = {
   id: string;
   uri: string;
@@ -7,6 +16,12 @@ export type VoiceRecording = {
   fileName?: string;
   sizeBytes?: number;
   transcribedText?: string;
+  /** BCP-47 language code detected by Whisper (e.g. 'en', 'hi', 'ar', 'es') */
+  detectedLanguage?: string;
+  /** Ordered transcript segments when recording was split into chunks */
+  segments?: RecordingSegment[];
+  /** All segment URIs belonging to this recording session (for chunked recordings) */
+  segmentUris?: string[];
 };
 
 export type VoiceRecorderSettings = {

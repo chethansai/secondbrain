@@ -17,6 +17,7 @@ import { TeleprompterPermissionModal } from './TeleprompterPermissionModal';
 
 type Props = {
   data: NotesData;
+  commit: (result: any) => Promise<boolean>;
   authTimeoutHours: number;
   onAuthTimeoutChange: (hours: number) => Promise<void> | void;
   onImport: (data: NotesData) => Promise<boolean> | boolean;
@@ -26,7 +27,7 @@ type Props = {
   onOpenOcr?: () => void;
 };
 
-export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onImport, teleprompterEnabled, teleprompterCategories, onUpdateTeleprompterSettings, onOpenOcr }: Props) {
+export function SettingsPanel({ data, commit, authTimeoutHours, onAuthTimeoutChange, onImport, teleprompterEnabled, teleprompterCategories, onUpdateTeleprompterSettings, onOpenOcr }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [importText, setImportText] = useState('');
@@ -261,7 +262,7 @@ export function SettingsPanel({ data, authTimeoutHours, onAuthTimeoutChange, onI
         </View>
       </View>
       <View style={styles.settingGroup}>
-        <VoiceRecorderSettingsSection data={data} commit={async () => true} />
+        <VoiceRecorderSettingsSection data={data} commit={commit} />
       </View>
 
       <View style={styles.settingGroup}>

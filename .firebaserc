@@ -1,5 +1,7 @@
+
+
 {
   "projects": {
-    "default": "notes-55c97"
+    "default": "your-firebase-project-id"
   }
 }
