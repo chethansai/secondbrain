@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, AppState, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, AppState, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 import { formatPath } from '../categories/categoryTree';
 import { HISTORY_CATEGORY } from '../notes/noteMutations';
 import { useTheme } from '../../shared/design/ThemeProvider';
@@ -145,6 +145,7 @@ function createStyles(colors: typeof import('../../shared/design/tokens').colors
       justifyContent: 'center',
       overflow: 'hidden',
       borderRadius: rounded.sm,
+      marginHorizontal: Platform.OS === 'android' ? 100 : 0,
     },
     promptText: {
       ...typography.bodySmMedium,

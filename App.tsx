@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, NativeScrollEvent, NativeSyntheticEvent, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, NativeScrollEvent, NativeSyntheticEvent, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { AutomationCommand, parseAutomationDeepLink } from './src/features/automation/deepLinks';
 import { clearAutomationFileQueue, ensureDefaultAutomationQueueFile, getDefaultAutomationQueueUri, readAutomationFileQueue, rewriteAutomationFileQueue } from './src/features/automation/fileQueue';
 import { AuthGate } from './src/features/auth/AuthGate';
@@ -25,7 +25,6 @@ import { useNotesSync } from './src/features/sync/useNotesSync';
 import { useAiReviewSync } from './src/features/sync/useAiReviewSync';
 import { WorkspaceBoard } from './src/features/workspace/WorkspaceBoard';
 import { ActionGrid, ErrorBanner, PanelHeader, WorkspaceHeader } from './src/features/workspace/WorkspaceChrome';
-import { NotesTeleprompterBar } from './src/features/workspace/NotesTeleprompterBar';
 import { useWorkspaceBackHandler } from './src/features/workspace/useWorkspaceBackHandler';
 import { ThemeProvider, useTheme } from './src/shared/design/ThemeProvider';
 import { rounded, spacing, typography } from './src/shared/design/tokens';
@@ -702,7 +701,6 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {teleprompterEnabled && <NotesTeleprompterBar notes={teleprompterNotes} />}
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" onScroll={handleScreenScroll} scrollEventThrottle={16}>
         <View style={[styles.workspaceCard, showingRootBoard && styles.workspaceCardBoard]}>
           {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}
