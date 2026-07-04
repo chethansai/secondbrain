@@ -204,6 +204,11 @@ export async function deleteVoiceRecording(id: string): Promise<boolean> {
 
   try {
     await FileSystem.deleteAsync(recording.uri, { idempotent: true });
+    if (recording.segmentUris && Array.isArray(recording.segmentUris)) {
+      for (const uri of recording.segmentUris) {
+        await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => undefined);
+      }
+    }
   } catch (e) {
     console.warn('Failed to delete file', e);
   }

@@ -20,6 +20,8 @@ export type VoiceRecording = {
   detectedLanguage?: string;
   /** Ordered transcript segments when recording was split into chunks */
   segments?: RecordingSegment[];
+  /** All segment URIs belonging to this recording session (for chunked recordings) */
+  segmentUris?: string[];
 };
 
 export type VoiceRecorderSettings = {

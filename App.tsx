@@ -810,6 +810,7 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
               <PanelHeader title="Settings" onBack={backToWorkspace} />
               <SettingsPanel
                 data={data}
+                commit={commit}
                 authTimeoutHours={authTimeoutHours}
                 onAuthTimeoutChange={onAuthTimeoutChange}
                 onImport={importData}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../shared/design/ThemeProvider';
 import { rounded, spacing, typography } from '../../shared/design/tokens';
 import { Button } from '../../shared/ui/Button';
@@ -152,7 +152,7 @@ export function VoiceRecorderSettingsSection({ data, commit }: Props) {
     );
     if (untranscribed.length > 0 && transcribingId === null) {
       const rec = untranscribed[0];
-      handleTranscribe(rec.id, rec.uri).catch(console.error);
+      handleTranscribe(rec.id, rec.uri, rec.segmentUris ? rec.segmentUris.slice(1) : undefined).catch(console.error);
     }
   }, [recordings, transcriptionTexts, transcribingId, handleTranscribe]);
 
@@ -245,6 +245,7 @@ export function VoiceRecorderSettingsSection({ data, commit }: Props) {
         uri: primaryUri,
         durationMs: result.durationMs,
         fileName: primaryUri.split('/').pop(),
+        segmentUris: result.uris,
       });
 
       sessionSegmentUris.current = extraUris;
@@ -638,7 +639,15 @@ export function VoiceRecorderSettingsSection({ data, commit }: Props) {
       </View>
 
       {/* Single recording delete confirmation */}
-      {showDeleteConfirm && deleteTargetId && (
+      <Modal
+        visible={showDeleteConfirm && !!deleteTargetId}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowDeleteConfirm(false);
+          setDeleteTargetId(null);
+        }}
+      >
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmDialog}>
             <Text style={styles.confirmTitle}>Delete Recording?</Text>
@@ -662,10 +671,15 @@ export function VoiceRecorderSettingsSection({ data, commit }: Props) {
             </View>
           </View>
         </View>
-      )}
+      </Modal>
 
       {/* Bulk delete confirmation */}
-      {showDeleteConfirm && !deleteTargetId && selectedRecordings.size > 0 && (
+      <Modal
+        visible={showDeleteConfirm && !deleteTargetId && selectedRecordings.size > 0}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeleteConfirm(false)}
+      >
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmDialog}>
             <Text style={styles.confirmTitle}>Delete {selectedRecordings.size} recording(s)?</Text>
@@ -689,20 +703,44 @@ export function VoiceRecorderSettingsSection({ data, commit }: Props) {
             </View>
           </View>
         </View>
-      )}
+      </Modal>
 
       {/* Category Picker Modal */}
-      {showCategoryPicker && saveTargetRecording && (
+      <Modal
+        visible={showCategoryPicker && !!saveTargetRecording}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowCategoryPicker(false);
+          setSaveTargetRecording(null);
+        }}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Save to Category</Text>
-            <Text style={styles.modalSubtitle}>Select a category to save the transcription</Text>
+            <Text style={styles.modalSubtitle}>Save your voice transcription</Text>
+            
+            {/* Save to default VOICENOTES category button */}
+            <Button
+              label="Save to default (VOICENOTES)"
+              icon="checkmark"
+              variant="primary"
+              onPress={() => handleCategorySelected([['VOICENOTES']])}
+              disabled={saving}
+              style={{ marginBottom: spacing.md }}
+            />
+
+            <View style={{ height: 1, backgroundColor: colors.hairlineStrong, marginBottom: spacing.md }} />
+
+            <Text style={[styles.transcriptionLabel, { marginBottom: spacing.xs }]}>Or choose another category:</Text>
+
             <CategoryPicker
               data={data}
               selectedPath={null}
               onSelect={(path) => { handleCategorySelected([path]); }}
               disabled={saving}
             />
+
             <View style={styles.modalActions}>
               <Button
                 label="Cancel"
@@ -713,7 +751,7 @@ export function VoiceRecorderSettingsSection({ data, commit }: Props) {
             </View>
           </View>
         </View>
-      )}
+      </Modal>
 
       {status ? <Text style={styles.status}>{status}</Text> : null}
     </View>
