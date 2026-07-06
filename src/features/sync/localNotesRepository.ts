@@ -152,3 +152,15 @@ function defaultLocalWorkspaceIndex(): WorkspaceIndex {
   const workspace = createWorkspaceMeta(defaultWorkspaceId, defaultWorkspaceId, [], [], [], true, []);
   return { workspaces: [workspace], activeWorkspaceId: workspace.id, defaultWorkspaceId: workspace.id, version: 1 };
 }
+
+export async function clearAllLocalRepositories(): Promise<void> {
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    const appKeys = allKeys.filter((key) => key.startsWith('rnnotetaking.'));
+    if (appKeys.length > 0) {
+      await AsyncStorage.multiRemove(appKeys);
+    }
+  } catch (error) {
+    console.error('[CACHE CLEAR] Error clearing AsyncStorage:', error);
+  }
+}

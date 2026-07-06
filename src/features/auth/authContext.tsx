@@ -1,17 +1,20 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { firebaseAuth } from '../sync/firebase';
+import { clearAllLocalRepositories } from '../sync/localNotesRepository';
 
 type AuthContextType = {
   user: User | null;
   uid: string | null;
   loading: boolean;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   uid: null,
   loading: true,
+  logout: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -28,8 +31,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const uid = user ? user.uid : null;
 
+  const logout = async () => {
+    try {
+      await signOut(firebaseAuth);
+      await clearAllLocalRepositories();
+    } catch (error) {
+      console.error('[AUTH LOGOUT] Error signing out:', error);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, uid, loading }}>
+    <AuthContext.Provider value={{ user, uid, loading, logout }}>
       {children}
     </AuthContext.Provider>
   );
