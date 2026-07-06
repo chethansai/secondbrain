@@ -3,36 +3,37 @@ import { doc, getDoc, getDocFromServer, onSnapshot, runTransaction, setDoc, Unsu
 import { AiNotificationJob, AiNotificationState, AiNotificationStatus } from '../../shared/types/notes';
 import { firestore } from './firebase';
 
-const aiNotificationsCollection = 'reactnativecollection_notifications';
-const aiNotificationsStateId = 'ainotifications';
-const aiNotificationsStateRef = doc(firestore, aiNotificationsCollection, aiNotificationsStateId);
+export function getUserAiNotificationsRef(uid: string) {
+  return doc(firestore, 'users', uid, 'reactnativecollection', 'ainotifications');
+}
+
 const localAiNotificationsKey = 'rnnotetaking.aiNotifications.state.v1';
 
-export function subscribeToAiNotifications(onChange: (state: AiNotificationState) => void, onError: (message: string) => void): Unsubscribe {
+export function subscribeToAiNotifications(uid: string, onChange: (state: AiNotificationState) => void, onError: (message: string) => void): Unsubscribe {
   return onSnapshot(
-    aiNotificationsStateRef,
+    getUserAiNotificationsRef(uid),
     (snapshot) => onChange(parseAiNotificationState(snapshot.exists() ? (snapshot.data() as Record<string, unknown>) : undefined)),
     (error) => onError(error.message),
   );
 }
 
-export async function readAiNotifications(): Promise<AiNotificationState> {
-  const snapshot = await getDoc(aiNotificationsStateRef);
+export async function readAiNotifications(uid: string): Promise<AiNotificationState> {
+  const snapshot = await getDoc(getUserAiNotificationsRef(uid));
   return parseAiNotificationState(snapshot.exists() ? (snapshot.data() as Record<string, unknown>) : undefined);
 }
 
-export async function readLatestAiNotifications(): Promise<AiNotificationState> {
-  const snapshot = await getDocFromServer(aiNotificationsStateRef);
+export async function readLatestAiNotifications(uid: string): Promise<AiNotificationState> {
+  const snapshot = await getDocFromServer(getUserAiNotificationsRef(uid));
   return parseAiNotificationState(snapshot.exists() ? (snapshot.data() as Record<string, unknown>) : undefined);
 }
 
-export async function writeAiNotifications(state: AiNotificationState): Promise<void> {
-  await setDoc(aiNotificationsStateRef, serializeAiNotificationState(state), { merge: false });
+export async function writeAiNotifications(uid: string, state: AiNotificationState): Promise<void> {
+  await setDoc(getUserAiNotificationsRef(uid), serializeAiNotificationState(state), { merge: false });
 }
 
-export async function addAiNotificationJob(job: AiNotificationJob): Promise<AiNotificationState> {
+export async function addAiNotificationJob(uid: string, job: AiNotificationJob): Promise<AiNotificationState> {
   console.log('[aiNotifications] add job request', { jobId: job.id, scheduledAt: job.scheduledAt, title: job.title });
-  const nextState = await runNotificationTransaction((remoteState) => ({
+  const nextState = await runNotificationTransaction(uid, (remoteState) => ({
     jobs: [job, ...remoteState.jobs],
     version: remoteState.version + 1,
   }), { source: 'addAiNotificationJob' });
@@ -41,16 +42,16 @@ export async function addAiNotificationJob(job: AiNotificationJob): Promise<AiNo
   return nextState;
 }
 
-export async function removeAiNotificationJob(jobId: string): Promise<AiNotificationState> {
-  const nextState = await runNotificationTransaction((remoteState) => {
+export async function removeAiNotificationJob(uid: string, jobId: string): Promise<AiNotificationState> {
+  const nextState = await runNotificationTransaction(uid, (remoteState) => {
     return { jobs: remoteState.jobs.filter((job) => job.id !== jobId), version: remoteState.version + 1 };
   }, { deleteJobId: jobId, source: 'removeAiNotificationJob' });
   await writeLocalAiNotifications(nextState);
   return nextState;
 }
 
-export async function mergeAndWriteAiNotifications(state: AiNotificationState): Promise<AiNotificationState> {
-  const nextState = await runNotificationTransaction((remoteState) => mergeNotificationStates(remoteState, state), { source: 'mergeAndWriteAiNotifications' });
+export async function mergeAndWriteAiNotifications(uid: string, state: AiNotificationState): Promise<AiNotificationState> {
+  const nextState = await runNotificationTransaction(uid, (remoteState) => mergeNotificationStates(remoteState, state), { source: 'mergeAndWriteAiNotifications' });
   await writeLocalAiNotifications(nextState);
   return nextState;
 }
@@ -143,14 +144,15 @@ export function mergeNotificationStates(...states: AiNotificationState[]): AiNot
   };
 }
 
-async function runNotificationTransaction(update: (remoteState: AiNotificationState) => AiNotificationState, options: { deleteJobId?: string; source?: string } = {}) {
+async function runNotificationTransaction(uid: string, update: (remoteState: AiNotificationState) => AiNotificationState, options: { deleteJobId?: string; source?: string } = {}) {
+  const ref = getUserAiNotificationsRef(uid);
   return runTransaction(firestore, async (transaction) => {
-    const snapshot = await transaction.get(aiNotificationsStateRef);
+    const snapshot = await transaction.get(ref);
     const remoteState = parseAiNotificationState(snapshot.exists() ? (snapshot.data() as Record<string, unknown>) : undefined);
     console.log('[aiNotifications] transaction remote state', { source: options.source, version: remoteState.version, jobIds: remoteState.jobs.map((job) => job.id), deleteJobId: options.deleteJobId });
     const nextState = update(remoteState);
     console.log('[aiNotifications] transaction next state', { source: options.source, version: nextState.version, jobIds: nextState.jobs.map((job) => job.id) });
-    transaction.set(aiNotificationsStateRef, serializeAiNotificationState(nextState));
+    transaction.set(ref, serializeAiNotificationState(nextState));
     return nextState;
   });
 }

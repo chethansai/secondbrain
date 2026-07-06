@@ -7,19 +7,25 @@ export type NotesSnapshot = {
   data: NotesData;
 };
 
-const legacyNotesRef = doc(firestore, 'reactnativecollection', 'main');
-const workspaceListRef = doc(firestore, 'reactnativecollection', 'workspaceslist');
 export const defaultWorkspaceId = 'workspace1';
 
 export type WorkspaceSnapshot = WorkspaceIndex;
 
-export function subscribeToNotes(onChange: (snapshot: NotesSnapshot) => void, onError: (message: string) => void): Unsubscribe {
-  return subscribeToWorkspaceNotes(defaultWorkspaceId, onChange, onError);
+export function getUserNotesRef(uid: string) {
+  return doc(firestore, 'users', uid, 'reactnativecollection', 'main');
 }
 
-export function subscribeToWorkspaceNotes(workspaceId: string, onChange: (snapshot: NotesSnapshot) => void, onError: (message: string) => void): Unsubscribe {
+export function getUserWorkspaceListRef(uid: string) {
+  return doc(firestore, 'users', uid, 'reactnativecollection', 'workspaceslist');
+}
+
+export function subscribeToNotes(uid: string, onChange: (snapshot: NotesSnapshot) => void, onError: (message: string) => void): Unsubscribe {
+  return subscribeToWorkspaceNotes(uid, defaultWorkspaceId, onChange, onError);
+}
+
+export function subscribeToWorkspaceNotes(uid: string, workspaceId: string, onChange: (snapshot: NotesSnapshot) => void, onError: (message: string) => void): Unsubscribe {
   return onSnapshot(
-    legacyNotesRef,
+    getUserNotesRef(uid),
     (snapshot) => {
       if (!snapshot.exists()) {
         onChange({ data: {} });
@@ -38,13 +44,13 @@ export function subscribeToWorkspaceNotes(workspaceId: string, onChange: (snapsh
   );
 }
 
-export async function readWorkspaceNotes(workspaceId: string): Promise<NotesSnapshot> {
-  const snapshot = await getDoc(legacyNotesRef);
+export async function readWorkspaceNotes(uid: string, workspaceId: string): Promise<NotesSnapshot> {
+  const snapshot = await getDoc(getUserNotesRef(uid));
   return parseNotesSnapshot(snapshot.exists() ? snapshot.data() : undefined);
 }
 
-export async function readLatestWorkspaceNotes(workspaceId: string): Promise<NotesSnapshot> {
-  const snapshot = await getDocFromServer(legacyNotesRef);
+export async function readLatestWorkspaceNotes(uid: string, workspaceId: string): Promise<NotesSnapshot> {
+  const snapshot = await getDocFromServer(getUserNotesRef(uid));
   return parseNotesSnapshot(snapshot.exists() ? snapshot.data() : undefined);
 }
 
@@ -56,34 +62,34 @@ function parseNotesSnapshot(raw: Record<string, unknown> | undefined): NotesSnap
   return { data: parsed.data };
 }
 
-export async function readLatestWorkspaceIndex(): Promise<WorkspaceSnapshot> {
-  const snapshot = await getDocFromServer(workspaceListRef);
+export async function readLatestWorkspaceIndex(uid: string): Promise<WorkspaceSnapshot> {
+  const snapshot = await getDocFromServer(getUserWorkspaceListRef(uid));
   if (!snapshot.exists()) return defaultWorkspaceIndex();
 
   const parsed = parseWorkspaceIndex(snapshot.data());
   return parsed.workspaces.length ? parsed : defaultWorkspaceIndex();
 }
 
-export async function writeNotes(data: NotesData): Promise<void> {
-  await writeWorkspaceNotes(defaultWorkspaceId, data);
+export async function writeNotes(uid: string, data: NotesData): Promise<void> {
+  await writeWorkspaceNotes(uid, defaultWorkspaceId, data);
 }
 
-export async function writeWorkspaceNotes(workspaceId: string, data: NotesData): Promise<void> {
-  await setDoc(legacyNotesRef, { data }, { merge: false });
+export async function writeWorkspaceNotes(uid: string, workspaceId: string, data: NotesData): Promise<void> {
+  await setDoc(getUserNotesRef(uid), { data }, { merge: false });
 }
 
-export async function readWorkspaceIndex(): Promise<WorkspaceSnapshot> {
-  const snapshot = await getDoc(workspaceListRef);
+export async function readWorkspaceIndex(uid: string): Promise<WorkspaceSnapshot> {
+  const snapshot = await getDoc(getUserWorkspaceListRef(uid));
   if (!snapshot.exists()) {
-    const legacy = await getDoc(legacyNotesRef);
+    const legacy = await getDoc(getUserNotesRef(uid));
     const index = defaultWorkspaceIndex();
-    await writeWorkspaceIndex(index);
+    await writeWorkspaceIndex(uid, index);
 
     if (legacy.exists()) {
       const raw = legacy.data();
       const parsed = validateNotesData(raw.data ?? {});
       if (parsed.ok) {
-        await writeWorkspaceNotes(defaultWorkspaceId, parsed.data);
+        await writeWorkspaceNotes(uid, defaultWorkspaceId, parsed.data);
       }
     }
 
@@ -93,21 +99,21 @@ export async function readWorkspaceIndex(): Promise<WorkspaceSnapshot> {
   const parsed = parseWorkspaceIndex(snapshot.data());
   if (parsed.workspaces.length === 0) {
     const index = defaultWorkspaceIndex();
-    await writeWorkspaceIndex(index);
+    await writeWorkspaceIndex(uid, index);
     return index;
   }
   return parsed;
 }
 
-export function subscribeToWorkspaceIndex(onChange: (snapshot: WorkspaceSnapshot) => void, onError: (message: string) => void): Unsubscribe {
+export function subscribeToWorkspaceIndex(uid: string, onChange: (snapshot: WorkspaceSnapshot) => void, onError: (message: string) => void): Unsubscribe {
   let initialized = false;
   return onSnapshot(
-    workspaceListRef,
+    getUserWorkspaceListRef(uid),
     async (snapshot) => {
       if (!snapshot.exists()) {
         if (!initialized) {
           initialized = true;
-          onChange(await readWorkspaceIndex());
+          onChange(await readWorkspaceIndex(uid));
         }
         return;
       }
@@ -117,8 +123,8 @@ export function subscribeToWorkspaceIndex(onChange: (snapshot: WorkspaceSnapshot
   );
 }
 
-export async function writeWorkspaceIndex(index: WorkspaceIndex): Promise<void> {
-  await setDoc(workspaceListRef, serializeWorkspaceIndex(index), { merge: false });
+export async function writeWorkspaceIndex(uid: string, index: WorkspaceIndex): Promise<void> {
+  await setDoc(getUserWorkspaceListRef(uid), serializeWorkspaceIndex(index), { merge: false });
 }
 
 export function createWorkspaceMeta(id: string, name: string, selectedCategoryNames: string[] = [], pinnedCategoryNames: string[] = [], pinnedNotes: PinnedNoteRef[] = [], teleprompterEnabled: boolean = true, teleprompterCategoryNames: string[] = []): WorkspaceMeta {

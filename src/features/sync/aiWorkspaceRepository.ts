@@ -8,23 +8,28 @@ export type AiWorkspaceNotesSnapshot = {
   data: NotesData;
 };
 
-const aiRunsCollection = 'reactnativecollection';
-const aiWorkspaceIndexId = 'aiworkspaceindex';
-const aiWorkspaceIndexRef = doc(firestore, aiRunsCollection, aiWorkspaceIndexId);
+export function getUserAiWorkspaceIndexRef(uid: string) {
+  return doc(firestore, 'users', uid, 'reactnativecollection', 'aiworkspaceindex');
+}
+
+export function getUserAiWorkspaceNotesRef(uid: string, documentId: string) {
+  return doc(firestore, 'users', uid, 'reactnativecollection', sanitizeDocumentId(documentId));
+}
+
 const localAiWorkspaceIndexKey = 'rnnotetaking.aiWorkspace.index';
 const localAiWorkspaceNotesPrefix = 'rnnotetaking.aiWorkspace.notes.';
 
-export function subscribeToAiWorkspaceIndex(onChange: (snapshot: AiWorkspaceIndex) => void, onError: (message: string) => void): Unsubscribe {
+export function subscribeToAiWorkspaceIndex(uid: string, onChange: (snapshot: AiWorkspaceIndex) => void, onError: (message: string) => void): Unsubscribe {
   return onSnapshot(
-    aiWorkspaceIndexRef,
+    getUserAiWorkspaceIndexRef(uid),
     (snapshot) => onChange(parseAiWorkspaceIndex(snapshot.exists() ? snapshot.data() : undefined)),
     (error) => onError(error.message),
   );
 }
 
-export function subscribeToAiWorkspaceNotes(documentId: string, onChange: (snapshot: AiWorkspaceNotesSnapshot) => void, onError: (message: string) => void): Unsubscribe {
+export function subscribeToAiWorkspaceNotes(uid: string, documentId: string, onChange: (snapshot: AiWorkspaceNotesSnapshot) => void, onError: (message: string) => void): Unsubscribe {
   return onSnapshot(
-    aiWorkspaceNotesRef(documentId),
+    getUserAiWorkspaceNotesRef(uid, documentId),
     (snapshot) => {
       try {
         onChange(parseAiWorkspaceNotes(snapshot.exists() ? snapshot.data() : undefined));
@@ -36,36 +41,36 @@ export function subscribeToAiWorkspaceNotes(documentId: string, onChange: (snaps
   );
 }
 
-export async function readLatestAiWorkspaceIndex(): Promise<AiWorkspaceIndex> {
-  const snapshot = await getDocFromServer(aiWorkspaceIndexRef);
+export async function readLatestAiWorkspaceIndex(uid: string): Promise<AiWorkspaceIndex> {
+  const snapshot = await getDocFromServer(getUserAiWorkspaceIndexRef(uid));
   return parseAiWorkspaceIndex(snapshot.exists() ? snapshot.data() : undefined);
 }
 
-export async function readAiWorkspaceIndex(): Promise<AiWorkspaceIndex> {
-  const snapshot = await getDoc(aiWorkspaceIndexRef);
+export async function readAiWorkspaceIndex(uid: string): Promise<AiWorkspaceIndex> {
+  const snapshot = await getDoc(getUserAiWorkspaceIndexRef(uid));
   return parseAiWorkspaceIndex(snapshot.exists() ? snapshot.data() : undefined);
 }
 
-export async function writeAiWorkspaceIndex(index: AiWorkspaceIndex): Promise<void> {
-  await setDoc(aiWorkspaceIndexRef, serializeAiWorkspaceIndex(index), { merge: false });
+export async function writeAiWorkspaceIndex(uid: string, index: AiWorkspaceIndex): Promise<void> {
+  await setDoc(getUserAiWorkspaceIndexRef(uid), serializeAiWorkspaceIndex(index), { merge: false });
 }
 
-export async function readAiWorkspaceNotes(documentId: string): Promise<AiWorkspaceNotesSnapshot> {
-  const snapshot = await getDoc(aiWorkspaceNotesRef(documentId));
+export async function readAiWorkspaceNotes(uid: string, documentId: string): Promise<AiWorkspaceNotesSnapshot> {
+  const snapshot = await getDoc(getUserAiWorkspaceNotesRef(uid, documentId));
   return parseAiWorkspaceNotes(snapshot.exists() ? snapshot.data() : undefined);
 }
 
-export async function readLatestAiWorkspaceNotes(documentId: string): Promise<AiWorkspaceNotesSnapshot> {
-  const snapshot = await getDocFromServer(aiWorkspaceNotesRef(documentId));
+export async function readLatestAiWorkspaceNotes(uid: string, documentId: string): Promise<AiWorkspaceNotesSnapshot> {
+  const snapshot = await getDocFromServer(getUserAiWorkspaceNotesRef(uid, documentId));
   return parseAiWorkspaceNotes(snapshot.exists() ? snapshot.data() : undefined);
 }
 
-export async function writeAiWorkspaceNotes(documentId: string, data: NotesData): Promise<void> {
-  await setDoc(aiWorkspaceNotesRef(documentId), { data, updatedAt: new Date().toISOString() }, { merge: false });
+export async function writeAiWorkspaceNotes(uid: string, documentId: string, data: NotesData): Promise<void> {
+  await setDoc(getUserAiWorkspaceNotesRef(uid, documentId), { data, updatedAt: new Date().toISOString() }, { merge: false });
 }
 
-export async function deleteAiWorkspaceNotes(documentId: string): Promise<void> {
-  await deleteDoc(aiWorkspaceNotesRef(documentId));
+export async function deleteAiWorkspaceNotes(uid: string, documentId: string): Promise<void> {
+  await deleteDoc(getUserAiWorkspaceNotesRef(uid, documentId));
 }
 
 export async function readLocalAiWorkspaceIndex(): Promise<AiWorkspaceIndex> {
@@ -125,9 +130,7 @@ export function serializeAiWorkspaceIndex(index: AiWorkspaceIndex) {
   };
 }
 
-function aiWorkspaceNotesRef(documentId: string) {
-  return doc(firestore, aiRunsCollection, sanitizeDocumentId(documentId));
-}
+
 
 function sanitizeDocumentId(documentId: string) {
   return documentId.trim().replace(/[\/]/g, '_') || 'aimain1';

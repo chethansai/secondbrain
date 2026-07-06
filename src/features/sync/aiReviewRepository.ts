@@ -3,23 +3,25 @@ import { AiReviewActionType, AiReviewDecision, AiReviewDecisionStatus, AiReviewL
 import { CategoryPath } from '../../shared/types/notes';
 import { firestore } from './firebase';
 
-const aiReviewLedgerRef = doc(firestore, 'reactnativecollection', 'reviewledger');
+export function getUserAiReviewLedgerRef(uid: string) {
+  return doc(firestore, 'users', uid, 'reactnativecollection', 'reviewledger');
+}
 
-export function subscribeToAiReviewLedger(onChange: (ledger: AiReviewLedger) => void, onError: (message: string) => void): Unsubscribe {
+export function subscribeToAiReviewLedger(uid: string, onChange: (ledger: AiReviewLedger) => void, onError: (message: string) => void): Unsubscribe {
   return onSnapshot(
-    aiReviewLedgerRef,
+    getUserAiReviewLedgerRef(uid),
     (snapshot) => onChange(snapshot.exists() ? parseAiReviewLedger(snapshot.data()) : defaultAiReviewLedger()),
     (error) => onError(error.message),
   );
 }
 
-export async function readLatestAiReviewLedger(): Promise<AiReviewLedger> {
-  const snapshot = await getDocFromServer(aiReviewLedgerRef);
+export async function readLatestAiReviewLedger(uid: string): Promise<AiReviewLedger> {
+  const snapshot = await getDocFromServer(getUserAiReviewLedgerRef(uid));
   return snapshot.exists() ? parseAiReviewLedger(snapshot.data()) : defaultAiReviewLedger();
 }
 
-export async function writeAiReviewLedger(ledger: AiReviewLedger): Promise<void> {
-  await setDoc(aiReviewLedgerRef, removeUndefinedFields(ledger), { merge: false });
+export async function writeAiReviewLedger(uid: string, ledger: AiReviewLedger): Promise<void> {
+  await setDoc(getUserAiReviewLedgerRef(uid), removeUndefinedFields(ledger), { merge: false });
 }
 
 function removeUndefinedFields<T>(value: T): T {
