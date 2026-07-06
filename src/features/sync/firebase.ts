@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
 import { getAuth, initializeAuth } from 'firebase/auth';
 // @ts-ignore - getReactNativePersistence is runtime-available in React Native environment but not declared in TypeScript web declarations.
 import { getReactNativePersistence } from 'firebase/auth';
@@ -41,7 +41,9 @@ const firebaseConfig = {
 };
 
 export const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-export const firestore = getFirestore(firebaseApp);
+export const firestore = initializeFirestore(firebaseApp, {
+  localCache: persistentLocalCache({}),
+});
 
 // Safe initialization of Firebase Auth to prevent "already-initialized" errors
 let authInstance;

@@ -75,7 +75,11 @@ export async function writeNotes(uid: string, data: NotesData): Promise<void> {
 }
 
 export async function writeWorkspaceNotes(uid: string, workspaceId: string, data: NotesData): Promise<void> {
-  await setDoc(getUserNotesRef(uid), { data }, { merge: false });
+  await setDoc(getUserNotesRef(uid), {
+    data,
+    version: 1,
+    updatedAt: new Date().toISOString(),
+  }, { merge: false });
 }
 
 export async function readWorkspaceIndex(uid: string): Promise<WorkspaceSnapshot> {

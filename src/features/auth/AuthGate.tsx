@@ -6,6 +6,7 @@ import { LockScreen } from './LockScreen';
 import { useAuth } from './authContext';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { firebaseAuth } from '../sync/firebase';
+import { createUserProfile, updateUserLastLogin } from './userRepository';
 import { TextInputField } from '../../shared/ui/TextInputField';
 import { Button } from '../../shared/ui/Button';
 import { rounded, shadows, spacing, typography } from '../../shared/design/tokens';
@@ -114,7 +115,10 @@ export function AuthGate({ children }: Props) {
 
     setActionLoading(true);
     try {
-      await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+      const userCredential = await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+      if (userCredential.user) {
+        await updateUserLastLogin(userCredential.user.uid);
+      }
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/invalid-email' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
@@ -152,7 +156,10 @@ export function AuthGate({ children }: Props) {
 
     setActionLoading(true);
     try {
-      await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
+      if (userCredential.user) {
+        await createUserProfile(userCredential.user.uid, email.trim());
+      }
       Alert.alert('Success', 'Account created successfully.');
       switchView('signin');
     } catch (err: any) {
