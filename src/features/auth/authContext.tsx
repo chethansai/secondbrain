@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { onIdTokenChanged, signOut, User } from 'firebase/auth';
+import { NativeModules, Platform } from 'react-native';
 import { firebaseAuth } from '../sync/firebase';
 import { clearAllLocalRepositories } from '../sync/localNotesRepository';
+
+const { OverlayModule } = NativeModules;
 
 type AuthContextType = {
   user: User | null;
@@ -22,9 +25,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(firebaseAuth, (currentUser) => {
+    const unsubscribe = onIdTokenChanged(firebaseAuth, async (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+
+      if (Platform.OS === 'android' && OverlayModule && OverlayModule.syncAuthSession) {
+        if (currentUser) {
+          try {
+            const token = await currentUser.getIdToken();
+            await OverlayModule.syncAuthSession(currentUser.uid, token);
+            console.log('[AUTH CONTEXT] Synced active session to Android Native');
+          } catch (error) {
+            console.error('[AUTH CONTEXT] Failed to sync auth token to Android Native:', error);
+          }
+        } else {
+          try {
+            await OverlayModule.syncAuthSession(null, null);
+            console.log('[AUTH CONTEXT] Cleared session on Android Native');
+          } catch (error) {
+            console.error('[AUTH CONTEXT] Failed to clear session on Android Native:', error);
+          }
+        }
+      }
     });
     return unsubscribe;
   }, []);

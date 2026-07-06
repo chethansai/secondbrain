@@ -16,6 +16,21 @@ class OverlayModule(private val reactContext: ReactApplicationContext) : ReactCo
   override fun getName(): String = "OverlayModule"
 
   @ReactMethod
+  fun syncAuthSession(uid: String?, idToken: String?, promise: Promise) {
+    try {
+      val sharedPref = reactContext.getSharedPreferences("rnnotetaking_auth", android.content.Context.MODE_PRIVATE)
+      with(sharedPref.edit()) {
+        putString("uid", uid)
+        putString("idToken", idToken)
+        apply()
+      }
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("auth_sync_error", e.message ?: e.toString())
+    }
+  }
+
+  @ReactMethod
   fun isOverlayPermissionGranted(promise: Promise) {
     promise.resolve(canDrawOverlays())
   }

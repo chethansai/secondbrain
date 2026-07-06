@@ -39,11 +39,31 @@ class OverlayNotesStore(private val context: Context) {
 
   fun readNoteSnapshot(): NoteSnapshot {
     val fields = readDataFields()
-    return NoteSnapshot(listCategorySnapshots(fields).distinctBy { it.path.joinToString("") })
+    return NoteSnapshot(listCategorySnapshots(fields).distinctBy { it.path.joinToString(" ") })
+  }
+
+  private fun getAuthSession(): Pair<String?, String?> {
+    val sharedPref = context.getSharedPreferences("rnnotetaking_auth", Context.MODE_PRIVATE)
+    val uid = sharedPref.getString("uid", null)
+    val idToken = sharedPref.getString("idToken", null)
+    return Pair(uid, idToken)
+  }
+
+  private fun firestoreDocumentUrl(documentId: String, uid: String): String {
+    val projectId = BuildConfig.FIREBASE_PROJECT_ID.trim()
+    val apiKey = BuildConfig.FIREBASE_API_KEY.trim()
+    if (projectId.isEmpty() || apiKey.isEmpty()) {
+      throw IllegalStateException("Missing native Firebase config. Set FIREBASE_PROJECT_ID and FIREBASE_API_KEY in android/local.properties, Gradle properties, or the build environment.")
+    }
+    return "https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$uid/reactnativecollection/$documentId?key=$apiKey"
   }
 
   fun appendNote(path: List<String>, note: String): JSONObject {
-    val document = readFirestoreDocument()
+    val (uid, idToken) = getAuthSession()
+    if (uid == null || idToken == null) {
+      throw IllegalStateException("User is not signed in. Open the app to log in.")
+    }
+    val document = readFirestoreDocument(uid, idToken)
     val fields = document.optJSONObject("fields") ?: JSONObject().also { document.put("fields", it) }
     val dataValue = fields.optJSONObject("data") ?: JSONObject().put("mapValue", JSONObject().put("fields", JSONObject())).also { fields.put("data", it) }
     val dataFields = dataValue.optJSONObject("mapValue")?.optJSONObject("fields") ?: JSONObject()
@@ -52,7 +72,7 @@ class OverlayNotesStore(private val context: Context) {
     appendCategoryString(dataFields, listOf(historyCategoryName), formatAddedNoteHistory(note, path))
 
     val body = JSONObject().put("fields", JSONObject().put("data", dataValue))
-    val connection = openFirestoreConnection(firestoreDocumentUrl(), "PATCH")
+    val connection = openFirestoreConnection(firestoreDocumentUrl("main", uid), idToken, "PATCH")
     writeJson(connection, body)
     val responseCode = connection.responseCode
     if (responseCode !in 200..299) throw IllegalStateException(readResponse(connection))
@@ -64,7 +84,11 @@ class OverlayNotesStore(private val context: Context) {
   fun togglePinnedCategory(path: List<String>): Boolean {
     val cleanPath = path.map { it.trim() }.filter { it.isNotEmpty() }
     if (cleanPath.isEmpty()) return false
-    val document = readWorkspaceListDocument()
+    val (uid, idToken) = getAuthSession()
+    if (uid == null || idToken == null) {
+      throw IllegalStateException("User is not signed in. Open the app to log in.")
+    }
+    val document = readWorkspaceListDocument(uid, idToken)
     val fields = document.optJSONObject("fields") ?: JSONObject().also { document.put("fields", it) }
     val workspaceName = fields.optJSONObject("defaultworkspace")?.optString("stringValue")?.trim()?.takeIf { it.isNotEmpty() } ?: defaultWorkspaceId
     val pinnedCategoriesValue = fields.optJSONObject("pinnedcategories") ?: JSONObject().also { fields.put("pinnedcategories", it) }
@@ -85,7 +109,7 @@ class OverlayNotesStore(private val context: Context) {
     if (!fields.has(workspaceName)) fields.put(workspaceName, stringArrayField(emptyList()))
 
     val body = JSONObject().put("fields", fields)
-    val connection = openFirestoreConnection(workspaceListDocumentUrl(), "PATCH")
+    val connection = openFirestoreConnection(firestoreDocumentUrl("workspaceslist", uid), idToken, "PATCH")
     writeJson(connection, body)
     val responseCode = connection.responseCode
     if (responseCode !in 200..299) throw IllegalStateException(readResponse(connection))
@@ -93,15 +117,17 @@ class OverlayNotesStore(private val context: Context) {
   }
 
   private fun readDataFields(): JSONObject {
-    val document = readFirestoreDocument()
+    val (uid, idToken) = getAuthSession()
+    if (uid == null || idToken == null) return JSONObject()
+    val document = readFirestoreDocument(uid, idToken)
     return document.optJSONObject("fields")
       ?.optJSONObject("data")
       ?.optJSONObject("mapValue")
       ?.optJSONObject("fields") ?: JSONObject()
   }
 
-  private fun readFirestoreDocument(): JSONObject {
-    val connection = openFirestoreConnection(firestoreDocumentUrl(), "GET")
+  private fun readFirestoreDocument(uid: String, idToken: String): JSONObject {
+    val connection = openFirestoreConnection(firestoreDocumentUrl("main", uid), idToken, "GET")
     val responseCode = connection.responseCode
     if (responseCode == 404) return JSONObject()
     if (responseCode !in 200..299) throw IllegalStateException(readResponse(connection))
@@ -109,8 +135,8 @@ class OverlayNotesStore(private val context: Context) {
     return if (response.isBlank()) JSONObject() else JSONObject(response)
   }
 
-  private fun readWorkspaceListDocument(): JSONObject {
-    val connection = openFirestoreConnection(workspaceListDocumentUrl(), "GET")
+  private fun readWorkspaceListDocument(uid: String, idToken: String): JSONObject {
+    val connection = openFirestoreConnection(firestoreDocumentUrl("workspaceslist", uid), idToken, "GET")
     val responseCode = connection.responseCode
     if (responseCode == 404) return JSONObject()
     if (responseCode !in 200..299) throw IllegalStateException(readResponse(connection))
@@ -118,12 +144,13 @@ class OverlayNotesStore(private val context: Context) {
     return if (response.isBlank()) JSONObject() else JSONObject(response)
   }
 
-  private fun openFirestoreConnection(url: String, method: String): HttpURLConnection {
+  private fun openFirestoreConnection(url: String, idToken: String, method: String): HttpURLConnection {
     val connection = URL(url).openConnection() as HttpURLConnection
     connection.requestMethod = method
     connection.connectTimeout = 12000
     connection.readTimeout = 12000
     connection.setRequestProperty("Content-Type", "application/json")
+    connection.setRequestProperty("Authorization", "Bearer $idToken")
     if (method == "PATCH") connection.doOutput = true
     return connection
   }
@@ -133,7 +160,9 @@ class OverlayNotesStore(private val context: Context) {
   }
 
   private fun readPinnedCategoryKeys(): List<String> {
-    val document = readWorkspaceListDocument()
+    val (uid, idToken) = getAuthSession()
+    if (uid == null || idToken == null) return emptyList()
+    val document = readWorkspaceListDocument(uid, idToken)
     val fields = document.optJSONObject("fields") ?: return emptyList()
     val workspaceName = fields.optJSONObject("defaultworkspace")?.optString("stringValue")?.trim()?.takeIf { it.isNotEmpty() } ?: defaultWorkspaceId
     val workspacePins = fields
@@ -313,17 +342,6 @@ class OverlayNotesStore(private val context: Context) {
     private val historyDateFormat = ThreadLocal.withInitial { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
     private const val pathSeparator = "\u001f"
 
-    private fun firestoreDocumentUrl(): String = firestoreDocumentUrl("main")
 
-    private fun workspaceListDocumentUrl(): String = firestoreDocumentUrl("workspaceslist")
-
-    private fun firestoreDocumentUrl(documentId: String): String {
-      val projectId = BuildConfig.FIREBASE_PROJECT_ID.trim()
-      val apiKey = BuildConfig.FIREBASE_API_KEY.trim()
-      if (projectId.isEmpty() || apiKey.isEmpty()) {
-        throw IllegalStateException("Missing native Firebase config. Set FIREBASE_PROJECT_ID and FIREBASE_API_KEY in android/local.properties, Gradle properties, or the build environment.")
-      }
-      return "https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/reactnativecollection/$documentId?key=$apiKey"
-    }
   }
 }
