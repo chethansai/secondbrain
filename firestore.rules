@@ -2,20 +2,26 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Secure user-scoped data directory tree
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Deny all access to legacy global collections
     match /reactnativecollection/{documentId} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
 
     match /reactnativecollection_workspace_notes/{documentId} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
 
     match /reactnativecollection_ai_runs/{documentId} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
 
     match /reactnativecollection_notifications/{documentId} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

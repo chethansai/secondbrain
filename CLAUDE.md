@@ -20,6 +20,7 @@ After every implemented chat step or redirection/decision that changes the repo:
 
 ## history
 
+- 2026-07-06: **PHASE 4 MULTI-USER: FIRESTORE RULES SECURED**. Modified `firestore.rules` to enforce authentication checking (`request.auth != null`) and isolate access recursively to a user's own path (`/users/{userId}/{document=**}`). Blocked all access to legacy global collections.
 - 2026-07-06: **PHASE 3 MULTI-USER: JS SYNC HOOKS & RUNNER MIGRATED**. Updated React hooks `useNotesSync.ts`, `useAiReviewSync.ts`, `useAiWorkspaceSync.ts`, and `useAiNotificationsSync.ts` to consume the active user's `uid` from `useAuth()` and pass it to user-scoped repository calls. Refactored `aiNotificationRunner.ts` to query user-scoped paths via `firebaseAuth.currentUser` in background execution. Verified full compilation passes cleanly.
 - 2026-07-06: **PHASE 2 MULTI-USER: REPOSITORY PATHS ABSTRACTED**. Refactored Firestore repository helper functions in `notesRepository.ts`, `aiReviewRepository.ts`, `aiWorkspaceRepository.ts`, and `aiNotificationsRepository.ts` to accept the user's `uid` and construct paths dynamically under `users/{uid}/reactnativecollection`. Expected caller compilation errors verified.
 - 2026-07-06: **PHASE 1 MULTI-USER: FIREBASE AUTH INITIALIZED**. Configured Firebase Auth client initialization with AsyncStorage persistence in `src/features/sync/firebase.ts`. Created `AuthProvider` and `useAuth` hook in `src/features/auth/authContext.tsx` to expose auth states to the app context. Verified setup compiles cleanly with strict typechecking.
