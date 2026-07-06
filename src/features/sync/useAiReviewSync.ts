@@ -20,7 +20,7 @@ export function useAiReviewSync() {
 
   useEffect(() => {
     if (!uid) {
-      readLocalAiReviewLedger().then((localLedger) => {
+      readLocalAiReviewLedger(uid).then((localLedger) => {
         setLedger(localLedger);
         ledgerRef.current = localLedger;
         setLoading(false);
@@ -36,10 +36,10 @@ export function useAiReviewSync() {
         setLoading(false);
         setError(null);
         setLocalMode(false);
-        writeLocalAiReviewLedger(snapshot).catch(() => undefined);
+        writeLocalAiReviewLedger(snapshot, uid).catch(() => undefined);
       },
       async () => {
-        const localLedger = await readLocalAiReviewLedger();
+        const localLedger = await readLocalAiReviewLedger(uid);
         setLedger(localLedger);
         ledgerRef.current = localLedger;
         setLoading(false);
@@ -62,10 +62,10 @@ export function useAiReviewSync() {
       } else {
         setLocalMode(true);
       }
-      await writeLocalAiReviewLedger(stamped);
+      await writeLocalAiReviewLedger(stamped, uid);
       return true;
     } catch {
-      await writeLocalAiReviewLedger(stamped);
+      await writeLocalAiReviewLedger(stamped, uid);
       setLocalMode(true);
       return true;
     } finally {
@@ -93,11 +93,11 @@ export function useAiReviewSync() {
       const latest = await readLatestAiReviewLedger(uid);
       setLedger(latest);
       ledgerRef.current = latest;
-      await writeLocalAiReviewLedger(latest);
+      await writeLocalAiReviewLedger(latest, uid);
       setLocalMode(false);
       return true;
     } catch {
-      const localLedger = await readLocalAiReviewLedger();
+      const localLedger = await readLocalAiReviewLedger(uid);
       setLedger(localLedger);
       ledgerRef.current = localLedger;
       setLocalMode(true);

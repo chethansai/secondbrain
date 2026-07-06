@@ -54,7 +54,7 @@ export function useNotesSync() {
       console.log('[PERF] bootstrapLocalSnapshot started at', snapshotStartTime, '(+' + (snapshotStartTime - effectStartTime) + 'ms from effect start)');
 
       try {
-        const snapshot = await readLocalWorkspaceSnapshot();
+        const snapshot = await readLocalWorkspaceSnapshot(uid);
         const snapshotReadTime = Date.now();
         console.log('[PERF] readLocalWorkspaceSnapshot completed in', (snapshotReadTime - snapshotStartTime) + 'ms');
 
@@ -88,7 +88,7 @@ export function useNotesSync() {
     }
 
     function cacheSnapshot(nextWorkspaceIndex: WorkspaceIndex, nextData: NotesData) {
-      writeLocalWorkspaceSnapshot(nextWorkspaceIndex, nextData).catch(() => undefined);
+      writeLocalWorkspaceSnapshot(nextWorkspaceIndex, nextData, uid).catch(() => undefined);
     }
 
     // SAFETY TIMEOUT - Prevents permanent "Loading workspace" blank screen (root cause fix)
@@ -112,7 +112,7 @@ export function useNotesSync() {
         setWorkspaceIndex(snapshot);
         setWorkspaceLoading(false);
         setError(null);
-        writeLocalWorkspaceIndex(snapshot).catch(() => undefined);
+        writeLocalWorkspaceIndex(snapshot, uid).catch(() => undefined);
         setData((currentData) => {
           cacheSnapshot(snapshot, currentData);
           return currentData;
@@ -123,7 +123,7 @@ export function useNotesSync() {
       async () => {
         if (cancelled) return;
         try {
-          const snapshot = await readLocalWorkspaceIndex();
+          const snapshot = await readLocalWorkspaceIndex(uid);
           setWorkspaceIndex(snapshot);
           setWorkspaceLoading(false);
           setLocalMode(true);
@@ -146,7 +146,7 @@ export function useNotesSync() {
         setLoading(false);
         setError(null);
         setLocalMode(false);
-        writeLocalWorkspaceNotes(defaultWorkspaceId, snapshot.data).catch(() => undefined);
+        writeLocalWorkspaceNotes(defaultWorkspaceId, snapshot.data, uid).catch(() => undefined);
         setWorkspaceIndex((currentIndex) => {
           cacheSnapshot(currentIndex, snapshot.data);
           return currentIndex;
@@ -156,7 +156,7 @@ export function useNotesSync() {
       async () => {
         if (cancelled) return;
         try {
-          const snapshot = await readLocalWorkspaceNotes(defaultWorkspaceId);
+          const snapshot = await readLocalWorkspaceNotes(defaultWorkspaceId, uid);
           setData(snapshot.data);
           setLocalMode(true);
           setError(null);
@@ -186,15 +186,15 @@ export function useNotesSync() {
       } else {
         setLocalMode(true);
       }
-      await writeLocalWorkspaceIndex(index);
-      await writeLocalWorkspaceSnapshot(index, data);
+      await writeLocalWorkspaceIndex(index, uid);
+      await writeLocalWorkspaceSnapshot(index, data, uid);
       return true;
     } catch (error) {
       console.log('FIRESTORE ERROR CODE:', (error as any).code);
       console.log('FIRESTORE ERROR MESSAGE:', (error as any).message);
       console.log('FIRESTORE ERROR FULL:', error);
-      await writeLocalWorkspaceIndex(index);
-      await writeLocalWorkspaceSnapshot(index, data);
+      await writeLocalWorkspaceIndex(index, uid);
+      await writeLocalWorkspaceSnapshot(index, data, uid);
       setLocalMode(true);
       setError(`Could not save to Firestore: ${(error as any).code}\n${(error as any).message}`);
       return true;
@@ -217,15 +217,15 @@ export function useNotesSync() {
         } else {
           setLocalMode(true);
         }
-        await writeLocalWorkspaceNotes(defaultWorkspaceId, result.data);
-        await writeLocalWorkspaceSnapshot(workspaceIndex, result.data);
+        await writeLocalWorkspaceNotes(defaultWorkspaceId, result.data, uid);
+        await writeLocalWorkspaceSnapshot(workspaceIndex, result.data, uid);
         return true;
       } catch (error) {
         console.log('FIRESTORE ERROR CODE:', (error as any).code);
         console.log('FIRESTORE ERROR MESSAGE:', (error as any).message);
         console.log('FIRESTORE ERROR FULL:', error);
-        await writeLocalWorkspaceNotes(defaultWorkspaceId, result.data);
-        await writeLocalWorkspaceSnapshot(workspaceIndex, result.data);
+        await writeLocalWorkspaceNotes(defaultWorkspaceId, result.data, uid);
+        await writeLocalWorkspaceSnapshot(workspaceIndex, result.data, uid);
         setLocalMode(true);
         setError(`Could not add to Firestore: ${(error as any).code}\n${(error as any).message}`);
         return true;
@@ -331,9 +331,9 @@ export function useNotesSync() {
       setWorkspaceIndex(indexSnapshot);
       setData(notesSnapshot.data);
       await Promise.all([
-        writeLocalWorkspaceIndex(indexSnapshot),
-        writeLocalWorkspaceNotes(defaultWorkspaceId, notesSnapshot.data),
-        writeLocalWorkspaceSnapshot(indexSnapshot, notesSnapshot.data),
+        writeLocalWorkspaceIndex(indexSnapshot, uid),
+        writeLocalWorkspaceNotes(defaultWorkspaceId, notesSnapshot.data, uid),
+        writeLocalWorkspaceSnapshot(indexSnapshot, notesSnapshot.data, uid),
       ]);
       setLocalMode(false);
       return true;

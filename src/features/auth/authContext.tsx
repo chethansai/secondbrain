@@ -55,8 +55,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
+      const currentUid = user?.uid ?? null;
       await signOut(firebaseAuth);
-      await clearAllLocalRepositories();
+      // Wipe only the signing-out user's scoped cache keys
+      await clearAllLocalRepositories(currentUid);
     } catch (error) {
       console.error('[AUTH LOGOUT] Error signing out:', error);
     }

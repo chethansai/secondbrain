@@ -3,11 +3,57 @@ import { NotesData, WorkspaceIndex, WorkspaceMeta } from '../../shared/types/not
 import { createWorkspaceMeta, defaultWorkspaceId, NotesSnapshot, parseWorkspaceIndex, serializeWorkspaceIndex } from './notesRepository';
 import { validateNotesData } from './validation';
 
-const localNotesKey = 'rnnotetaking.notes.main';
-const localWorkspaceNotesPrefix = 'rnnotetaking.notes.workspace.';
-const localWorkspaceListKey = 'rnnotetaking.workspaces.list';
-const legacyLocalWorkspaceIndexKey = 'rnnotetaking.workspaces.index';
-const localWorkspaceSnapshotKey = 'rnnotetaking.workspace.snapshot.v1';
+// ---------------------------------------------------------------------------
+// Key helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a key prefix that scopes cache entries to a specific user.
+ * When uid is absent we fall back to an anonymous prefix so unauthenticated
+ * reads/writes still work (e.g. during the brief window before Firebase
+ * resolves the auth state).
+ */
+function userPrefix(uid: string | null | undefined): string {
+  return uid ? `rnnotetaking.u.${uid}` : 'rnnotetaking.anon';
+}
+
+function snapshotKey(uid: string | null | undefined): string {
+  return `${userPrefix(uid)}.workspace.snapshot.v1`;
+}
+
+function workspaceListKey(uid: string | null | undefined): string {
+  return `${userPrefix(uid)}.workspaces.list`;
+}
+
+function legacyWorkspaceIndexKey(uid: string | null | undefined): string {
+  return `${userPrefix(uid)}.workspaces.index`;
+}
+
+function workspaceNotesKey(uid: string | null | undefined, workspaceId: string): string {
+  const cleanId = (workspaceId.trim() || defaultWorkspaceId).replace(/[\/]/g, '_');
+  return `${userPrefix(uid)}.notes.workspace.${cleanId}`;
+}
+
+function legacyNotesKey(uid: string | null | undefined): string {
+  return `${userPrefix(uid)}.notes.main`;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy (anonymous/unscoped) key constants — kept for migration reads only
+// ---------------------------------------------------------------------------
+const LEGACY_ANON_SNAPSHOT_KEY = 'rnnotetaking.workspace.snapshot.v1';
+const LEGACY_ANON_WORKSPACE_LIST_KEY = 'rnnotetaking.workspaces.list';
+const LEGACY_ANON_WORKSPACE_INDEX_KEY = 'rnnotetaking.workspaces.index';
+const LEGACY_ANON_NOTES_KEY = 'rnnotetaking.notes.main';
+
+function legacyAnonWorkspaceNotesKey(workspaceId: string): string {
+  const cleanId = (workspaceId.trim() || defaultWorkspaceId).replace(/[\/]/g, '_');
+  return `rnnotetaking.notes.workspace.${cleanId}`;
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export type LocalWorkspaceSnapshot = {
   workspaceIndex: WorkspaceIndex;
@@ -15,36 +61,55 @@ export type LocalWorkspaceSnapshot = {
   cachedAt: number;
 };
 
-export async function readLocalWorkspaceSnapshot(): Promise<LocalWorkspaceSnapshot | null> {
-  const startTime = Date.now();
-  console.log('[PERF] readLocalWorkspaceSnapshot AsyncStorage.getItem started');
-  const raw = await AsyncStorage.getItem(localWorkspaceSnapshotKey);
-  const endTime = Date.now();
-  console.log('[PERF] readLocalWorkspaceSnapshot AsyncStorage.getItem completed in', (endTime - startTime) + 'ms');
+// ---------------------------------------------------------------------------
+// Snapshot (combined notes + workspace index in one key — fastest cold boot)
+// ---------------------------------------------------------------------------
+
+export async function readLocalWorkspaceSnapshot(uid?: string | null): Promise<LocalWorkspaceSnapshot | null> {
+  const key = snapshotKey(uid);
+
+  // 1. Try the user-scoped key first
+  const raw = await AsyncStorage.getItem(key);
   if (raw) {
     const snapshot = parseLocalWorkspaceSnapshot(raw);
     if (snapshot) return snapshot;
   }
 
+  // 2. Migrate from old legacy (anonymous/unscoped) key if this is a returning
+  //    user whose data was written before uid-scoping was introduced.
+  if (uid) {
+    const legacyRaw = await AsyncStorage.getItem(LEGACY_ANON_SNAPSHOT_KEY);
+    if (legacyRaw) {
+      const snapshot = parseLocalWorkspaceSnapshot(legacyRaw);
+      if (snapshot) {
+        // Persist under the new user-scoped key and clean up the legacy key.
+        await writeLocalWorkspaceSnapshot(snapshot.workspaceIndex, snapshot.data, uid);
+        AsyncStorage.removeItem(LEGACY_ANON_SNAPSHOT_KEY).catch(() => undefined);
+        return snapshot;
+      }
+    }
+  }
+
+  // 3. Try composing from individual workspace/notes keys (handles very old data).
   const hasLegacyCache = Boolean(
-    await AsyncStorage.getItem(localWorkspaceListKey)
-    ?? await AsyncStorage.getItem(legacyLocalWorkspaceIndexKey)
-    ?? await AsyncStorage.getItem(localWorkspaceNotesKey(defaultWorkspaceId))
-    ?? await AsyncStorage.getItem(localNotesKey),
+    await AsyncStorage.getItem(workspaceListKey(uid))
+    ?? await AsyncStorage.getItem(legacyWorkspaceIndexKey(uid))
+    ?? await AsyncStorage.getItem(workspaceNotesKey(uid, defaultWorkspaceId))
+    ?? await AsyncStorage.getItem(legacyNotesKey(uid)),
   );
   if (!hasLegacyCache) return null;
 
   const [workspaceIndex, notesSnapshot] = await Promise.all([
-    readLocalWorkspaceIndex(),
-    readLocalWorkspaceNotes(defaultWorkspaceId),
+    readLocalWorkspaceIndex(uid),
+    readLocalWorkspaceNotes(defaultWorkspaceId, uid),
   ]);
   const snapshot = { workspaceIndex, data: notesSnapshot.data, cachedAt: Date.now() };
-  await writeLocalWorkspaceSnapshot(workspaceIndex, notesSnapshot.data);
+  await writeLocalWorkspaceSnapshot(workspaceIndex, notesSnapshot.data, uid);
   return snapshot;
 }
 
-export async function writeLocalWorkspaceSnapshot(workspaceIndex: WorkspaceIndex, data: NotesData): Promise<void> {
-  await AsyncStorage.setItem(localWorkspaceSnapshotKey, JSON.stringify({
+export async function writeLocalWorkspaceSnapshot(workspaceIndex: WorkspaceIndex, data: NotesData, uid?: string | null): Promise<void> {
+  await AsyncStorage.setItem(snapshotKey(uid), JSON.stringify({
     workspaceIndex: serializeWorkspaceIndex(workspaceIndex),
     notes: { data },
     cachedAt: Date.now(),
@@ -70,54 +135,122 @@ function parseLocalWorkspaceSnapshot(raw: string): LocalWorkspaceSnapshot | null
   }
 }
 
-export async function readLocalNotes(): Promise<NotesSnapshot> {
-  return readLocalWorkspaceNotes(defaultWorkspaceId);
+// ---------------------------------------------------------------------------
+// Notes
+// ---------------------------------------------------------------------------
+
+export async function readLocalNotes(uid?: string | null): Promise<NotesSnapshot> {
+  return readLocalWorkspaceNotes(defaultWorkspaceId, uid);
 }
 
-export async function readLocalWorkspaceNotes(workspaceId: string): Promise<NotesSnapshot> {
-  const raw = await AsyncStorage.getItem(localWorkspaceNotesKey(workspaceId)) ?? (workspaceId === defaultWorkspaceId ? await AsyncStorage.getItem(localNotesKey) : null);
+export async function readLocalWorkspaceNotes(workspaceId: string, uid?: string | null): Promise<NotesSnapshot> {
+  const scopedKey = workspaceNotesKey(uid, workspaceId);
+  let raw = await AsyncStorage.getItem(scopedKey);
+
+  // Migrate from anonymous key if present and this is a signed-in user
+  if (!raw && uid) {
+    const legacyKey = legacyAnonWorkspaceNotesKey(workspaceId);
+    const legacyRaw = await AsyncStorage.getItem(legacyKey);
+    if (!legacyRaw && workspaceId === defaultWorkspaceId) {
+      raw = await AsyncStorage.getItem(LEGACY_ANON_NOTES_KEY);
+    } else {
+      raw = legacyRaw;
+    }
+    if (raw) {
+      // Re-persist under user-scoped key, then clean up anonymous key
+      await AsyncStorage.setItem(scopedKey, raw);
+      AsyncStorage.removeItem(legacyKey).catch(() => undefined);
+    }
+  }
+
   if (!raw) return { data: {} };
 
   const parsed = JSON.parse(raw) as { data?: unknown };
   const validation = validateNotesData(parsed.data ?? {});
   if (!validation.ok) return { data: {} };
-
   return { data: validation.data };
 }
 
-export async function writeLocalNotes(data: NotesData): Promise<void> {
-  await writeLocalWorkspaceNotes(defaultWorkspaceId, data);
+export async function writeLocalNotes(data: NotesData, uid?: string | null): Promise<void> {
+  await writeLocalWorkspaceNotes(defaultWorkspaceId, data, uid);
 }
 
-export async function writeLocalWorkspaceNotes(workspaceId: string, data: NotesData): Promise<void> {
-  await AsyncStorage.setItem(localWorkspaceNotesKey(workspaceId), JSON.stringify({ data }));
-  if (workspaceId === defaultWorkspaceId) {
-    await AsyncStorage.setItem(localNotesKey, JSON.stringify({ data }));
+export async function writeLocalWorkspaceNotes(workspaceId: string, data: NotesData, uid?: string | null): Promise<void> {
+  await AsyncStorage.setItem(workspaceNotesKey(uid, workspaceId), JSON.stringify({ data }));
+}
+
+// ---------------------------------------------------------------------------
+// Workspace index
+// ---------------------------------------------------------------------------
+
+export async function readLocalWorkspaceIndex(uid?: string | null): Promise<WorkspaceIndex> {
+  const raw = await AsyncStorage.getItem(workspaceListKey(uid))
+    ?? await AsyncStorage.getItem(legacyWorkspaceIndexKey(uid));
+
+  // Migrate from anonymous key if uid is present
+  if (!raw && uid) {
+    const legacyRaw = await AsyncStorage.getItem(LEGACY_ANON_WORKSPACE_LIST_KEY)
+      ?? await AsyncStorage.getItem(LEGACY_ANON_WORKSPACE_INDEX_KEY);
+    if (legacyRaw) {
+      try {
+        const parsed = JSON.parse(legacyRaw) as Record<string, unknown>;
+        const index = parseLocalWorkspaceIndex(parsed);
+        await writeLocalWorkspaceIndex(index, uid);
+        AsyncStorage.multiRemove([LEGACY_ANON_WORKSPACE_LIST_KEY, LEGACY_ANON_WORKSPACE_INDEX_KEY]).catch(() => undefined);
+        return index;
+      } catch {
+        return defaultLocalWorkspaceIndex();
+      }
+    }
   }
-}
 
-function localWorkspaceNotesKey(workspaceId: string) {
-  const cleanId = (workspaceId.trim() || defaultWorkspaceId).replace(/[\/]/g, '_');
-  return `${localWorkspaceNotesPrefix}${cleanId}`;
-}
-
-export async function readLocalWorkspaceIndex(): Promise<WorkspaceIndex> {
-  const raw = await AsyncStorage.getItem(localWorkspaceListKey) ?? await AsyncStorage.getItem(legacyLocalWorkspaceIndexKey);
   if (!raw) return defaultLocalWorkspaceIndex();
 
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const index = parseLocalWorkspaceIndex(parsed);
-    await writeLocalWorkspaceIndex(index);
+    await writeLocalWorkspaceIndex(index, uid);
     return index;
   } catch {
     return defaultLocalWorkspaceIndex();
   }
 }
 
-export async function writeLocalWorkspaceIndex(index: WorkspaceIndex): Promise<void> {
-  await AsyncStorage.setItem(localWorkspaceListKey, JSON.stringify(serializeWorkspaceIndex(index)));
+export async function writeLocalWorkspaceIndex(index: WorkspaceIndex, uid?: string | null): Promise<void> {
+  await AsyncStorage.setItem(workspaceListKey(uid), JSON.stringify(serializeWorkspaceIndex(index)));
 }
+
+// ---------------------------------------------------------------------------
+// Cache clearing
+// ---------------------------------------------------------------------------
+
+/**
+ * Removes all local repository keys for a specific user.
+ * If `uid` is omitted, removes ALL app keys (used for full wipe / dev reset).
+ */
+export async function clearAllLocalRepositories(uid?: string | null): Promise<void> {
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    let keysToRemove: string[];
+    if (uid) {
+      // Remove only this user's scoped keys
+      const prefix = userPrefix(uid);
+      keysToRemove = allKeys.filter((key) => key.startsWith(prefix));
+    } else {
+      // Full wipe: remove all app keys (all users + anonymous)
+      keysToRemove = allKeys.filter((key) => key.startsWith('rnnotetaking.'));
+    }
+    if (keysToRemove.length > 0) {
+      await AsyncStorage.multiRemove(keysToRemove);
+    }
+  } catch (error) {
+    console.error('[CACHE CLEAR] Error clearing AsyncStorage:', error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Private helpers
+// ---------------------------------------------------------------------------
 
 function parseLocalWorkspaceIndex(parsed: Record<string, unknown>): WorkspaceIndex {
   if (Array.isArray(parsed.workspaces)) {
@@ -151,16 +284,4 @@ function parseLegacyWorkspaceIndex(parsed: Partial<WorkspaceIndex>): WorkspaceIn
 function defaultLocalWorkspaceIndex(): WorkspaceIndex {
   const workspace = createWorkspaceMeta(defaultWorkspaceId, defaultWorkspaceId, [], [], [], true, []);
   return { workspaces: [workspace], activeWorkspaceId: workspace.id, defaultWorkspaceId: workspace.id, version: 1 };
-}
-
-export async function clearAllLocalRepositories(): Promise<void> {
-  try {
-    const allKeys = await AsyncStorage.getAllKeys();
-    const appKeys = allKeys.filter((key) => key.startsWith('rnnotetaking.'));
-    if (appKeys.length > 0) {
-      await AsyncStorage.multiRemove(appKeys);
-    }
-  } catch (error) {
-    console.error('[CACHE CLEAR] Error clearing AsyncStorage:', error);
-  }
 }
