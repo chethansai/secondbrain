@@ -73,10 +73,18 @@ if (typeof global !== 'undefined' && (global as any).HermesInternal) {
   }
 }
 
+import { AuthProvider } from './src/features/auth/authContext';
+
 export default function App() {
   const appRenderTime = Date.now();
   console.log('[PERF] App component render at', appRenderTime, '(+' + (appRenderTime - APP_START_TIME) + 'ms from module load)');
-  return <ThemeProvider><AppContent /></ThemeProvider>;
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
+  );
 }
 function AppContent() {
   const [pendingAutomationCommand, setPendingAutomationCommand] = useState<AutomationCommand | null>(null);
