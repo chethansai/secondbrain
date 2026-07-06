@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { CategoryPath, NotesData, MutationResult, PinnedNoteRef, WorkspaceIndex, WorkspaceMeta } from '../../shared/types/notes';
 import { readLocalWorkspaceIndex, readLocalWorkspaceNotes, readLocalWorkspaceSnapshot, writeLocalWorkspaceIndex, writeLocalWorkspaceNotes, writeLocalWorkspaceSnapshot } from './localNotesRepository';
 import { createWorkspaceMeta, defaultWorkspaceId, readLatestWorkspaceIndex, readLatestWorkspaceNotes, subscribeToWorkspaceIndex, subscribeToWorkspaceNotes, writeWorkspaceIndex, writeWorkspaceNotes } from './notesRepository';
+import { useAuth } from '../auth/authContext';
 
 function defaultWorkspaceIndex(): WorkspaceIndex {
   return {
@@ -13,6 +14,7 @@ function defaultWorkspaceIndex(): WorkspaceIndex {
 }
 
 export function useNotesSync() {
+  const { uid } = useAuth();
   const [data, setData] = useState<NotesData>({});
   const [workspaceIndex, setWorkspaceIndex] = useState<WorkspaceIndex>(() => defaultWorkspaceIndex());
   const [loading, setLoading] = useState(true);
@@ -77,6 +79,14 @@ export function useNotesSync() {
 
     bootstrapLocalSnapshot();
 
+    if (!uid) {
+      // Unauthenticated state behaves in offline fallback mode locally
+      setLoading(false);
+      setWorkspaceLoading(false);
+      setLocalMode(true);
+      return;
+    }
+
     function cacheSnapshot(nextWorkspaceIndex: WorkspaceIndex, nextData: NotesData) {
       writeLocalWorkspaceSnapshot(nextWorkspaceIndex, nextData).catch(() => undefined);
     }
@@ -94,6 +104,7 @@ export function useNotesSync() {
     }, 8000);
 
     const unsubscribe = subscribeToWorkspaceIndex(
+      uid,
       (snapshot) => {
         if (cancelled) return;
         const remoteWorkspaceTime = Date.now();
@@ -125,6 +136,7 @@ export function useNotesSync() {
     );
 
     const unsubscribeNotes = subscribeToWorkspaceNotes(
+      uid,
       defaultWorkspaceId,
       (snapshot) => {
         if (cancelled) return;
@@ -163,15 +175,19 @@ export function useNotesSync() {
       unsubscribe();
       unsubscribeNotes();
     };
-  }, []);
+  }, [uid]);
 
   const persistWorkspaceIndex = useCallback(async (index: WorkspaceIndex) => {
     setWorkspaceIndex(index);
     try {
-      await writeWorkspaceIndex(index);
+      if (uid) {
+        await writeWorkspaceIndex(uid, index);
+        setLocalMode(false);
+      } else {
+        setLocalMode(true);
+      }
       await writeLocalWorkspaceIndex(index);
       await writeLocalWorkspaceSnapshot(index, data);
-      setLocalMode(false);
       return true;
     } catch (error) {
       console.log('FIRESTORE ERROR CODE:', (error as any).code);
@@ -183,7 +199,7 @@ export function useNotesSync() {
       setError(`Could not save to Firestore: ${(error as any).code}\n${(error as any).message}`);
       return true;
     }
-  }, [data]);
+  }, [uid, data]);
 
   const commit = useCallback(
     async (result: MutationResult) => {
@@ -195,10 +211,14 @@ export function useNotesSync() {
       setError(null);
       setData(result.data);
       try {
-        await writeWorkspaceNotes(defaultWorkspaceId, result.data);
+        if (uid) {
+          await writeWorkspaceNotes(uid, defaultWorkspaceId, result.data);
+          setLocalMode(false);
+        } else {
+          setLocalMode(true);
+        }
         await writeLocalWorkspaceNotes(defaultWorkspaceId, result.data);
         await writeLocalWorkspaceSnapshot(workspaceIndex, result.data);
-        setLocalMode(false);
         return true;
       } catch (error) {
         console.log('FIRESTORE ERROR CODE:', (error as any).code);
@@ -213,7 +233,7 @@ export function useNotesSync() {
         setSaving(false);
       }
     },
-    [workspaceIndex],
+    [uid, workspaceIndex],
   );
 
   const createWorkspace = useCallback(async (name: string) => {
@@ -300,9 +320,13 @@ export function useNotesSync() {
     setRefreshing(true);
     setError(null);
     try {
+      if (!uid) {
+        setRefreshing(false);
+        return false;
+      }
       const [indexSnapshot, notesSnapshot] = await Promise.all([
-        readLatestWorkspaceIndex(),
-        readLatestWorkspaceNotes(defaultWorkspaceId),
+        readLatestWorkspaceIndex(uid),
+        readLatestWorkspaceNotes(uid, defaultWorkspaceId),
       ]);
       setWorkspaceIndex(indexSnapshot);
       setData(notesSnapshot.data);
@@ -320,7 +344,7 @@ export function useNotesSync() {
     } finally {
       setRefreshing(false);
     }
-  }, [refreshing]);
+  }, [refreshing, uid]);
 
   return {
     data,

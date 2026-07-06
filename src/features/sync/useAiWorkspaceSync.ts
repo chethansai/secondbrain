@@ -16,8 +16,10 @@ import {
   writeLocalAiWorkspaceIndex,
   writeLocalAiWorkspaceNotes,
 } from './aiWorkspaceRepository';
+import { useAuth } from '../auth/authContext';
 
 export function useAiWorkspaceSync() {
+  const { uid } = useAuth();
   const [data, setData] = useState<NotesData>({});
   const [index, setIndex] = useState<AiWorkspaceIndex>({ documents: [], idMap: {}, activeDocumentId: null, nextNumber: 1, version: 1 });
   const [indexLoading, setIndexLoading] = useState(true);
@@ -29,7 +31,16 @@ export function useAiWorkspaceSync() {
   const activeDocument = useMemo(() => index.documents.find((document) => document.documentId === index.activeDocumentId) ?? index.documents[0] ?? null, [index]);
 
   useEffect(() => {
+    if (!uid) {
+      readLocalAiWorkspaceIndex().then((snapshot) => {
+        setIndex(snapshot);
+        setIndexLoading(false);
+        setLocalMode(true);
+      });
+      return;
+    }
     const unsubscribe = subscribeToAiWorkspaceIndex(
+      uid,
       (snapshot) => {
         setIndex(snapshot);
         setIndexLoading(false);
@@ -44,7 +55,7 @@ export function useAiWorkspaceSync() {
       },
     );
     return unsubscribe;
-  }, []);
+  }, [uid]);
 
   useEffect(() => {
     if (!index.activeDocumentId) {
@@ -52,9 +63,18 @@ export function useAiWorkspaceSync() {
       setDataLoading(false);
       return;
     }
-    setDataLoading(true);
     const documentId = index.activeDocumentId;
+    if (!uid) {
+      readLocalAiWorkspaceNotes(documentId).then((snapshot) => {
+        setData(snapshot.data);
+        setDataLoading(false);
+        setLocalMode(true);
+      });
+      return;
+    }
+    setDataLoading(true);
     const unsubscribe = subscribeToAiWorkspaceNotes(
+      uid,
       documentId,
       (snapshot) => {
         setData(snapshot.data);
@@ -70,14 +90,18 @@ export function useAiWorkspaceSync() {
       },
     );
     return unsubscribe;
-  }, [index.activeDocumentId]);
+  }, [uid, index.activeDocumentId]);
 
   const persistIndex = useCallback(async (nextIndex: AiWorkspaceIndex) => {
     setIndex(nextIndex);
     try {
-      await writeAiWorkspaceIndex(nextIndex);
+      if (uid) {
+        await writeAiWorkspaceIndex(uid, nextIndex);
+        setLocalMode(false);
+      } else {
+        setLocalMode(true);
+      }
       await writeLocalAiWorkspaceIndex(nextIndex);
-      setLocalMode(false);
       return true;
     } catch (error) {
       console.log('FIRESTORE ERROR CODE:', (error as any).code);
@@ -88,7 +112,7 @@ export function useAiWorkspaceSync() {
       setError(`Could not save to Firestore: ${(error as any).code}\n${(error as any).message}`);
       return true;
     }
-  }, []);
+  }, [uid]);
 
   const createFromJson = useCallback(async (jsonText: string) => {
     let parsed: unknown;
@@ -118,12 +142,16 @@ export function useAiWorkspaceSync() {
 
     setData(validation.data);
     try {
-      await writeAiWorkspaceNotes(documentMeta.documentId, validation.data);
-      await writeAiWorkspaceIndex(nextIndex);
+      if (uid) {
+        await writeAiWorkspaceNotes(uid, documentMeta.documentId, validation.data);
+        await writeAiWorkspaceIndex(uid, nextIndex);
+        setLocalMode(false);
+      } else {
+        setLocalMode(true);
+      }
       await writeLocalAiWorkspaceNotes(documentMeta.documentId, validation.data);
       await writeLocalAiWorkspaceIndex(nextIndex);
       setIndex(nextIndex);
-      setLocalMode(false);
       return true;
     } catch (error) {
       console.log('FIRESTORE ERROR CODE:', (error as any).code);
@@ -138,7 +166,7 @@ export function useAiWorkspaceSync() {
     } finally {
       setSaving(false);
     }
-  }, [index]);
+  }, [uid, index]);
 
   const selectDocument = useCallback(async (documentId: string) => {
     if (!index.documents.some((document) => document.documentId === documentId)) return false;
@@ -169,11 +197,15 @@ export function useAiWorkspaceSync() {
     if (!nextActiveDocumentId) setData({});
 
     try {
-      await deleteAiWorkspaceNotes(documentId);
-      await writeAiWorkspaceIndex(nextIndex);
+      if (uid) {
+        await deleteAiWorkspaceNotes(uid, documentId);
+        await writeAiWorkspaceIndex(uid, nextIndex);
+        setLocalMode(false);
+      } else {
+        setLocalMode(true);
+      }
       await deleteLocalAiWorkspaceNotes(documentId);
       await writeLocalAiWorkspaceIndex(nextIndex);
-      setLocalMode(false);
       return true;
     } catch (error) {
       console.log('FIRESTORE ERROR CODE:', (error as any).code);
@@ -187,7 +219,7 @@ export function useAiWorkspaceSync() {
     } finally {
       setSaving(false);
     }
-  }, [index]);
+  }, [uid, index]);
 
   const commit = useCallback(async (result: MutationResult) => {
     if (result.ok === false) {
@@ -210,12 +242,16 @@ export function useAiWorkspaceSync() {
     };
 
     try {
-      await writeAiWorkspaceNotes(index.activeDocumentId, result.data);
-      await writeAiWorkspaceIndex(nextIndex);
+      if (uid) {
+        await writeAiWorkspaceNotes(uid, index.activeDocumentId, result.data);
+        await writeAiWorkspaceIndex(uid, nextIndex);
+        setLocalMode(false);
+      } else {
+        setLocalMode(true);
+      }
       await writeLocalAiWorkspaceNotes(index.activeDocumentId, result.data);
       await writeLocalAiWorkspaceIndex(nextIndex);
       setIndex(nextIndex);
-      setLocalMode(false);
       return true;
     } catch (error) {
       console.log('FIRESTORE ERROR CODE:', (error as any).code);
@@ -230,18 +266,22 @@ export function useAiWorkspaceSync() {
     } finally {
       setSaving(false);
     }
-  }, [index]);
+  }, [uid, index]);
 
   const refresh = useCallback(async () => {
     if (refreshing) return false;
     setRefreshing(true);
     setError(null);
     try {
-      const nextIndex = await readLatestAiWorkspaceIndex();
+      if (!uid) {
+        setRefreshing(false);
+        return false;
+      }
+      const nextIndex = await readLatestAiWorkspaceIndex(uid);
       setIndex(nextIndex);
       await writeLocalAiWorkspaceIndex(nextIndex);
       if (nextIndex.activeDocumentId) {
-        const snapshot = await readLatestAiWorkspaceNotes(nextIndex.activeDocumentId);
+        const snapshot = await readLatestAiWorkspaceNotes(uid, nextIndex.activeDocumentId);
         setData(snapshot.data);
         await writeLocalAiWorkspaceNotes(nextIndex.activeDocumentId, snapshot.data);
       }
@@ -254,7 +294,7 @@ export function useAiWorkspaceSync() {
     } finally {
       setRefreshing(false);
     }
-  }, [refreshing]);
+  }, [refreshing, uid]);
 
   return {
     data,

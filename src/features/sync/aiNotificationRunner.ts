@@ -7,6 +7,21 @@ import { formatAiReviewRequestError, requestAiText } from '../ai/aiReviewService
 import { mergeAndWriteAiNotifications, readAiNotifications, readLocalAiNotifications, writeLocalAiNotifications } from './aiNotificationsRepository';
 import { readLocalWorkspaceNotes } from './localNotesRepository';
 import { defaultWorkspaceId, readWorkspaceNotes } from './notesRepository';
+import { firebaseAuth } from './firebase';
+
+export async function getActiveUserUid(): Promise<string | null> {
+  if (firebaseAuth.currentUser) return firebaseAuth.currentUser.uid;
+  return new Promise((resolve) => {
+    const unsubscribe = firebaseAuth.onAuthStateChanged((user) => {
+      unsubscribe();
+      resolve(user?.uid ?? null);
+    });
+    setTimeout(() => {
+      unsubscribe();
+      resolve(firebaseAuth.currentUser?.uid ?? null);
+    }, 3000);
+  });
+}
 
 export const aiNotificationBackgroundTaskName = 'rnnotetaking-ai-notifications';
 const notificationChannelId = 'ai-notifications';
@@ -226,7 +241,8 @@ export async function cancelScheduledAiPlaceholderNotifications() {
 
 export async function processDueAiNotifications() {
   console.log('[AI BACKGROUND] Headless task started - processing due jobs');
-  const state = await readNotificationStateForRunner();
+  const uid = await getActiveUserUid();
+  const state = await readNotificationStateForRunner(uid);
   const now = Date.now();
   const dueJobs = state.jobs.filter((job) => job.status === 'scheduled' && new Date(job.scheduledAt).getTime() <= now && !processingJobIds.has(job.id));
   if (!dueJobs.length) {
@@ -234,7 +250,7 @@ export async function processDueAiNotifications() {
     return { state, processed: 0 };
   }
 
-  const latestState = await readNotificationStateForRunner();
+  const latestState = await readNotificationStateForRunner(uid);
   const refreshedDueJobs = latestState.jobs.filter((job) => job.status === 'scheduled' && new Date(job.scheduledAt).getTime() <= now && !processingJobIds.has(job.id));
   let nextState = latestState;
   let processed = 0;
@@ -242,7 +258,7 @@ export async function processDueAiNotifications() {
     console.log(`[AI BACKGROUND] Processing job ${job.id}`);
     processingJobIds.add(job.id);
     try {
-      nextState = await processAiNotificationJob(job, nextState);
+      nextState = await processAiNotificationJob(uid, job, nextState);
       processed += 1;
       console.log(`[AI BACKGROUND] Job ${job.id} completed successfully`);
     } catch (error) {
@@ -255,14 +271,14 @@ export async function processDueAiNotifications() {
   return { state: nextState, processed };
 }
 
-async function processAiNotificationJob(job: AiNotificationJob, state: AiNotificationState) {
+async function processAiNotificationJob(uid: string | null, job: AiNotificationJob, state: AiNotificationState) {
   console.log(`[AI BACKGROUND] Starting AI request for job ${job.id}`);
   let nextState = updateJob(state, job.id, { status: 'running', updatedAt: new Date().toISOString(), error: undefined });
-  await writeNotificationStateForRunner(nextState);
+  await writeNotificationStateForRunner(uid, nextState);
   let result: string | undefined;
   let errorMsg: string | undefined;
   try {
-    const data = await readNotificationDocument(job.documentId);
+    const data = await readNotificationDocument(uid, job.documentId);
     console.log(`[AI BACKGROUND] Fetched data for job ${job.id}, calling AI...`);
     result = cleanResult(await requestAiText(buildNotificationPrompt(job.prompt, data)));
     console.log(`[AI BACKGROUND] AI response received for job ${job.id}`);
@@ -277,7 +293,7 @@ async function processAiNotificationJob(job: AiNotificationJob, state: AiNotific
     now, 
     failed: !!errorMsg 
   }));
-  await writeNotificationStateForRunner(nextState);
+  await writeNotificationStateForRunner(uid, nextState);
   await cancelNativeAiNotification(job.nativeNotificationId);
   const finalTitle = job.title + (errorMsg ? ' failed' : '');
   const finalBody = errorMsg || result || 'Processing complete.';
@@ -288,28 +304,38 @@ async function processAiNotificationJob(job: AiNotificationJob, state: AiNotific
   return nextState;
 }
 
-async function readNotificationStateForRunner() {
+async function readNotificationStateForRunner(uid: string | null) {
   try {
-    const state = await readAiNotifications();
-    await writeLocalAiNotifications(state);
-    return state;
+    if (uid) {
+      const state = await readAiNotifications(uid);
+      await writeLocalAiNotifications(state);
+      return state;
+    }
+    return readLocalAiNotifications();
   } catch {
     return readLocalAiNotifications();
   }
 }
 
-async function writeNotificationStateForRunner(state: AiNotificationState) {
-  await mergeAndWriteAiNotifications(state).catch(() => writeLocalAiNotifications(state));
+async function writeNotificationStateForRunner(uid: string | null, state: AiNotificationState) {
+  if (uid) {
+    await mergeAndWriteAiNotifications(uid, state).catch(() => writeLocalAiNotifications(state));
+  } else {
+    await writeLocalAiNotifications(state);
+  }
 }
 
-async function readNotificationDocument(documentId: string): Promise<NotesData> {
-  if (documentId === 'main') return readMainNotesData();
-  return readMainNotesData();
+async function readNotificationDocument(uid: string | null, documentId: string): Promise<NotesData> {
+  if (documentId === 'main') return readMainNotesData(uid);
+  return readMainNotesData(uid);
 }
 
-async function readMainNotesData(): Promise<NotesData> {
+async function readMainNotesData(uid: string | null): Promise<NotesData> {
   try {
-    return (await readWorkspaceNotes(defaultWorkspaceId)).data;
+    if (uid) {
+      return (await readWorkspaceNotes(uid, defaultWorkspaceId)).data;
+    }
+    return (await readLocalWorkspaceNotes(defaultWorkspaceId)).data;
   } catch {
     return (await readLocalWorkspaceNotes(defaultWorkspaceId)).data;
   }

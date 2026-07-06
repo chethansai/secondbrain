@@ -13,6 +13,7 @@ import {
   writeLocalAiNotifications,
 } from './aiNotificationsRepository';
 import { cancelNativeAiNotification, cancelNativeAiNotificationWorker, getAiNotificationBackgroundStatus, processDueAiNotifications, registerAiNotificationBackgroundTask, scheduleNativeAiNotificationPlaceholder } from './aiNotificationRunner';
+import { useAuth } from '../auth/authContext';
 
 const defaultBackgroundStatus: AiNotificationBackgroundStatus = {
   mode: 'foreground-catchup',
@@ -24,6 +25,7 @@ const defaultBackgroundStatus: AiNotificationBackgroundStatus = {
 };
 
 export function useAiNotificationsSync() {
+  const { uid } = useAuth();
   const [state, setState] = useState<AiNotificationState>(defaultAiNotificationState());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -36,7 +38,17 @@ export function useAiNotificationsSync() {
   useEffect(() => { stateRef.current = state; }, [state]);
 
   useEffect(() => {
+    if (!uid) {
+      readLocalAiNotifications().then((snapshot) => {
+        setState(snapshot);
+        setLoading(false);
+        setLocalMode(true);
+        getAiNotificationBackgroundStatus(true).then(setBackgroundStatus).catch(() => undefined);
+      });
+      return;
+    }
     const unsubscribe = subscribeToAiNotifications(
+      uid,
       (snapshot) => {
         setState(snapshot);
         setLoading(false);
@@ -55,7 +67,7 @@ export function useAiNotificationsSync() {
       },
     );
     return unsubscribe;
-  }, []);
+  }, [uid]);
 
   useEffect(() => {
     registerAiNotificationBackgroundTask()
@@ -85,8 +97,13 @@ export function useAiNotificationsSync() {
       let nextState: AiNotificationState;
       let savedRemotely = false;
       try {
-        nextState = await addAiNotificationJob(job);
-        savedRemotely = true;
+        if (uid) {
+          nextState = await addAiNotificationJob(uid, job);
+          savedRemotely = true;
+        } else {
+          nextState = { jobs: [job, ...stateRef.current.jobs], version: stateRef.current.version + 1 };
+          await writeLocalAiNotifications(nextState);
+        }
       } catch {
         nextState = { jobs: [job, ...stateRef.current.jobs], version: stateRef.current.version + 1 };
         await writeLocalAiNotifications(nextState);
@@ -105,11 +122,19 @@ export function useAiNotificationsSync() {
           version: stateRef.current.version + 1,
         };
         try {
-          const mergedState = await mergeAndWriteAiNotifications(stateWithNativeId);
-          setState(mergedState);
-          stateRef.current = mergedState;
-          setLocalMode(false);
-          setBackgroundStatus((current) => ({ ...current, localOnly: false }));
+          if (uid) {
+            const mergedState = await mergeAndWriteAiNotifications(uid, stateWithNativeId);
+            setState(mergedState);
+            stateRef.current = mergedState;
+            setLocalMode(false);
+            setBackgroundStatus((current) => ({ ...current, localOnly: false }));
+          } else {
+            await writeLocalAiNotifications(stateWithNativeId);
+            setState(stateWithNativeId);
+            stateRef.current = stateWithNativeId;
+            setLocalMode(true);
+            setBackgroundStatus((current) => ({ ...current, localOnly: true }));
+          }
         } catch {
           await writeLocalAiNotifications(stateWithNativeId);
           setState(stateWithNativeId);
@@ -123,7 +148,7 @@ export function useAiNotificationsSync() {
     } finally {
       setSaving(false);
     }
-  }, []);
+  }, [uid]);
 
   const deleteNotification = useCallback(async (jobId: string) => {
     setSaving(true);
@@ -131,11 +156,20 @@ export function useAiNotificationsSync() {
     await cancelNativeAiNotification(job?.nativeNotificationId);
     await cancelNativeAiNotificationWorker(job?.id);
     try {
-      const nextState = await removeAiNotificationJob(jobId);
-      setState(nextState);
-      stateRef.current = nextState;
-      setLocalMode(false);
-      setBackgroundStatus((current) => ({ ...current, localOnly: false }));
+      if (uid) {
+        const nextState = await removeAiNotificationJob(uid, jobId);
+        setState(nextState);
+        stateRef.current = nextState;
+        setLocalMode(false);
+        setBackgroundStatus((current) => ({ ...current, localOnly: false }));
+      } else {
+        const nextState = { jobs: stateRef.current.jobs.filter((job) => job.id !== jobId), version: stateRef.current.version + 1 };
+        await writeLocalAiNotifications(nextState);
+        setState(nextState);
+        stateRef.current = nextState;
+        setLocalMode(true);
+        setBackgroundStatus((current) => ({ ...current, localOnly: true }));
+      }
       return true;
     } catch {
       const nextState = { jobs: stateRef.current.jobs.filter((job) => job.id !== jobId), version: stateRef.current.version + 1 };
@@ -148,14 +182,18 @@ export function useAiNotificationsSync() {
     } finally {
       setSaving(false);
     }
-  }, []);
+  }, [uid]);
 
   const refresh = useCallback(async () => {
     if (refreshing) return false;
     setRefreshing(true);
     setError(null);
     try {
-      const nextState = await readLatestAiNotifications();
+      if (!uid) {
+        setRefreshing(false);
+        return false;
+      }
+      const nextState = await readLatestAiNotifications(uid);
       setState(nextState);
       stateRef.current = nextState;
       await writeLocalAiNotifications(nextState);
@@ -174,7 +212,7 @@ export function useAiNotificationsSync() {
     } finally {
       setRefreshing(false);
     }
-  }, [refreshing]);
+  }, [refreshing, uid]);
 
   const runDueJobs = useCallback(() => {
     const hasDueJob = stateRef.current.jobs.some((job) => job.status === 'scheduled' && new Date(job.scheduledAt).getTime() <= Date.now());
