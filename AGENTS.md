@@ -411,6 +411,7 @@ Minimum behavior matrix to consider when touching core flows:
 
 ## history
 
+- 2026-07-06: **PHASE 1 MULTI-USER: FIREBASE AUTH INITIALIZED**. Configured Firebase Auth client initialization with AsyncStorage persistence in `src/features/sync/firebase.ts`. Created `AuthProvider` and `useAuth` hook in `src/features/auth/authContext.tsx` to expose auth states to the app context. Verified setup compiles cleanly with strict typechecking.
 - 2026-07-06: **SECURITY AUDIT & MULTI-USER TRANSITION PLAN**. Conducted a comprehensive security audit of the single-user passcode model and drafted `MULTI_USER_AUTH_AUDIT.md` detailing the Firestore multi-user schema, Firebase Auth setup, Firestore rules strategy, danger/risk register, and a 10-phase migration path (including Android native widget token sync).
 - 2026-07-04: **VOICE RECORDER DEFAULT CATEGORY & ACTIONS**. Configured voice recordings to save directly to `VOICENOTES` category by default. Refactored voice recorder settings UI buttons (Save, Delete) for better flow and alignment.
 - 2026-07-04: **TELEPROMPTER IMPLEMENTATION INTEGRATED**. Completed wiring and implementation of the floating teleprompter status bar scrolling overlay.
