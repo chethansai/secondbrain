@@ -15,9 +15,13 @@ const requiredFirebaseEnv = [
 ] as const satisfies readonly [string, string | undefined][];
 
 const getFirebaseEnv = (name: string, rawValue: string | undefined) => {
-  const value = rawValue?.trim();
+  let value = rawValue?.trim();
   if (!value) {
     throw new Error(`Missing Firebase environment variable: ${name}. Copy .env.example to .env and fill it with your Firebase project config.`);
+  }
+  // Strip wrapping double or single quotes if present
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    value = value.substring(1, value.length - 1);
   }
   return value;
 };
