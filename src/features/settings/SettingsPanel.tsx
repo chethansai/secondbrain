@@ -6,7 +6,6 @@ import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { TextInputField } from '../../shared/ui/TextInputField';
 import { NotesData, NoteItem } from '../../shared/types/notes';
-import { authTimeoutOptions, formatAuthTimeout } from '../auth/authSession';
 import { cloneItems, isCategoryNode, listAllCategories } from '../categories/categoryTree';
 import type { CategorySummary } from '../../shared/types/notes';
 import { validateNotesData } from '../sync/validation';
@@ -18,8 +17,6 @@ import { TeleprompterPermissionModal } from './TeleprompterPermissionModal';
 type Props = {
   data: NotesData;
   commit: (result: any) => Promise<boolean>;
-  authTimeoutHours: number;
-  onAuthTimeoutChange: (hours: number) => Promise<void> | void;
   onImport: (data: NotesData) => Promise<boolean> | boolean;
   teleprompterEnabled?: boolean;
   teleprompterCategories?: string[];
@@ -27,12 +24,11 @@ type Props = {
   onOpenOcr?: () => void;
 };
 
-export function SettingsPanel({ data, commit, authTimeoutHours, onAuthTimeoutChange, onImport, teleprompterEnabled, teleprompterCategories, onUpdateTeleprompterSettings, onOpenOcr }: Props) {
+export function SettingsPanel({ data, commit, onImport, teleprompterEnabled, teleprompterCategories, onUpdateTeleprompterSettings, onOpenOcr }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [importText, setImportText] = useState('');
   const [status, setStatus] = useState<string | null>(null);
-  const [authMenuOpen, setAuthMenuOpen] = useState(false);
   const [overlayPermissionGranted, setOverlayPermissionGranted] = useState(false);
   const [overlayOpacity, setOverlayOpacity] = useState(0.86);
   const [overlaySize, setOverlaySize] = useState(58);
@@ -187,33 +183,7 @@ export function SettingsPanel({ data, commit, authTimeoutHours, onAuthTimeoutCha
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.settingGroup}>
-        <Text style={styles.settingLabel}>Ask for password after</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Choose password timeout" onPress={() => setAuthMenuOpen((current) => !current)} style={styles.dropdownButton}>
-          <Text style={styles.dropdownValue}>{formatAuthTimeout(authTimeoutHours)}</Text>
-          <Icon name="chevron-down" size={16} color={colors.ink} />
-        </Pressable>
-        {authMenuOpen ? (
-          <View style={styles.dropdownMenu}>
-            {authTimeoutOptions.map((hours) => (
-              <Pressable
-                key={hours}
-                accessibilityRole="button"
-                accessibilityLabel={`Set password timeout to ${formatAuthTimeout(hours)}`}
-                onPress={async () => {
-                  await onAuthTimeoutChange(hours);
-                  setAuthMenuOpen(false);
-                  setStatus(hours === 0 ? 'Password will not be asked again automatically.' : `Password will be asked again after ${formatAuthTimeout(hours)}.`);
-                }}
-                style={[styles.dropdownOption, hours === authTimeoutHours && styles.dropdownOptionSelected]}
-              >
-                <Text style={[styles.dropdownOptionText, hours === authTimeoutHours && styles.dropdownOptionTextSelected]}>{formatAuthTimeout(hours)}</Text>
-                {hours === authTimeoutHours ? <Icon name="checkmark" size={16} color={colors.onPrimary} /> : null}
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-      </View>
+
       <View style={styles.settingGroup}>
         <Text style={styles.settingLabel}>Floating icon</Text>
         <View style={styles.overlayPanel}>

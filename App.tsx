@@ -110,14 +110,14 @@ function AppContent() {
 
   return (
     <AuthGate>
-      {({ authTimeoutHours, onAuthTimeoutChange, onLogout }) => (
-        <NotesWorkspace automationCommand={pendingAutomationCommand} onAutomationComplete={completeAutomationCommand} authTimeoutHours={authTimeoutHours} onAuthTimeoutChange={onAuthTimeoutChange} onLogout={onLogout} />
+      {({ onLogout }) => (
+        <NotesWorkspace automationCommand={pendingAutomationCommand} onAutomationComplete={completeAutomationCommand} onLogout={onLogout} />
       )}
     </AuthGate>
   );
 }
 
-function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHours, onAuthTimeoutChange, onLogout }: { automationCommand: AutomationCommand | null; onAutomationComplete: (commandKey: string) => void; authTimeoutHours: number; onAuthTimeoutChange: (hours: number) => Promise<void>; onLogout: () => void }) {
+function NotesWorkspace({ automationCommand, onAutomationComplete, onLogout }: { automationCommand: AutomationCommand | null; onAutomationComplete: (commandKey: string) => void; onLogout: () => void }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { data, workspaces, activeWorkspace, activeWorkspaceId, defaultWorkspaceId, loading, saving, refreshing, error, setError, commit, createWorkspace, selectWorkspace, setDefaultWorkspace, renameWorkspace, updateSelectedCategoryPaths, updatePinnedCategoryPaths, updatePinnedNotes, updateTeleprompterSettings, refresh } = useNotesSync();
@@ -727,7 +727,6 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   saving={saving}
                   refreshing={refreshing}
                   floatingActionsVisible={boardTopActionsVisible}
-                  authTimeoutHours={authTimeoutHours}
                   onSelectWorkspace={selectWorkspaceAndReset}
                   onSetDefaultWorkspace={setDefaultWorkspace}
                   onCreateWorkspace={() => setPromptMode('workspace')}
@@ -740,7 +739,6 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
                   onOpenAi={() => setTab('ai')}
                   onOpenAiWorkspace={() => setTab('aiWorkspace')}
                   onOpenOcr={() => openOcrModal()}
-                  onAuthTimeoutChange={onAuthTimeoutChange}
                   onLogout={onLogout}
                   onStartFloatingIcon={startFloatingIcon}
                   overlayAvailable={overlayAvailable}
@@ -817,8 +815,6 @@ function NotesWorkspace({ automationCommand, onAutomationComplete, authTimeoutHo
               <SettingsPanel
                 data={data}
                 commit={commit}
-                authTimeoutHours={authTimeoutHours}
-                onAuthTimeoutChange={onAuthTimeoutChange}
                 onImport={importData}
                 teleprompterEnabled={teleprompterEnabled}
                 teleprompterCategories={teleprompterCategoryNames}

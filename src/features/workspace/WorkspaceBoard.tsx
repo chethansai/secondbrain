@@ -22,7 +22,6 @@ type Props = {
   saving: boolean;
   refreshing: boolean;
   floatingActionsVisible: boolean;
-  authTimeoutHours: number;
   onSelectWorkspace: (workspaceId: string) => void;
   onSetDefaultWorkspace: (workspaceId: string) => void;
   onCreateWorkspace: () => void;
@@ -35,7 +34,6 @@ type Props = {
   onOpenAi: () => void;
   onOpenAiWorkspace: () => void;
   onOpenOcr?: () => void;
-  onAuthTimeoutChange: (hours: number) => Promise<void> | void;
   onLogout: () => void;
   onStartFloatingIcon: () => Promise<boolean> | boolean;
   overlayAvailable: boolean;
@@ -68,7 +66,6 @@ export function WorkspaceBoard({
   saving,
   refreshing,
   floatingActionsVisible,
-  authTimeoutHours,
   onSelectWorkspace,
   onSetDefaultWorkspace,
   onCreateWorkspace,
@@ -81,7 +78,6 @@ export function WorkspaceBoard({
   onOpenAi,
   onOpenAiWorkspace,
   onOpenOcr,
-  onAuthTimeoutChange,
   onLogout,
   onStartFloatingIcon,
   overlayAvailable,
@@ -109,8 +105,6 @@ export function WorkspaceBoard({
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
-  const [authHoursText, setAuthHoursText] = useState(formatAuthTimeoutInput(authTimeoutHours));
-  const [authHoursStatus, setAuthHoursStatus] = useState<string | null>(null);
   const [priorityMenuKey, setPriorityMenuKey] = useState<string | null>(null);
   const [categoryActionsKey, setCategoryActionsKey] = useState<string | null>(null);
   const [categorySearch, setCategorySearch] = useState('');
@@ -164,23 +158,6 @@ export function WorkspaceBoard({
     closeHeaderMenus();
     onRefresh();
   }
-
-  async function submitAuthHours() {
-    const nextHours = Number(authHoursText);
-    if (!Number.isFinite(nextHours) || nextHours <= 0) {
-      setAuthHoursText(formatAuthTimeoutInput(authTimeoutHours));
-      setAuthHoursStatus('Enter hours');
-      return;
-    }
-    const roundedHours = Math.round(nextHours);
-    await onAuthTimeoutChange(roundedHours);
-    setAuthHoursText(String(roundedHours));
-    setAuthHoursStatus('Saved');
-  }
-
-  useEffect(() => {
-    setAuthHoursText(formatAuthTimeoutInput(authTimeoutHours));
-  }, [authTimeoutHours]);
 
   useEffect(() => {
     if (!floatingActionsVisible) {
@@ -279,30 +256,7 @@ export function WorkspaceBoard({
                   <Text style={styles.headerMenuRowText} numberOfLines={1}>Logout</Text>
                 </Pressable>
 
-                <View style={styles.authTimeoutRow}>
-                  <View style={styles.authTimeoutTextBlock}>
-                    <Text style={styles.headerMenuKicker}>Password</Text>
-                    <Text style={styles.authTimeoutText} numberOfLines={1}>{formatAuthTimeout(authTimeoutHours)}</Text>
-                  </View>
-                  <TextInput
-                    accessibilityLabel="Password timeout hours"
-                    value={authHoursText}
-                    onChangeText={(text) => { setAuthHoursStatus(null); setAuthHoursText(text.replace(/[^0-9]/g, '')); }}
-                    onSubmitEditing={submitAuthHours}
-                    onBlur={() => setAuthHoursText(authHoursText || formatAuthTimeoutInput(authTimeoutHours))}
-                    keyboardType="number-pad"
-                    returnKeyType="done"
-                    placeholder={authTimeoutHours === neverAuthTimeoutHours ? 'Never' : undefined}
-                    placeholderTextColor={colors.stone}
-                    maxLength={2}
-                    selectTextOnFocus
-                    style={styles.authTimeoutInput}
-                  />
-                  <Pressable accessibilityRole="button" accessibilityLabel="Save password timeout hours" onPress={submitAuthHours} style={styles.authTimeoutSaveButton}>
-                    <Icon name="checkmark" size={12} color={colors.onPrimary} />
-                  </Pressable>
-                  {authHoursStatus ? <Text style={styles.authTimeoutStatus}>{authHoursStatus}</Text> : null}
-                </View>
+
 
                 <View style={styles.workspaceMenuWrap}>
                   <Pressable accessibilityRole="button" accessibilityLabel="Choose workspace" onPress={() => setShowWorkspaceMenu((current) => !current)} style={styles.workspaceMenuButton}>

@@ -1,12 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { ActivityIndicator, AppState, StyleSheet, Text, View, KeyboardAvoidingView, Platform, Alert, ScrollView } from 'react-native';
 import { useTheme } from '../../shared/design/ThemeProvider';
-import { clearSavedUnlock, defaultAuthTimeoutHours, markUnlocked, readAuthTimeoutHours, readShouldStartUnlocked, writeAuthTimeoutHours } from './authSession';
-import { LockScreen } from './LockScreen';
 import { useAuth } from './authContext';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { firebaseAuth } from '../sync/firebase';
-import { createUserProfile, updateUserLastLogin } from './userRepository';
+import { createUserProfile, updateUserLastLogin, createUsernameMapping, isUsernameAvailable, getEmailByUsername } from './userRepository';
 import { TextInputField } from '../../shared/ui/TextInputField';
 import { Button } from '../../shared/ui/Button';
 import { rounded, shadows, spacing, typography } from '../../shared/design/tokens';
@@ -22,79 +20,34 @@ export function AuthGate({ children }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { user, loading: firebaseLoading, logout } = useAuth();
-  const [unlocked, setUnlocked] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [authTimeoutHours, setAuthTimeoutHours] = useState(defaultAuthTimeoutHours);
 
   // Auth UI state
   const [view, setView] = useState<AuthView>('signin');
+  const [username, setUsername] = useState('');
+  const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
+  const [usernameError, setUsernameError] = useState<string | undefined>();
   const [emailError, setEmailError] = useState<string | undefined>();
   const [passwordError, setPasswordError] = useState<string | undefined>();
   const [confirmError, setConfirmError] = useState<string | undefined>();
   const [generalError, setGeneralError] = useState<string | undefined>();
   const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-    async function loadAuthSession() {
-      try {
-        const [timeoutHours, shouldStartUnlocked] = await Promise.all([
-          readAuthTimeoutHours(),
-          readShouldStartUnlocked(),
-        ]);
-        if (!mounted) return;
-        setAuthTimeoutHours(timeoutHours);
-        setUnlocked(shouldStartUnlocked);
-      } finally {
-        if (mounted) setAuthLoading(false);
-      }
-    }
-
-    loadAuthSession();
-    return () => { mounted = false; };
-  }, []);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', async (state) => {
-      if (state !== 'active') return;
-      const shouldStayUnlocked = await readShouldStartUnlocked();
-      setUnlocked(shouldStayUnlocked);
-    });
-    return () => subscription.remove();
-  }, []);
-
-  useEffect(() => {
-    if (!unlocked) return;
-    const interval = setInterval(async () => {
-      const shouldStayUnlocked = await readShouldStartUnlocked();
-      setUnlocked(shouldStayUnlocked);
-    }, 60 * 1000);
-    return () => clearInterval(interval);
-  }, [unlocked]);
-
-  async function unlock() {
-    await markUnlocked();
-    setUnlocked(true);
-  }
-
-  async function updateAuthTimeout(hours: number) {
-    const nextHours = await writeAuthTimeoutHours(hours);
-    setAuthTimeoutHours(nextHours);
-    const shouldStayUnlocked = await readShouldStartUnlocked();
-    setUnlocked(shouldStayUnlocked);
-  }
-
   const switchView = (nextView: AuthView) => {
     setView(nextView);
+    setUsername('');
+    setUsernameOrEmail('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setUsernameError(undefined);
     setEmailError(undefined);
     setPasswordError(undefined);
     setConfirmError(undefined);
     setGeneralError(undefined);
-    setPassword('');
-    setConfirmPassword('');
   };
 
   const handleSignIn = async () => {
@@ -103,8 +56,8 @@ export function AuthGate({ children }: Props) {
     setGeneralError(undefined);
 
     let valid = true;
-    if (!email.trim()) {
-      setEmailError('Email is required.');
+    if (!usernameOrEmail.trim()) {
+      setEmailError('Username or email is required.');
       valid = false;
     }
     if (!password) {
@@ -115,14 +68,25 @@ export function AuthGate({ children }: Props) {
 
     setActionLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+      let targetEmail = usernameOrEmail.trim();
+      if (!targetEmail.includes('@')) {
+        const resolvedEmail = await getEmailByUsername(targetEmail);
+        if (!resolvedEmail) {
+          setEmailError('No account found with this username.');
+          setActionLoading(false);
+          return;
+        }
+        targetEmail = resolvedEmail;
+      }
+
+      const userCredential = await signInWithEmailAndPassword(firebaseAuth, targetEmail, password);
       if (userCredential.user) {
         await updateUserLastLogin(userCredential.user.uid);
       }
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/invalid-email' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        setEmailError('Invalid email or incorrect password.');
+        setEmailError('Invalid username/email or incorrect password.');
       } else if (err.code === 'auth/wrong-password') {
         setPasswordError('Incorrect password.');
       } else {
@@ -134,16 +98,35 @@ export function AuthGate({ children }: Props) {
   };
 
   const handleSignUp = async () => {
+    setUsernameError(undefined);
     setEmailError(undefined);
     setPasswordError(undefined);
     setConfirmError(undefined);
     setGeneralError(undefined);
 
     let valid = true;
-    if (!email.trim()) {
-      setEmailError('Email is required.');
+    const cleanUsername = username.trim();
+    const cleanEmail = email.trim();
+
+    if (!cleanUsername) {
+      setUsernameError('Username is required.');
+      valid = false;
+    } else if (cleanUsername.length < 3) {
+      setUsernameError('Username must be at least 3 characters.');
+      valid = false;
+    } else if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
+      setUsernameError('Username can only contain letters, numbers, and underscores.');
       valid = false;
     }
+
+    if (!cleanEmail) {
+      setEmailError('Email is required.');
+      valid = false;
+    } else if (!cleanEmail.includes('@')) {
+      setEmailError('Invalid email format.');
+      valid = false;
+    }
+
     if (password.length < 6) {
       setPasswordError('Password must be at least 6 characters.');
       valid = false;
@@ -156,9 +139,17 @@ export function AuthGate({ children }: Props) {
 
     setActionLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
+      const available = await isUsernameAvailable(cleanUsername);
+      if (!available) {
+        setUsernameError('Username is already taken.');
+        setActionLoading(false);
+        return;
+      }
+
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, cleanEmail, password);
       if (userCredential.user) {
-        await createUserProfile(userCredential.user.uid, email.trim());
+        await createUsernameMapping(cleanUsername, cleanEmail, userCredential.user.uid);
+        await createUserProfile(userCredential.user.uid, cleanEmail, cleanUsername);
       }
       Alert.alert('Success', 'Account created successfully.');
       switchView('signin');
@@ -180,14 +171,25 @@ export function AuthGate({ children }: Props) {
     setEmailError(undefined);
     setGeneralError(undefined);
 
-    if (!email.trim()) {
-      setEmailError('Email is required.');
+    let targetEmail = email.trim();
+    if (!targetEmail) {
+      setEmailError('Email or username is required.');
       return;
     }
 
     setActionLoading(true);
     try {
-      await sendPasswordResetEmail(firebaseAuth, email.trim());
+      if (!targetEmail.includes('@')) {
+        const resolvedEmail = await getEmailByUsername(targetEmail);
+        if (!resolvedEmail) {
+          setEmailError('No account found with this username.');
+          setActionLoading(false);
+          return;
+        }
+        targetEmail = resolvedEmail;
+      }
+
+      await sendPasswordResetEmail(firebaseAuth, targetEmail);
       Alert.alert('Reset Email Sent', 'Check your inbox for password reset instructions.');
       switchView('signin');
     } catch (err: any) {
@@ -204,7 +206,7 @@ export function AuthGate({ children }: Props) {
     }
   };
 
-  if (authLoading || firebaseLoading) return <AuthLoadingScreen />;
+  if (firebaseLoading) return <AuthLoadingScreen />;
 
   if (!user) {
     return (
@@ -224,14 +226,13 @@ export function AuthGate({ children }: Props) {
                 <Text style={styles.subtitle}>Sign in to sync your notes across devices.</Text>
                 {generalError && <Text style={styles.errorText}>{generalError}</Text>}
                 <TextInputField
-                  label="Email"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
+                  label="Username or Email"
+                  value={usernameOrEmail}
+                  onChangeText={setUsernameOrEmail}
                   autoCapitalize="none"
                   autoCorrect={false}
                   error={emailError}
-                  accessibilityLabel="Email"
+                  accessibilityLabel="Username or Email"
                 />
                 <TextInputField
                   label="Password"
@@ -257,6 +258,15 @@ export function AuthGate({ children }: Props) {
                 <Text style={styles.title}>Join the workspace.</Text>
                 <Text style={styles.subtitle}>Create an account to start note taking.</Text>
                 {generalError && <Text style={styles.errorText}>{generalError}</Text>}
+                <TextInputField
+                  label="Username"
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  error={usernameError}
+                  accessibilityLabel="Username"
+                />
                 <TextInputField
                   label="Email"
                   value={email}
@@ -296,17 +306,16 @@ export function AuthGate({ children }: Props) {
             {view === 'reset' && (
               <>
                 <Text style={styles.title}>Reset password.</Text>
-                <Text style={styles.subtitle}>Enter your email to receive a password reset link.</Text>
+                <Text style={styles.subtitle}>Enter your email or username to receive a password reset link.</Text>
                 {generalError && <Text style={styles.errorText}>{generalError}</Text>}
                 <TextInputField
-                  label="Email"
+                  label="Email or Username"
                   value={email}
                   onChangeText={setEmail}
-                  keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
                   error={emailError}
-                  accessibilityLabel="Email"
+                  accessibilityLabel="Email or Username"
                   onSubmitEditing={handlePasswordReset}
                 />
                 <Button label={actionLoading ? "Sending Reset Link..." : "Send Reset Link"} onPress={handlePasswordReset} disabled={actionLoading} />
@@ -319,9 +328,7 @@ export function AuthGate({ children }: Props) {
     );
   }
 
-  if (!unlocked) return <LockScreen onUnlock={unlock} />;
-
-  return <>{children({ authTimeoutHours, onAuthTimeoutChange: updateAuthTimeout, onLogout: logout })}</>;
+  return <>{children({ authTimeoutHours: 0, onAuthTimeoutChange: async () => {}, onLogout: logout })}</>;
 }
 
 function AuthLoadingScreen() {

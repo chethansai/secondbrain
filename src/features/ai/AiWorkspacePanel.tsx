@@ -302,7 +302,6 @@ export function AiWorkspacePanel() {
           saving={saving}
           refreshing={refreshing}
           floatingActionsVisible
-          authTimeoutHours={24}
           onSelectWorkspace={selectAiDocument}
           onSetDefaultWorkspace={() => undefined}
           onCreateWorkspace={() => undefined}
@@ -314,7 +313,6 @@ export function AiWorkspacePanel() {
           onOpenAiNotifications={() => undefined}
           onOpenAi={() => undefined}
           onOpenAiWorkspace={() => undefined}
-          onAuthTimeoutChange={() => undefined}
           onLogout={() => undefined}
           onStartFloatingIcon={() => false}
           overlayAvailable={false}
